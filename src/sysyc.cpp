@@ -23,6 +23,7 @@ int main(int argc, char **argv) {
   CommonTokenStream tokens(&lexer);
   SysYParser parser(&tokens);
   SysYParser::FuncRParamsContext *params = parser.funcRParams();
+  
   ASTPrinter printer;
   printer.visitFuncRParams(params);
 
