@@ -1,12 +1,13 @@
 #include "ASTPrinter.h"
+#include "tree/ParseTreeWalker.h"
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
 using namespace std;
 using namespace antlr4;
+#include "SysYFormatter.h"
 #include "SysYLexer.h"
 #include "SysYParser.h"
-#include "ASTPrinter.h"
 
 int main(int argc, char **argv) {
   if (argc != 2) {
@@ -22,10 +23,13 @@ int main(int argc, char **argv) {
   SysYLexer lexer(&input);
   CommonTokenStream tokens(&lexer);
   SysYParser parser(&tokens);
-  SysYParser::FuncRParamsContext *params = parser.funcRParams();
-  
-  ASTPrinter printer;
-  printer.visitFuncRParams(params);
+  auto module = parser.module();
+  // tree::ParseTreeWalker walker;
+  // SysYASTPrinter printer(cout);
+  // cout << module->getText() << '\n';
+  // walker.walk(&printer, module);
+  SysYFormatter formatter(cout);
+  formatter.visitModule(module);
 
   return EXIT_SUCCESS;
 }

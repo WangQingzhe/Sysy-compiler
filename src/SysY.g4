@@ -4,33 +4,165 @@ grammar SysY;
 /* Lexer rules                                     */
 /*===-------------------------------------------===*/
 
-Comma: ',';
+// fragments
 
-fragment Decimal: [0-9];
-fragment Octal: [0-7];
-fragment Heximal: [0-9a-fA-F];
-fragment NonZeroDecimal: [1-9];
+// keywords
+CONST: 'const';
+INT: 'int';
+FLOAT: 'float';
+VOID: 'void';
+IF: 'if';
+ELSE: 'else';
+WHILE: 'while';
+BREAK: 'break';
+CONTINUE: 'continue';
+RETURN: 'return';
 
-IntConst: NonZeroDecimal Decimal*
-        | '0' Octal+
-		| ('0x' | '0X') Heximal+;
+// operators
+ASSIGN: '=';
+ADD: '+';
+SUB: '-';
+MUL: '*';
+DIV: '/';
+MODULO: '%';
+LT: '<';
+GT: '>';
+LE: '<=';
+GE: '>=';
+EQ: '==';
+NE: '!=';
+AND: '&&';
+OR: '||';
+NOT: '!';
 
-String: '"' (ESC | .)*? '"';
+// punctuations
+LPAREN: '(';
+RPAREN: ')';
+LBRACKET: '[';
+RBRACKET: ']';
+LBRACE: '{';
+RBRACE: '}';
+COMMA: ',';
+SEMICOLON: ';';
 
+// identifier
+fragment ALPHA: [a-zA-Z];
+fragment ALPHANUM: [a-zA-Z0-9];
+fragment NONDIGIT: [a-zA-Z_];
+ID: NONDIGIT (ALPHANUM | '_')*;
+
+// literals
+fragment DecDigit: [0-9];
+fragment OctDigit: [0-7];
+fragment HexDigit: [0-9a-fA-F];
+fragment OctPrefix: '0';
+fragment HexPrefix: '0' [xX];
+fragment NonZeroDecDigit: [1-9];
+fragment Sign: [+-];
+fragment DecFractional: DecDigit* '.' DecDigit+ | DecDigit+ '.';
+fragment Exponent: [eE] Sign? DecDigit+;
+fragment DecFloat: DecFractional Exponent? | DecDigit+ Exponent;
+fragment HexFractional: HexDigit* '.' HexDigit+ | HexDigit+ '.';
+fragment BinExponent: [pP] Sign? DecDigit+;
+fragment HexFloat:
+	HexPrefix HexFractional BinExponent
+	| HexDigit+ BinExponent;
+
+ILITERAL:
+	NonZeroDecDigit DecDigit*
+	| OctPrefix OctDigit*
+	| HexPrefix HexDigit+;
+
+FLITERAL: DecFloat | HexFloat;
+
+// string
 fragment ESC: '\\"' | '\\\\';
+STRING: '"' (ESC | .)*? '"';
 
+// white space and comments
 WS: [ \t\r\n] -> skip;
-
-LINE_COMMENT: '//' .*? '\r'? '\n' -> skip;
-COMMENT: '/*' .*? '*/' -> skip;
+LINECOMMENT: '//' .*? '\r'? '\n' -> skip;
+BLOCKCOMMENT: '/*' .*? '*/' -> skip;
 
 /*===-------------------------------------------===*/
 /* Syntax rules                                    */
 /*===-------------------------------------------===*/
 
-funcRParams: funcRParam (Comma funcRParam)* EOF;
+module: (decl | func)+;
 
-funcRParam: number # expAsRParam | string # stringAsRParam;
+// constDecl and varDecl shares the same syntax structure, except that constDecl must have constant
+// initial values. We combine these two syntax rules, and ensure the constraint above at the
+// semantic check phase.
+decl: CONST? btype varDef (COMMA varDef)* SEMICOLON;
 
-number: IntConst;
-string: String;
+btype: INT | FLOAT;
+
+varDef: lValue (ASSIGN initValue)?;
+
+initValue:
+	exp											# scalarInitValue
+	| LBRACE (initValue (COMMA initValue)*)?	# arrayInitValue;
+
+func: funcType ID LPAREN funcFParams? RPAREN blockStmt;
+
+funcType: VOID | INT | FLOAT;
+
+funcFParams: funcFParam (COMMA funcFParam)*;
+
+funcFParam:
+	btype ID (LBRACKET RBRACKET (LBRACKET exp RBRACKET)*)?;
+
+blockStmt: LBRACE blockItem* RBRACE;
+
+blockItem: decl | stmt;
+
+stmt:
+	assignStmt
+	| expStmt
+	| ifStmt
+	| whileStmt
+	| breakStmt
+	| continueStmt
+	| returnStmt
+	| blockStmt
+	| emptyStmt;
+
+assignStmt: lValue ASSIGN exp SEMICOLON;
+
+expStmt: exp SEMICOLON;
+
+ifStmt: IF LPAREN exp RPAREN stmt (ELSE stmt)?;
+
+whileStmt: WHILE LPAREN exp RPAREN stmt;
+
+breakStmt: BREAK SEMICOLON;
+
+continueStmt: CONTINUE SEMICOLON;
+
+returnStmt: RETURN exp? SEMICOLON;
+
+emptyStmt: SEMICOLON;
+
+exp:
+	LPAREN exp RPAREN				# parenExp
+	| lValue						# lValueExp
+	| number						# numberExp
+	| string						# stringExp
+	| call							# callExp
+	| (ADD | SUB | NOT) exp			# unaryExp
+	| exp (MUL | DIV | MODULO) exp	# multiplicativeExp
+	| exp (ADD | SUB) exp			# additiveExp
+	| exp (LT | GT | LE | GE) exp	# relationExp
+	| exp (EQ | NE) exp				# equalExp
+	| exp AND exp					# andExp
+	| exp OR exp					# orExp;
+
+call: ID LPAREN funcRParams? RPAREN;
+
+lValue: ID (LBRACKET exp RBRACKET)*;
+
+number: ILITERAL | FLITERAL;
+
+string: STRING;
+
+funcRParams: exp (COMMA exp)*;
