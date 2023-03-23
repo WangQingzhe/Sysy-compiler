@@ -78,7 +78,7 @@ class PointerType : public Type {
 private:
   Type *baseType;
 
-protected:
+public:
   PointerType(Type *baseType) : Type(kPointer), baseType(baseType) {}
 
 public:
@@ -93,7 +93,7 @@ private:
   Type *returnType;
   std::vector<Type *> paramTypes;
 
-protected:
+public:
   FunctionType(Type *returnType) : Type(kFunction), returnType(returnType) {}
   FunctionType(Type *returnType, const std::vector<Type *> &paramTypes = {})
       : Type(kFunction), returnType(returnType), paramTypes(paramTypes) {}
@@ -611,7 +611,7 @@ public:
   };
   GlobalValue *addGlobalValue(Type *type, const std::vector<Value *> &dims = {},
                               const std::string &name = "") {
-    globals.emplace_back(type, dims, name);
+    globals.emplace_back(new GlobalValue(type, dims, name));
     return globals.back().get();
   }
 }; // class Module

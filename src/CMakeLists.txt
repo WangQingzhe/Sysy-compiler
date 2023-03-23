@@ -15,6 +15,7 @@ target_link_libraries(SysYParser PUBLIC antlr4_shared)
 add_executable(sysyc
   sysyc.cpp
   SysYFormatter.cpp
+  IR.cpp
 )
 target_include_directories(sysyc PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(sysyc PRIVATE SysYParser)

@@ -5,31 +5,14 @@
 #include <iterator>
 #include <map>
 #include <memory>
-#include <unordered_set>
+#include <set>
 #include <vector>
 
-namespace std {
+namespace sysy {
 
 //===----------------------------------------------------------------------===//
 // Types
 //===----------------------------------------------------------------------===//
-
-template <> struct hash<sysy::FunctionType> {
-  size_t operator()(const sysy::FunctionType &type) {
-    auto num = 1 + type.getNumParams();
-    vector<sysy::Type *> buffer(1, type.getReturnType());
-    copy(type.getParamTypes().begin(), type.getParamTypes().end(),
-         back_inserter(buffer));
-    string bytes(reinterpret_cast<char *>(buffer.data()),
-                 buffer.size() * sizeof(sysy::Type *));
-    hash<string> hasher;
-    return hasher(bytes);
-  }
-};
-
-} // namespace std
-
-namespace sysy {
 
 Type *Type::getIntType() {
   static Type intType(kInt);
@@ -68,9 +51,18 @@ PointerType *PointerType::get(Type *baseType) {
   return &(result.first->second);
 }
 
+bool operator<(const FunctionType &lhs, const FunctionType &rhs) {
+  return lhs.getReturnType() < rhs.getReturnType() or
+         lhs.getParamTypes().size() < rhs.getParamTypes().size() and
+             std::lexicographical_compare(lhs.getParamTypes().begin(),
+                                          lhs.getParamTypes().end(),
+                                          rhs.getParamTypes().begin(),
+                                          rhs.getParamTypes().end());
+}
+
 FunctionType *FunctionType::get(Type *returnType,
                                 const std::vector<Type *> &paramTypes) {
-  static std::unordered_set<FunctionType> functionTypes;
+  static std::set<FunctionType> functionTypes;
   auto result = functionTypes.emplace(returnType, paramTypes);
   // STL set objects are immutable, sothe emplace method returns const_iterator.
   // We are sure FunctionType pointers cannot be used to mutate the underlying
