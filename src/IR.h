@@ -75,10 +75,10 @@ public:
 }; // class Type
 
 class PointerType : public Type {
-private:
+protected:
   Type *baseType;
 
-public:
+protected:
   PointerType(Type *baseType) : Type(kPointer), baseType(baseType) {}
 
 public:
@@ -93,8 +93,7 @@ private:
   Type *returnType;
   std::vector<Type *> paramTypes;
 
-public:
-  FunctionType(Type *returnType) : Type(kFunction), returnType(returnType) {}
+protected:
   FunctionType(Type *returnType, const std::vector<Type *> &paramTypes = {})
       : Type(kFunction), returnType(returnType), paramTypes(paramTypes) {}
 

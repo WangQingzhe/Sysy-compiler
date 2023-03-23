@@ -4,8 +4,8 @@
 #include <cstddef>
 #include <iterator>
 #include <map>
-#include <memory>
 #include <set>
+#include <memory>
 #include <vector>
 
 namespace sysy {
@@ -46,9 +46,11 @@ Type *Type::getFunctionType(Type *returnType,
 }
 
 PointerType *PointerType::get(Type *baseType) {
-  static std::map<Type *, PointerType> pointerTypes;
-  auto result = pointerTypes.try_emplace(baseType, baseType);
-  return &(result.first->second);
+  static std::map<Type *, std::unique_ptr<PointerType>> pointerTypes;
+  auto type = new PointerType(baseType);
+  assert(type);
+  auto result = pointerTypes.try_emplace(baseType, type);
+  return result.first->second.get();
 }
 
 bool operator<(const FunctionType &lhs, const FunctionType &rhs) {
@@ -62,12 +64,11 @@ bool operator<(const FunctionType &lhs, const FunctionType &rhs) {
 
 FunctionType *FunctionType::get(Type *returnType,
                                 const std::vector<Type *> &paramTypes) {
-  static std::set<FunctionType> functionTypes;
-  auto result = functionTypes.emplace(returnType, paramTypes);
-  // STL set objects are immutable, sothe emplace method returns const_iterator.
-  // We are sure FunctionType pointers cannot be used to mutate the underlying
-  // FunctionType object because all FunctionType methods are const methods.
-  return const_cast<FunctionType *>(&(*result.first));
+  static std::set<std::unique_ptr<FunctionType>> functionTypes;
+  auto type = new FunctionType(returnType, paramTypes);
+  assert(type);
+  auto result = functionTypes.emplace(type);
+  return result.first->get();
 }
 
 void Value::replaceAllUsesWith(Value *value) {
