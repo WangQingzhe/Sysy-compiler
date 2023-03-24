@@ -12,6 +12,7 @@ private:
   BasicBlock::iterator position;
 
 public:
+  IRBuilder() = default;
   IRBuilder(BasicBlock *block) : block(block), position(block->end()) {}
   IRBuilder(BasicBlock *block, BasicBlock::iterator position)
       : block(block), position(position) {}
@@ -19,6 +20,10 @@ public:
 public:
   BasicBlock *getBasicBlock() const { return block; }
   BasicBlock::iterator getPosition() const { return position; }
+  void setPosition(BasicBlock *block, BasicBlock::iterator position) {
+    this->block = block;
+    this->position = position;
+  }
   void setPosition(BasicBlock::iterator position) { this->position = position; }
 
 public:

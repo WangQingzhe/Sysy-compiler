@@ -5,6 +5,7 @@
 #include <cstring>
 #include <iterator>
 #include <list>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -597,21 +598,39 @@ public:
 
 class Module {
 protected:
-  std::list<std::unique_ptr<Function>> functions;
-  std::list<std::unique_ptr<GlobalValue>> globals;
+  std::map<std::string, std::unique_ptr<Function>> functions;
+  std::map<std::string, std::unique_ptr<GlobalValue>> globals;
+  // std::list<std::unique_ptr<Function>> functions;
+  // std::list<std::unique_ptr<GlobalValue>> globals;
 
 public:
   Module() = default;
 
 public:
-  Function *addFunction(Type *type, const std::string &name) {
-    functions.emplace_back(new Function(type, name));
-    return functions.back().get();
+  Function *createFunction(const std::string &name, Type *type) {
+    auto result = functions.try_emplace(name, new Function(type, name));
+    if (not result.second)
+      return nullptr;
+    return result.first->second.get();
   };
-  GlobalValue *addGlobalValue(Type *type, const std::vector<Value *> &dims = {},
-                              const std::string &name = "") {
-    globals.emplace_back(new GlobalValue(type, dims, name));
-    return globals.back().get();
+  GlobalValue *createGlobalValue(const std::string &name, Type *type,
+                                 const std::vector<Value *> &dims = {}) {
+    auto result = globals.try_emplace(name, new GlobalValue(type, dims, name));
+    if (not result.second)
+      return nullptr;
+    return result.first->second.get();
+  }
+  Function *getFunction(const std::string &name) const {
+    auto result = functions.find(name);
+    if (result == functions.end())
+      return nullptr;
+    return result->second.get();
+  }
+  GlobalValue *getGlobalValue(const std::string &name) const {
+    auto result = globals.find(name);
+    if (result == globals.end())
+      return nullptr;
+    return result->second.get();
   }
 }; // class Module
 
