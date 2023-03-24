@@ -52,7 +52,7 @@ PointerType *PointerType::get(Type *baseType) {
     return iter->second.get();
   auto type = new PointerType(baseType);
   assert(type);
-  auto result = pointerTypes.try_emplace(baseType, type);
+  auto result = pointerTypes.emplace(baseType, type);
   return result.first->second.get();
 }
 
@@ -84,16 +84,25 @@ void Value::replaceAllUsesWith(Value *value) {
 }
 
 ConstantValue *ConstantValue::getInt(int value, const std::string &name) {
-  static std::map<int, Value *> intConstants;
-
+  static std::map<int, std::unique_ptr<ConstantValue>> intConstants;
+  auto iter = intConstants.find(value);
+  if (iter != intConstants.end())
+    return iter->second.get();
   auto inst = new ConstantValue(value);
   assert(inst);
-  return inst;
+  auto result = intConstants.emplace(value, inst);
+  return result.first->second.get();
 }
+
 ConstantValue *ConstantValue::getFloat(float value, const std::string &name) {
+  static std::map<float, std::unique_ptr<ConstantValue>> floatConstants;
+  auto iter = floatConstants.find(value);
+  if (iter != floatConstants.end())
+    return iter->second.get();
   auto inst = new ConstantValue(value);
   assert(inst);
-  return inst;
+  auto result = floatConstants.emplace(value, inst);
+  return result.first->second.get();
 }
 
 void User::setOperand(int index, Value *value) {
