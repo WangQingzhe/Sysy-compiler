@@ -27,14 +27,6 @@ public:
   void setPosition(BasicBlock::iterator position) { this->position = position; }
 
 public:
-  CallInst *createCallInst(Function *callee,
-                           const std::vector<Value *> args = {},
-                           const std::string &name = "") {
-    auto inst = new CallInst(callee, args, block, name);
-    assert(inst);
-    block->getInstructions().emplace(position, inst);
-    return inst;
-  }
   UnaryInst *createUnaryInst(Instruction::Kind kind, Type *type, Value *operand,
                              const std::string &name = "") {
 
@@ -43,12 +35,142 @@ public:
     block->getInstructions().emplace(position, inst);
     return inst;
   }
+  UnaryInst *createNegInst(Value *operand, const std::string &name = "") {
+    return createUnaryInst(Instruction::kNeg, Type::getIntType(), operand,
+                           name);
+  }
+  UnaryInst *createNotInst(Value *operand, const std::string &name = "") {
+    return createUnaryInst(Instruction::kNot, Type::getIntType(), operand,
+                           name);
+  }
+  UnaryInst *createFtoIInst(Value *operand, const std::string &name = "") {
+    return createUnaryInst(Instruction::kFtoI, Type::getIntType(), operand,
+                           name);
+  }
+  UnaryInst *createFNegInst(Value *operand, const std::string &name = "") {
+    return createUnaryInst(Instruction::kFNeg, Type::getFloatType(), operand,
+                           name);
+  }
+  UnaryInst *createIToFInst(Value *operand, const std::string &name = "") {
+    return createUnaryInst(Instruction::kIToF, Type::getFloatType(), operand,
+                           name);
+  }
   BinaryInst *createBinaryInst(Instruction::Kind kind, Type *type, Value *lhs,
                                Value *rhs, const std::string &name = "") {
     auto inst = new BinaryInst(kind, type, lhs, rhs, block, name);
     assert(inst);
     block->getInstructions().emplace(position, inst);
     return inst;
+  }
+  BinaryInst *createAddInst(Value *lhs, Value *rhs,
+                            const std::string &name = "") {
+    return createBinaryInst(Instruction::kAdd, Type::getIntType(), lhs, rhs,
+                            name);
+  }
+  BinaryInst *createSubInst(Value *lhs, Value *rhs,
+                            const std::string &name = "") {
+    return createBinaryInst(Instruction::kSub, Type::getIntType(), lhs, rhs,
+                            name);
+  }
+  BinaryInst *createMulInst(Value *lhs, Value *rhs,
+                            const std::string &name = "") {
+    return createBinaryInst(Instruction::kMul, Type::getIntType(), lhs, rhs,
+                            name);
+  }
+  BinaryInst *createDivInst(Value *lhs, Value *rhs,
+                            const std::string &name = "") {
+    return createBinaryInst(Instruction::kDiv, Type::getIntType(), lhs, rhs,
+                            name);
+  }
+  BinaryInst *createRemInst(Value *lhs, Value *rhs,
+                            const std::string &name = "") {
+    return createBinaryInst(Instruction::kRem, Type::getIntType(), lhs, rhs,
+                            name);
+  }
+  BinaryInst *createICmpEQInst(Value *lhs, Value *rhs,
+                               const std::string &name = "") {
+    return createBinaryInst(Instruction::kICmpEQ, Type::getIntType(), lhs, rhs,
+                            name);
+  }
+  BinaryInst *createICmpNEInst(Value *lhs, Value *rhs,
+                               const std::string &name = "") {
+    return createBinaryInst(Instruction::kICmpNE, Type::getIntType(), lhs, rhs,
+                            name);
+  }
+  BinaryInst *createICmpLTInst(Value *lhs, Value *rhs,
+                               const std::string &name = "") {
+    return createBinaryInst(Instruction::kICmpLT, Type::getIntType(), lhs, rhs,
+                            name);
+  }
+  BinaryInst *createICmpLEInst(Value *lhs, Value *rhs,
+                               const std::string &name = "") {
+    return createBinaryInst(Instruction::kICmpLE, Type::getIntType(), lhs, rhs,
+                            name);
+  }
+  BinaryInst *createICmpGTInst(Value *lhs, Value *rhs,
+                               const std::string &name = "") {
+    return createBinaryInst(Instruction::kICmpGT, Type::getIntType(), lhs, rhs,
+                            name);
+  }
+  BinaryInst *createICmpGEInst(Value *lhs, Value *rhs,
+                               const std::string &name = "") {
+    return createBinaryInst(Instruction::kICmpGE, Type::getIntType(), lhs, rhs,
+                            name);
+  }
+  BinaryInst *createFAddInst(Value *lhs, Value *rhs,
+                             const std::string &name = "") {
+    return createBinaryInst(Instruction::kFAdd, Type::getFloatType(), lhs, rhs,
+                            name);
+  }
+  BinaryInst *createFSubInst(Value *lhs, Value *rhs,
+                             const std::string &name = "") {
+    return createBinaryInst(Instruction::kFSub, Type::getFloatType(), lhs, rhs,
+                            name);
+  }
+  BinaryInst *createFMulInst(Value *lhs, Value *rhs,
+                             const std::string &name = "") {
+    return createBinaryInst(Instruction::kFMul, Type::getFloatType(), lhs, rhs,
+                            name);
+  }
+  BinaryInst *createFDivInst(Value *lhs, Value *rhs,
+                             const std::string &name = "") {
+    return createBinaryInst(Instruction::kFDiv, Type::getFloatType(), lhs, rhs,
+                            name);
+  }
+  BinaryInst *createFRemInst(Value *lhs, Value *rhs,
+                             const std::string &name = "") {
+    return createBinaryInst(Instruction::kFRem, Type::getFloatType(), lhs, rhs,
+                            name);
+  }
+  BinaryInst *createFCmpEQInst(Value *lhs, Value *rhs,
+                               const std::string &name = "") {
+    return createBinaryInst(Instruction::kFCmpEQ, Type::getFloatType(), lhs,
+                            rhs, name);
+  }
+  BinaryInst *createFCmpNEInst(Value *lhs, Value *rhs,
+                               const std::string &name = "") {
+    return createBinaryInst(Instruction::kFCmpNE, Type::getFloatType(), lhs,
+                            rhs, name);
+  }
+  BinaryInst *createFCmpLTInst(Value *lhs, Value *rhs,
+                               const std::string &name = "") {
+    return createBinaryInst(Instruction::kFCmpLT, Type::getFloatType(), lhs,
+                            rhs, name);
+  }
+  BinaryInst *createFCmpLEInst(Value *lhs, Value *rhs,
+                               const std::string &name = "") {
+    return createBinaryInst(Instruction::kFCmpLE, Type::getFloatType(), lhs,
+                            rhs, name);
+  }
+  BinaryInst *createFCmpGTInst(Value *lhs, Value *rhs,
+                               const std::string &name = "") {
+    return createBinaryInst(Instruction::kFCmpGT, Type::getFloatType(), lhs,
+                            rhs, name);
+  }
+  BinaryInst *createFCmpGEInst(Value *lhs, Value *rhs,
+                               const std::string &name = "") {
+    return createBinaryInst(Instruction::kFCmpGE, Type::getFloatType(), lhs,
+                            rhs, name);
   }
   ReturnInst *createReturnInst(Value *value = nullptr) {
     auto inst = new ReturnInst(value);

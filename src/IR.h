@@ -37,6 +37,9 @@ template <typename IterT> range<IterT> make_range(IterT b, IterT e) {
 // targets.
 // 2. `PointerType` and `FunctionType` derive from `Type` and represent pointer
 // type and function type, respectively.
+//
+// NOTE `Type` and its derived classes have their ctors declared as 'protected'.
+// Users must use Type::getXXXType() methods to obtain `Type` pointers.
 //===----------------------------------------------------------------------===//
 
 class Type {
@@ -169,6 +172,36 @@ public:
   void removeUse(Use *use) { uses.remove(use); }
 }; // class Value
 
+class ConstantValue : public Value {
+  friend class IRBuilder;
+
+protected:
+  union {
+    int iConstant;
+    float fConstant;
+  };
+
+protected:
+  ConstantValue(int value, const std::string &name = "")
+      : Value(Type::getIntType(), name), iConstant(value) {}
+  ConstantValue(float value, const std::string &name = "")
+      : Value(Type::getFloatType(), name), fConstant(value) {}
+
+public:
+  static ConstantValue *getInt(int value, const std::string &name = "");
+  static ConstantValue *getFloat(float value, const std::string &name = "");
+
+public:
+  int getInt() const {
+    assert(isInt());
+    return iConstant;
+  }
+  float getFloat() const {
+    assert(isFloat());
+    return fConstant;
+  }
+}; // class ConstantValue
+
 class BasicBlock;
 class Argument : public Value {
 protected:
@@ -215,6 +248,7 @@ public:
   block_list &getSuccessors() { return successors; }
   iterator begin() { return instructions.begin(); }
   iterator end() { return instructions.end(); }
+  iterator terminator() { return std::prev(end()); }
 }; // class BasicBlock
 
 class User : public Value {
@@ -242,29 +276,6 @@ public:
   const std::string &getName() const { return name; }
 }; // class User
 
-// class Constant : public User {
-// protected:
-//   union scalar {
-//     int iConstant;
-//     float fConstant;
-//   };
-//   std::vector<int> dims;
-//   std::vector<scalar> data;
-
-// protected:
-//   Constant(Type *type, const std::string &name = "") : User(type, name) {}
-
-// public:
-//   int getInt() const {
-//     assert(isInt());
-//     return iConstant;
-//   }
-//   float getFloat() const {
-//     assert(isFloat());
-//     return fConstant;
-//   }
-// }; // class ConstantInst
-
 class Instruction : public User {
 public:
   enum Kind : uint64_t {
@@ -273,17 +284,14 @@ public:
     kAdd = 0x1UL << 0,
     kSub = 0x1UL << 1,
     kMul = 0x1UL << 2,
-    kSDiv = 0x1UL << 3,
-    kSRem = 0x1UL << 4,
+    kDiv = 0x1UL << 3,
+    kRem = 0x1UL << 4,
     kICmpEQ = 0x1UL << 5,
     kICmpNE = 0x1UL << 6,
     kICmpLT = 0x1UL << 7,
     kICmpGT = 0x1UL << 8,
     kICmpLE = 0x1UL << 9,
     kICmpGE = 0x1UL << 10,
-    kAShr = 0x1UL << 11,
-    kLShr = 0x1UL << 12,
-    kShl = 0x1UL << 13,
     kFAdd = 0x1UL << 14,
     kFSub = 0x1UL << 15,
     kFMul = 0x1UL << 16,
@@ -301,19 +309,18 @@ public:
     kFNeg = 0x1UL << 26,
     kFtoI = 0x1UL << 28,
     kIToF = 0x1UL << 29,
-    kBitCast = 0x1UL << 30,
     // call
-    kCall = 0x1UL << 33,
+    kCall = 0x1UL << 30,
     // terminator
     kCondBr = 0x1UL << 31,
     kBr = 0x1UL << 32,
-    kReturn = 0x1UL << 34,
+    kReturn = 0x1UL << 33,
     // mem op
-    kAlloca = 0x1UL << 35,
-    kLoad = 0x1UL << 36,
-    kStore = 0x1UL << 37,
+    kAlloca = 0x1UL << 34,
+    kLoad = 0x1UL << 35,
+    kStore = 0x1UL << 36,
     // constant
-    // kConstant = 0x1UL << 38,
+    // kConstant = 0x1UL << 37,
   };
 
 protected:
@@ -330,17 +337,10 @@ public:
   BasicBlock *getParent() const { return parent; }
   void setParent(BasicBlock *bb) { parent = bb; }
 
-  bool isInteger() const {
-    static constexpr uint64_t IntegerOpMask =
-        kAdd | kSub | kMul | kSDiv | kSRem | kICmpEQ | kICmpNE | kICmpLT |
-        kICmpGT | kICmpLE | kICmpGE | kAShr | kLShr | kShl | kNeg | kNot |
-        kIToF;
-    return kind & IntegerOpMask;
-  }
   bool isCmp() const {
     static constexpr uint64_t CondOpMask =
-        kICmpEQ | kICmpNE | kICmpLT | kICmpGT | kICmpLE | kICmpGE | kFCmpEQ |
-        kFCmpNE | kFCmpLT | kFCmpGT | kFCmpLE | kFCmpGE;
+        (kICmpEQ | kICmpNE | kICmpLT | kICmpGT | kICmpLE | kICmpGE) |
+        (kFCmpEQ | kFCmpNE | kFCmpLT | kFCmpGT | kFCmpLE | kFCmpGE);
     return kind & CondOpMask;
   }
   bool isTerminator() {
@@ -547,11 +547,13 @@ public:
   Value *getIndex(int index) const { return getOperand(index + 2).getValue(); }
 }; // class StoreInst
 
+class Module;
 class Function : public Value {
   friend class Module;
 
 protected:
-  Function(Type *type, const std::string &name) : Value(type, name) {
+  Function(Module *parent, Type *type, const std::string &name)
+      : Value(type, name), parent(parent), blocks() {
     blocks.emplace_back(new BasicBlock(this, "entry"));
   }
 
@@ -559,6 +561,7 @@ public:
   using block_list = std::list<std::unique_ptr<BasicBlock>>;
 
 protected:
+  Module *parent;
   block_list blocks;
 
 public:
@@ -585,9 +588,12 @@ class GlobalValue : public User {
   friend class Module;
 
 protected:
-  GlobalValue(Type *type, const std::vector<Value *> &dims = {},
-              const std::string &name = "")
-      : User(type, name) {
+  Module *parent;
+
+protected:
+  GlobalValue(Module *parent, Type *type, const std::string &name,
+              const std::vector<Value *> &dims = {})
+      : User(type, name), parent(parent) {
     addOperands(dims);
   }
 
@@ -600,22 +606,21 @@ class Module {
 protected:
   std::map<std::string, std::unique_ptr<Function>> functions;
   std::map<std::string, std::unique_ptr<GlobalValue>> globals;
-  // std::list<std::unique_ptr<Function>> functions;
-  // std::list<std::unique_ptr<GlobalValue>> globals;
 
 public:
   Module() = default;
 
 public:
   Function *createFunction(const std::string &name, Type *type) {
-    auto result = functions.try_emplace(name, new Function(type, name));
+    auto result = functions.try_emplace(name, new Function(this, type, name));
     if (not result.second)
       return nullptr;
     return result.first->second.get();
   };
   GlobalValue *createGlobalValue(const std::string &name, Type *type,
                                  const std::vector<Value *> &dims = {}) {
-    auto result = globals.try_emplace(name, new GlobalValue(type, dims, name));
+    auto result =
+        globals.try_emplace(name, new GlobalValue(this, type, name, dims));
     if (not result.second)
       return nullptr;
     return result.first->second.get();
