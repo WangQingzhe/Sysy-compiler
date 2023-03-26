@@ -1,9 +1,9 @@
 #pragma once
 
+#include "range.h"
 #include <cassert>
 #include <cstdint>
 #include <cstring>
-#include <iterator>
 #include <list>
 #include <map>
 #include <memory>
@@ -13,60 +13,7 @@
 namespace sysy {
 
 /*!
- * \defgroup range Iterator range
- * @{
- */
-
-/*!
- * \brief `range` is an simple wrapper of an iterator pair [begin, end)
- *
- * Example usage
- *
- * ```cpp
- *    vector<int> v = {1,2,3};
- *    auto rg = make_range(v);
- *    for (auto v : rg)
- *      cout << v << '\n';
- * ```
- */
-template <typename IterT> struct range {
-  using iterator = IterT;
-  using value_type = typename std::iterator_traits<iterator>::value_type;
-  using reference = typename std::iterator_traits<iterator>::reference;
-
-private:
-  iterator b;
-  iterator e;
-
-public:
-  explicit range(iterator b, iterator e) : b(b), e(e) {}
-  iterator begin() { return b; }
-  iterator end() { return e; }
-  auto size() const { return std::distance(b, e); }
-  auto empty() const { return b == e; }
-};
-
-//! create `range` object from iterator pair [begin, end)
-template <typename IterT> range<IterT> make_range(IterT b, IterT e) {
-  return range(b, e);
-}
-//! create `range` object from a container who has `begin()` and `end()` methods
-template <typename ContainerT>
-range<typename ContainerT::iterator> make_range(ContainerT &c) {
-  return make_range(c.begin(), c.end());
-}
-//! create `range` object from a container who has `begin()` and `end()` methods
-template <typename ContainerT>
-range<typename ContainerT::const_iterator> make_range(const ContainerT &c) {
-  return make_range(c.begin(), c.end());
-}
-
-/*!
- * @}
- */
-
-/*!
- * \defgroup type Type system
+ * \defgroup type Types
  * The SysY type system is quite simple.
  * 1. The base class `Type` is used to represent all primitive scalar types,
  * include `int`, `float`, `void`, and the label type representing branch
@@ -195,12 +142,6 @@ public:
  *
  * @{
  */
-
-//===----------------------------------------------------------------------===//
-// Values
-//
-// description
-//===----------------------------------------------------------------------===//
 
 class User;
 class Value;
@@ -363,7 +304,8 @@ public:
 }; // class BasicBlock
 
 //! User is the abstract base type of `Value` types which use other `Value` as
-//! operands. Currently, there are two kinds of `User`s, `Instruction` and `GlobalValue`.
+//! operands. Currently, there are two kinds of `User`s, `Instruction` and
+//! `GlobalValue`.
 class User : public Value {
 protected:
   std::vector<Use> operands;
@@ -403,10 +345,7 @@ public:
 
 /*!
  * Base of all concrete instruction types.
- *
- * Instruction
  */
-
 class Instruction : public User {
 public:
   enum Kind : uint64_t {
@@ -508,6 +447,7 @@ public:
 }; // class Instruction
 
 class Function;
+//! Function call.
 class CallInst : public Instruction {
   friend class IRBuilder;
 
@@ -522,6 +462,7 @@ public:
   }
 }; // class CallInst
 
+//! Unary instruction, includes '!', '-' and type conversion.
 class UnaryInst : public Instruction {
   friend class IRBuilder;
 
@@ -536,6 +477,7 @@ public:
   Value *getOperand() const { return User::getOperand(0); }
 }; // class UnaryInst
 
+//! Binary instruction, e.g., arithmatic, relation, logic, etc.
 class BinaryInst : public Instruction {
   friend class IRBuilder;
 
@@ -552,6 +494,7 @@ public:
   Value *getRhs() const { return getOperand(1); }
 }; // class BinaryInst
 
+//! The return statement
 class ReturnInst : public Instruction {
   friend class IRBuilder;
 
@@ -569,6 +512,7 @@ public:
   }
 }; // class ReturnInst
 
+//! Unconditional branch
 class UncondBrInst : public Instruction {
   friend class IRBuilder;
 
@@ -590,6 +534,7 @@ public:
   }
 }; // class UncondBrInst
 
+//! Conditional branch
 class CondBrInst : public Instruction {
   friend class IRBuilder;
 
@@ -626,6 +571,7 @@ public:
   }
 }; // class CondBrInst
 
+//! Allocate memory for stack variables, used for non-global variable declartion
 class AllocaInst : public Instruction {
   friend class IRBuilder;
 
@@ -642,6 +588,7 @@ public:
   Value *getDim(int index) { return getOperand(index); }
 }; // class AllocaInst
 
+//! Load a value from memory address specified by a pointer value
 class LoadInst : public Instruction {
   friend class IRBuilder;
 
@@ -664,6 +611,7 @@ public:
   Value *getIndex(int index) const { return getOperand(index + 1); }
 }; // class LoadInst
 
+//! Store a value to memory address specified by a pointer value
 class StoreInst : public Instruction {
   friend class IRBuilder;
 
@@ -688,6 +636,7 @@ public:
 }; // class StoreInst
 
 class Module;
+//! Function definition
 class Function : public Value {
   friend class Module;
 
@@ -724,6 +673,7 @@ public:
   }
 }; // class Function
 
+//! Global value declared at file scope
 class GlobalValue : public User {
   friend class Module;
 
@@ -742,6 +692,7 @@ public:
   Value *getDim(int index) { return getOperand(index); }
 }; // class GlobalValue
 
+//! IR unit for representing a SysY compile unit
 class Module {
 protected:
   std::map<std::string, std::unique_ptr<Function>> functions;
