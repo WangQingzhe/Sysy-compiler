@@ -252,7 +252,7 @@ protected:
   BasicBlock *block;
   int index;
 
-protected:
+public:
   Argument(Type *type, BasicBlock *block, int index,
            const std::string &name = "")
       : Value(type, name), block(block), index(index) {}
@@ -301,6 +301,10 @@ public:
   iterator begin() { return instructions.begin(); }
   iterator end() { return instructions.end(); }
   iterator terminator() { return std::prev(end()); }
+  Argument *createArgument(Type *type, const std::string &name = "") {
+    arguments.emplace_back(type, this, arguments.size(), name);
+    return &arguments.back();
+  };
 }; // class BasicBlock
 
 //! User is the abstract base type of `Value` types which use other `Value` as
