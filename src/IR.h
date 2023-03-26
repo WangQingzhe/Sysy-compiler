@@ -12,13 +12,33 @@
 
 namespace sysy {
 
+/*!
+ * \defgroup range Iterator range
+ * @{
+ */
+
+/*!
+ * \brief `range` is an simple wrapper of an iterator pair [begin, end)
+ *
+ * Example usage
+ *
+ * ```cpp
+ *    vector<int> v = {1,2,3};
+ *    auto rg = make_range(v);
+ *    for (auto v : rg)
+ *      cout << v << '\n';
+ * ```
+ */
 template <typename IterT> struct range {
   using iterator = IterT;
   using value_type = typename std::iterator_traits<iterator>::value_type;
   using reference = typename std::iterator_traits<iterator>::reference;
 
+private:
   iterator b;
   iterator e;
+
+public:
   explicit range(iterator b, iterator e) : b(b), e(e) {}
   iterator begin() { return b; }
   iterator end() { return e; }
@@ -26,32 +46,44 @@ template <typename IterT> struct range {
   auto empty() const { return b == e; }
 };
 
+//! create `range` object from iterator pair [begin, end)
 template <typename IterT> range<IterT> make_range(IterT b, IterT e) {
   return range(b, e);
 }
+//! create `range` object from a container who has `begin()` and `end()` methods
 template <typename ContainerT>
 range<typename ContainerT::iterator> make_range(ContainerT &c) {
   return make_range(c.begin(), c.end());
 }
+//! create `range` object from a container who has `begin()` and `end()` methods
 template <typename ContainerT>
 range<typename ContainerT::const_iterator> make_range(const ContainerT &c) {
   return make_range(c.begin(), c.end());
 }
 
-//===----------------------------------------------------------------------===//
-// Types
-//
-// The SysY type system is quite simple.
-// 1. The base class `Type` is used to represent all primitive scalar types,
-// include `int`, `float`, `void`, and the label type representing branch
-// targets.
-// 2. `PointerType` and `FunctionType` derive from `Type` and represent pointer
-// type and function type, respectively.
-//
-// NOTE `Type` and its derived classes have their ctors declared as 'protected'.
-// Users must use Type::getXXXType() methods to obtain `Type` pointers.
-//===----------------------------------------------------------------------===//
+/*!
+ * @}
+ */
 
+/*!
+ * \defgroup type Type system
+ * The SysY type system is quite simple.
+ * 1. The base class `Type` is used to represent all primitive scalar types,
+ * include `int`, `float`, `void`, and the label type representing branch
+ * targets.
+ * 2. `PointerType` and `FunctionType` derive from `Type` and represent pointer
+ * type and function type, respectively.
+ *
+ * NOTE `Type` and its derived classes have their ctors declared as 'protected'.
+ * Users must use Type::getXXXType() methods to obtain `Type` pointers.
+ * @{
+ */
+
+/*!
+ * `Type` is used to represent all primitive scalar types,
+ * include `int`, `float`, `void`, and the label type representing branch
+ * targets
+ */
 class Type {
 public:
   enum Kind {
@@ -88,6 +120,7 @@ public:
   int getSize() const;
 }; // class Type
 
+//! Pointer type
 class PointerType : public Type {
 protected:
   Type *baseType;
@@ -102,6 +135,7 @@ public:
   Type *getBaseType() const { return baseType; }
 }; // class PointerType
 
+//! Function type
 class FunctionType : public Type {
 private:
   Type *returnType;
@@ -121,6 +155,47 @@ public:
   int getNumParams() const { return paramTypes.size(); }
 }; // class FunctionType
 
+/*!
+ * @}
+ */
+
+/*!
+ * \defgroup ir IR
+ *
+ * The SysY IR is an instruction level language. The IR is orgnized
+ * as a four-level tree structure, as shown below.
+ *
+ * ```
+ * Module -- GlobalValue
+ *        |_ Function -- BasicBlock -- Instruction
+ * ```
+ *
+ * - `Module` corresponds to the top level "CompUnit" syntax structure
+ * - `GlobalValue` corresponds to the "Decl" syntax structure
+ * - `Function` corresponds to the "FuncDef" syntax structure
+ * - `BasicBlock` is a sequence of instructions without branching. A `Function`
+ *   made up by one or more `BasicBlock`s.
+ * - `Instruction` represents a primitive operation on values, e.g., add or sub.
+ *
+ * The fundamental data concept in SysY IR is `Value`. A `Value` is like
+ * a register and is used by `Instruction`s as input/output operand. Each value
+ * has an associated `Type` indicating the data type held by the value.
+ *
+ * Most `Instruction`s have a three-address signature, i.e., there are at most 2
+ * input values and at most 1 output value.
+ *
+ * The SysY IR adots a Static-Single-Assignment (SSA) design. That is, `Value`
+ * is defined (as the output operand ) by some instruction, and used (as the
+ * input operand) by other instructions. While a value can be used by multiple
+ * instructions, the `definition` occurs only once. As a result, there is a
+ * one-to-one relation between a value and the instruction defining it. In other
+ * words, any instruction defines a value can be viewed as the defined value
+ * itself. So `Instruction` is also a `Value` in SysY IR. See `Value` for the
+ * type hierachy.
+ *
+ * @{
+ */
+
 //===----------------------------------------------------------------------===//
 // Values
 //
@@ -130,7 +205,7 @@ public:
 class User;
 class Value;
 
-// `Use` represents the relation between a `Value` and its `User`
+//! `Use` represents the relation between a `Value` and its `User`
 class Use {
 public:
   enum Kind {
@@ -141,6 +216,8 @@ public:
 
 private:
   Kind kind;
+  //! the position of value in the user's operands, i.e.,
+  //! user->getOperands[index] == value
   int index;
   User *user;
   Value *value;
@@ -161,6 +238,7 @@ public:
   void setValue(Value *value) { value = value; }
 }; // class Use
 
+//! The base class of all value types
 class Value {
 protected:
   Type *type;
@@ -183,6 +261,12 @@ public:
   void removeUse(Use *use) { uses.remove(use); }
 }; // class Value
 
+/*!
+ * Static constants known at compile time.
+ *
+ * `ConstantValue`s are not defined by instructions, and do not use any other
+ * `Value`s. It's type is either `int` or `float`.
+ */
 class ConstantValue : public Value {
 protected:
   union {
@@ -212,6 +296,16 @@ public:
 }; // class ConstantValue
 
 class BasicBlock;
+/*!
+ * Arguments of `BasicBlock`s.
+ *
+ * SysY IR is an SSA language, however, it does not use PHI instructions as in
+ * LLVM IR. `Value`s from different predecessor blocks are passed explicitly as
+ * block arguments. This is also the approach used by MLIR.
+ * NOTE that `Function` does not own `Argument`s, function arguments are
+ * implemented as its entry block's arguments.
+ */
+
 class Argument : public Value {
 protected:
   BasicBlock *block;
@@ -225,6 +319,13 @@ protected:
 
 class Instruction;
 class Function;
+/*!
+ * The container for `Instruction` sequence.
+ *
+ * `BasicBlock` maintains a list of `Instruction`s, with the last one being
+ * a terminator (branch or return). Besides, `BasicBlock` stores its arguments
+ * and records its predecessor and successor `BasicBlock`s.
+ */
 class BasicBlock : public Value {
   friend class Function;
 
@@ -261,6 +362,8 @@ public:
   iterator terminator() { return std::prev(end()); }
 }; // class BasicBlock
 
+//! User is the abstract base type of `Value` types which use other `Value` as
+//! operands. Currently, there are two kinds of `User`s, `Instruction` and `GlobalValue`.
 class User : public Value {
 protected:
   std::vector<Use> operands;
@@ -297,6 +400,12 @@ public:
   void setOperand(int index, Value *value);
   const std::string &getName() const { return name; }
 }; // class User
+
+/*!
+ * Base of all concrete instruction types.
+ *
+ * Instruction
+ */
 
 class Instruction : public User {
 public:
@@ -359,25 +468,43 @@ public:
   BasicBlock *getParent() const { return parent; }
   void setParent(BasicBlock *bb) { parent = bb; }
 
-  bool isCmp() const {
-    static constexpr uint64_t CondOpMask =
+  bool isBinary() const {
+    static constexpr uint64_t BinaryOpMask =
+        (kAdd | kSub | kMul | kDiv | kRem) |
         (kICmpEQ | kICmpNE | kICmpLT | kICmpGT | kICmpLE | kICmpGE) |
+        (kFAdd | kFSub | kFMul | kFDiv | kFRem) |
         (kFCmpEQ | kFCmpNE | kFCmpLT | kFCmpGT | kFCmpLE | kFCmpGE);
-    return kind & CondOpMask;
+    return kind & BinaryOpMask;
+  }
+  bool isUnary() const {
+    static constexpr uint64_t UnaryOpMask = kNeg | kNot | kFNeg | kFtoI | kIToF;
+    return kind & UnaryOpMask;
+  }
+  bool isMemory() const {
+    static constexpr uint64_t MemoryOpMask = kAlloca | kLoad | kStore;
+    return kind & MemoryOpMask;
   }
   bool isTerminator() const {
     static constexpr uint64_t TerminatorOpMask = kCondBr | kBr | kReturn;
     return kind & TerminatorOpMask;
+  }
+  bool isCmp() const {
+    static constexpr uint64_t CmpOpMask =
+        (kICmpEQ | kICmpNE | kICmpLT | kICmpGT | kICmpLE | kICmpGE) |
+        (kFCmpEQ | kFCmpNE | kFCmpLT | kFCmpGT | kFCmpLE | kFCmpGE);
+    return kind & CmpOpMask;
+  }
+  bool isBranch() const {
+    static constexpr uint64_t BranchOpMask = kBr | kCondBr;
+    return kind & BranchOpMask;
   }
   bool isCommutative() const {
     static constexpr uint64_t CommutativeOpMask =
         kAdd | kMul | kICmpEQ | kICmpNE | kFAdd | kFMul | kFCmpEQ | kFCmpNE;
     return kind & CommutativeOpMask;
   }
-  bool isMemory() const {
-    static constexpr uint64_t MemoryOpMask = kAlloca | kLoad | kStore;
-    return kind & MemoryOpMask;
-  }
+  bool isUnconditional() const { return kind == kBr; }
+  bool isConditional() const { return kind == kCondBr; }
 }; // class Instruction
 
 class Function;
@@ -425,17 +552,12 @@ public:
   Value *getRhs() const { return getOperand(1); }
 }; // class BinaryInst
 
-class TerminatorInst : public Instruction {
-protected:
-  using Instruction::Instruction;
-}; // TerminatorInst
-
-class ReturnInst : public TerminatorInst {
+class ReturnInst : public Instruction {
   friend class IRBuilder;
 
 protected:
   ReturnInst(Value *value = nullptr, BasicBlock *parent = nullptr)
-      : TerminatorInst(kReturn, Type::getVoidType(), parent, "") {
+      : Instruction(kReturn, Type::getVoidType(), parent, "") {
     if (value)
       addOperand(value);
   }
@@ -447,22 +569,13 @@ public:
   }
 }; // class ReturnInst
 
-class BranchInst : public TerminatorInst {
-protected:
-  using TerminatorInst::TerminatorInst;
-
-public:
-  bool isUnconditional() const { return kind == kBr; }
-  bool isConditional() const { return kind == kCondBr; }
-}; // class BranchInst
-
-class UncondBrInst : public BranchInst {
+class UncondBrInst : public Instruction {
   friend class IRBuilder;
 
 protected:
   UncondBrInst(BasicBlock *block, std::vector<Value *> args,
                BasicBlock *parent = nullptr)
-      : BranchInst(kCondBr, Type::getVoidType(), parent, "") {
+      : Instruction(kCondBr, Type::getVoidType(), parent, "") {
     assert(block->getNumArguments() == args.size());
     addOperand(block);
     addOperands(args);
@@ -477,14 +590,14 @@ public:
   }
 }; // class UncondBrInst
 
-class CondBrInst : public BranchInst {
+class CondBrInst : public Instruction {
   friend class IRBuilder;
 
 protected:
   CondBrInst(Value *condition, BasicBlock *thenBlock, BasicBlock *elseBlock,
              const std::vector<Value *> &thenArgs,
              const std::vector<Value *> &elseArgs, BasicBlock *parent = nullptr)
-      : BranchInst(kCondBr, Type::getVoidType(), parent, "") {
+      : Instruction(kCondBr, Type::getVoidType(), parent, "") {
     assert(thenBlock->getNumArguments() == thenArgs.size() and
            elseBlock->getNumArguments() == elseArgs.size());
     addOperand(condition);
@@ -513,18 +626,13 @@ public:
   }
 }; // class CondBrInst
 
-class MemoryInst : public Instruction {
-protected:
-  using Instruction::Instruction;
-}; // class MemoryInst
-
-class AllocaInst : public MemoryInst {
+class AllocaInst : public Instruction {
   friend class IRBuilder;
 
 protected:
   AllocaInst(Type *type, const std::vector<Value *> &dims = {},
              BasicBlock *parent = nullptr, const std::string &name = "")
-      : MemoryInst(kAlloca, type, parent, name) {
+      : Instruction(kAlloca, type, parent, name) {
     addOperands(dims);
   }
 
@@ -534,13 +642,13 @@ public:
   Value *getDim(int index) { return getOperand(index); }
 }; // class AllocaInst
 
-class LoadInst : public MemoryInst {
+class LoadInst : public Instruction {
   friend class IRBuilder;
 
 protected:
   LoadInst(Value *pointer, const std::vector<Value *> &indices = {},
            BasicBlock *parent = nullptr, const std::string &name = "")
-      : MemoryInst(
+      : Instruction(
             kLoad,
             dynamic_cast<PointerType *>(pointer->getType())->getBaseType(),
             parent, name) {
@@ -556,14 +664,14 @@ public:
   Value *getIndex(int index) const { return getOperand(index + 1); }
 }; // class LoadInst
 
-class StoreInst : public MemoryInst {
+class StoreInst : public Instruction {
   friend class IRBuilder;
 
 protected:
   StoreInst(Value *value, Value *pointer,
             const std::vector<Value *> &indices = {},
             BasicBlock *parent = nullptr, const std::string &name = "")
-      : MemoryInst(kStore, Type::getVoidType(), parent, name) {
+      : Instruction(kStore, Type::getVoidType(), parent, name) {
     addOperand(value);
     addOperand(pointer);
     addOperands(indices);
@@ -671,16 +779,7 @@ public:
   }
 }; // class Module
 
-inline CallInst::CallInst(Function *callee, const std::vector<Value *> args,
-                          BasicBlock *parent, const std::string &name)
-    : Instruction(kCall, callee->getReturnType(), parent, name) {
-  addOperand(callee);
-  for (auto arg : args)
-    addOperand(arg);
-}
-
-inline Function *CallInst::getCallee() {
-  return dynamic_cast<Function *>(getOperand(0));
-}
-
+/*!
+ * @}
+ */
 } // namespace sysy

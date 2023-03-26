@@ -131,4 +131,16 @@ void User::replaceOperand(int index, Value *value) {
   use.setValue(value);
 }
 
+CallInst::CallInst(Function *callee, const std::vector<Value *> args,
+                          BasicBlock *parent, const std::string &name)
+    : Instruction(kCall, callee->getReturnType(), parent, name) {
+  addOperand(callee);
+  for (auto arg : args)
+    addOperand(arg);
+}
+
+Function *CallInst::getCallee() {
+  return dynamic_cast<Function *>(getOperand(0));
+}
+
 } // namespace sysy
