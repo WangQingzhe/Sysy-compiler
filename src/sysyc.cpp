@@ -27,9 +27,6 @@ int main(int argc, char **argv) {
   SysYParser parser(&tokens);
   auto module = parser.module();
 
-  // SysYFormatter formatter(cout);
-  // formatter.visitModule(module);
-
   SysYIRGenerator generator;
   generator.visitModule(module);
 
