@@ -5,7 +5,6 @@ antlr_target(SysYGen SysY.g4
   LEXER PARSER
   OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   VISITOR
-  LISTENER
 )
 
 add_library(SysYParser SHARED ${ANTLR_SysYGen_CXX_OUTPUTS})
@@ -14,7 +13,6 @@ target_link_libraries(SysYParser PUBLIC antlr4_shared)
 
 add_executable(sysyc
   sysyc.cpp
-  SysYFormatter.cpp
   IR.cpp
   SysYIRGenerator.cpp
 )
