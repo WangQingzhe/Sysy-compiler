@@ -10,10 +10,7 @@ any SysYIRGenerator::visitModule(SysYParser::ModuleContext *ctx) {
   auto pModule = new Module();
   assert(pModule);
   module.reset(pModule);
-  for (auto decl : ctx->decl())
-    visitDecl(decl);
-  for (auto func : ctx->func())
-    visitFunc(func);
+  visitChildren(ctx);
   return pModule;
 }
 
