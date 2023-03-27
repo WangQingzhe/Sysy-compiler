@@ -13,7 +13,6 @@ target_link_libraries(SysYParser PUBLIC antlr4_shared)
 
 add_executable(sysyc
   sysyc.cpp
-  SysYFormatter.cpp
   IR.cpp
   SysYIRGenerator.cpp
 )

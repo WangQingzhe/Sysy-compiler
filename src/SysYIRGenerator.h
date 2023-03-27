@@ -1,10 +1,10 @@
 #pragma once
 
+#include <memory>
 #include "IR.h"
 #include "IRBuilder.h"
 #include "SysYBaseVisitor.h"
 #include "SysYParser.h"
-#include <memory>
 
 namespace sysy {
 

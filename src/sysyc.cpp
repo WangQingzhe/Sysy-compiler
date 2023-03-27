@@ -4,10 +4,12 @@
 #include <fstream>
 #include <iostream>
 using namespace std;
-using namespace antlr4;
-#include "SysYFormatter.h"
 #include "SysYLexer.h"
 #include "SysYParser.h"
+using namespace antlr4;
+#include "SysYFormatter.h"
+#include "SysYIRGenerator.h"
+using namespace sysy;
 
 int main(int argc, char **argv) {
   if (argc != 2) {
@@ -24,12 +26,12 @@ int main(int argc, char **argv) {
   CommonTokenStream tokens(&lexer);
   SysYParser parser(&tokens);
   auto module = parser.module();
-  // tree::ParseTreeWalker walker;
-  // SysYASTPrinter printer(cout);
-  // cout << module->getText() << '\n';
-  // walker.walk(&printer, module);
-  SysYFormatter formatter(cout);
-  formatter.visitModule(module);
+
+  // SysYFormatter formatter(cout);
+  // formatter.visitModule(module);
+
+  SysYIRGenerator generator;
+  generator.visitModule(module);
 
   return EXIT_SUCCESS;
 }
