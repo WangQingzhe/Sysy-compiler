@@ -4,6 +4,8 @@
 #include "SysYParser.h"
 #include <ostream>
 
+namespace sysy {
+
 class SysYFormatter : public SysYBaseVisitor {
 protected:
   std::ostream &os;
@@ -332,3 +334,5 @@ public:
     return 0;
   }
 };
+
+} // namespace sysy
