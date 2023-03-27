@@ -65,3 +65,12 @@ exp2分支为大家准备好了进行实验2的基本代码框架，包括
 
 - 熟悉掌握IR定义与相关数据结构
 - 从AST生成IR（基于visitor机制）
+
+请同学们仔细阅读代码学习IR的定义。可以使用doxygen工具自动生成HTML文档
+
+```bash
+sudo apt install doxygen graphviz
+doxygen doc/Doxyfile
+```
+
+上述命令执行完毕后，将在doxygen/html下找到生成的代码文档。
