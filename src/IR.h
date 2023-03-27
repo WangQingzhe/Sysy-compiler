@@ -110,12 +110,9 @@ public:
  * \defgroup ir IR
  *
  * The SysY IR is an instruction level language. The IR is orgnized
- * as a four-level tree structure, as shown below.
+ * as a four-level tree structure, as shown below
  *
- * ```
- * Module -- GlobalValue
- *        |_ Function -- BasicBlock -- Instruction
- * ```
+ * \dotfile ir-4level.dot IR Structure
  *
  * - `Module` corresponds to the top level "CompUnit" syntax structure
  * - `GlobalValue` corresponds to the "Decl" syntax structure
@@ -148,15 +145,7 @@ class Value;
 
 //! `Use` represents the relation between a `Value` and its `User`
 class Use {
-public:
-  enum Kind {
-    kRead,
-    kWrite,
-    kReadWrite,
-  };
-
 private:
-  Kind kind;
   //! the position of value in the user's operands, i.e.,
   //! user->getOperands[index] == value
   int index;
@@ -165,17 +154,13 @@ private:
 
 public:
   Use() = default;
-  Use(Kind kind, int index, User *user, Value *value)
-      : kind(kind), index(index), user(user), value(value) {}
+  Use(int index, User *user, Value *value)
+      : index(index), user(user), value(value) {}
 
 public:
-  Kind getKind() const { return kind; }
   int getIndex() const { return index; }
   User *getUser() const { return user; }
   Value *getValue() const { return value; }
-  bool isRead() const { return kind == kRead; }
-  bool isWrite() const { return kind == kWrite; }
-  bool isReadWrite() const { return kind == kReadWrite; }
   void setValue(Value *value) { value = value; }
 }; // class Use
 
@@ -334,8 +319,8 @@ public:
     return make_range(operand_begin(), operand_end());
   }
   Value *getOperand(int index) const { return operands[index].getValue(); }
-  void addOperand(Value *value, Use::Kind mode = Use::kRead) {
-    operands.emplace_back(mode, operands.size(), this, value);
+  void addOperand(Value *value) {
+    operands.emplace_back(operands.size(), this, value);
     value->addUse(&operands.back());
   }
   template <typename ContainerT> void addOperands(const ContainerT &operands) {
