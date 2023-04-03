@@ -1,44 +1,28 @@
 #pragma once
 
+#include <memory>
 #include "IR.h"
 #include "IRBuilder.h"
 #include "SysYBaseVisitor.h"
 #include "SysYParser.h"
-#include <memory>
 
 namespace sysy {
 
 class SysYIRGenerator : public SysYBaseVisitor {
 private:
-  struct LocalMode {
-    bool &mode;
-    explicit LocalMode(bool &mode) : mode(mode) { mode = true; }
-    ~LocalMode() { mode = false; }
-  };
-
-private:
   std::unique_ptr<Module> module;
-  bool isLocal;
   IRBuilder builder;
 
 public:
   SysYIRGenerator() = default;
 
-private:
-  std::any visitGlobalDecl(SysYParser::DeclContext *ctx);
-  std::any visitLocalDecl(SysYParser::DeclContext *ctx);
-  
 public:
   virtual std::any visitModule(SysYParser::ModuleContext *ctx) override;
 
-  virtual std::any visitDecl(SysYParser::DeclContext *ctx) override {
-    return isLocal? visitLocalDecl(ctx) : visitGlobalDecl(ctx);
-  }
+  virtual std::any visitDecl(SysYParser::DeclContext *ctx) override;
 
-  virtual std::any visitBtype(SysYParser::BtypeContext *ctx) override {
-    return visitChildren(ctx);
-  }
-
+  virtual std::any visitBtype(SysYParser::BtypeContext *ctx) override;
+  
   virtual std::any visitVarDef(SysYParser::VarDefContext *ctx) override {
     return visitChildren(ctx);
   }
@@ -53,10 +37,7 @@ public:
     return visitChildren(ctx);
   }
 
-  virtual std::any visitFunc(SysYParser::FuncContext *ctx) override {
-    LocalMode guard(isLocal);
-    return visitChildren(ctx);
-  }
+  virtual std::any visitFunc(SysYParser::FuncContext *ctx) override;
 
   virtual std::any visitFuncType(SysYParser::FuncTypeContext *ctx) override {
     return visitChildren(ctx);
@@ -72,13 +53,9 @@ public:
     return visitChildren(ctx);
   }
 
-  virtual std::any visitBlockStmt(SysYParser::BlockStmtContext *ctx) override {
-    return visitChildren(ctx);
-  }
+  virtual std::any visitBlockStmt(SysYParser::BlockStmtContext *ctx) override;
 
-  virtual std::any visitBlockItem(SysYParser::BlockItemContext *ctx) override {
-    return visitChildren(ctx);
-  }
+  virtual std::any visitBlockItem(SysYParser::BlockItemContext *ctx) override;
 
   virtual std::any visitStmt(SysYParser::StmtContext *ctx) override {
     return visitChildren(ctx);
