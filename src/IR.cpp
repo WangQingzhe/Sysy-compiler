@@ -2,14 +2,27 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
+#include <iostream>
 #include <iterator>
 #include <map>
 #include <memory>
 #include <set>
 #include <vector>
+using namespace std;
 
 namespace sysy {
 
+template <typename T>
+std::ostream &interleave(std::ostream &os, const T &container,
+                         const std::string sep = ", ") {
+  auto b = container.begin(), e = container.end();
+  if (b == e)
+    return os;
+  os << *b;
+  for (b = std::next(b); b != e; b = std::next(b))
+    os << sep << *b;
+  return os;
+}
 //===----------------------------------------------------------------------===//
 // Types
 //===----------------------------------------------------------------------===//
@@ -58,6 +71,34 @@ int Type::getSize() const {
     return 0;
   }
   return 0;
+}
+
+void Type::print(ostream &os) const {
+  switch (getKind()) {
+  kInt:
+    os << "int";
+    break;
+  kFloat:
+    os << "float";
+    break;
+  kVoid:
+    os << "void";
+    break;
+  kPointer:
+    static_cast<const PointerType *>(this)->getBaseType()->print(os);
+    os << "*";
+    break;
+  kFunction:
+    static_cast<const FunctionType *>(this)->getReturnType()->print(os);
+    os << "(";
+    interleave(os, static_cast<const FunctionType *>(this)->getParamTypes());
+    os << ")";
+    break;
+  kLabel:
+  default:
+    cerr << "Unexpected type!\n";
+    break;
+  }
 }
 
 PointerType *PointerType::get(Type *baseType) {
@@ -132,7 +173,7 @@ void User::replaceOperand(int index, Value *value) {
 }
 
 CallInst::CallInst(Function *callee, const std::vector<Value *> args,
-                          BasicBlock *parent, const std::string &name)
+                   BasicBlock *parent, const std::string &name)
     : Instruction(kCall, callee->getReturnType(), parent, name) {
   addOperand(callee);
   for (auto arg : args)

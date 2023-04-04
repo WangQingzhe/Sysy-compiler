@@ -7,6 +7,7 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <ostream>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -70,6 +71,7 @@ public:
   std::enable_if_t<std::is_base_of_v<Type, T>, T *> as() const {
     return dynamic_cast<T *>(const_cast<Type *>(this));
   }
+  void print(std::ostream &os) const;
 }; // class Type
 
 //! Pointer type
