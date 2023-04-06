@@ -199,9 +199,7 @@ public:
     return visitChildren(ctx);
   }
 
-  virtual std::any visitCall(SysYParser::CallContext *ctx) override {
-    return visitChildren(ctx);
-  }
+  virtual std::any visitCall(SysYParser::CallContext *ctx) override;
 
   virtual std::any visitLValue(SysYParser::LValueContext *ctx) override {
     return visitChildren(ctx);

@@ -146,10 +146,14 @@ any SysYIRGenerator::visitNumberExp(SysYParser::NumberExpContext *ctx) {
 
 any SysYIRGenerator::visitLValueExp(SysYParser::LValueExpContext *ctx) {
   auto name = ctx->lValue()->ID()->getText();
-  auto ptr = symbols.lookup(name);
-  if (not ptr)
+  Value *value = symbols.lookup(name);
+  if (not value)
     error(ctx, "undefined variable");
-  Value *value = builder.createLoadInst(ptr);
+  auto  a = dynamic_cast<Argument *>(value);
+  if (dynamic_cast<GlobalValue *>(value) or
+      (dynamic_cast<Instruction *>(value) and
+       dynamic_cast<AllocaInst *>(value)))
+    value = builder.createLoadInst(value);
   return value;
 }
 
@@ -209,6 +213,20 @@ any SysYIRGenerator::visitReturnStmt(SysYParser::ReturnStmtContext *ctx) {
       ctx->exp() ? any_cast<Value *>(ctx->exp()->accept(this)) : nullptr;
   Value *result = builder.createReturnInst(value);
   return result;
+}
+
+any SysYIRGenerator::visitCall(SysYParser::CallContext *ctx) {
+  auto funcName = ctx->ID()->getText();
+  auto func = dynamic_cast<Function *>(symbols.lookup(funcName));
+  assert(func);
+  vector<Value *> args;
+  if (auto rArgs = ctx->funcRParams()) {
+    for (auto exp : rArgs->exp()) {
+      args.push_back(any_cast<Value *>(exp->accept(this)));
+    }
+  }
+  Value *call = builder.createCallInst(func, args);
+  return call;
 }
 
 } // namespace sysy

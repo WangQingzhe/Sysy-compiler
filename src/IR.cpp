@@ -510,7 +510,7 @@ void User::replaceOperand(int index, Value *value) {
   use.setValue(value);
 }
 
-CallInst::CallInst(Function *callee, const std::vector<Value *> args,
+CallInst::CallInst(Function *callee, const std::vector<Value *> &args,
                    BasicBlock *parent, const std::string &name)
     : Instruction(kCall, callee->getReturnType(), parent, name) {
   addOperand(callee);
