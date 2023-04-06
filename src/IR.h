@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <iterator>
 #include <list>
 #include <map>
 #include <memory>
@@ -66,6 +67,7 @@ public:
   bool isLabel() const { return kind == kLabel; }
   bool isPointer() const { return kind == kPointer; }
   bool isFunction() const { return kind == kFunction; }
+  bool isIntOrFloat() const { return kind == kInt or kind == kFloat; }
   int getSize() const;
   template <typename T>
   std::enable_if_t<std::is_base_of_v<Type, T>, T *> as() const {
@@ -185,6 +187,9 @@ protected:
 
 public:
   Type *getType() const { return type; }
+  const std::string &getName() const { return name; }
+  void setName(const std::string &n) { name = n; }
+  bool hasName() const { return not name.empty(); }
   bool isInt() const { return type->isInt(); }
   bool isFloat() const { return type->isFloat(); }
   bool isPointer() const { return type->isPointer(); }
@@ -192,6 +197,10 @@ public:
   void addUse(Use *use) { uses.push_back(use); }
   void replaceAllUsesWith(Value *value);
   void removeUse(Use *use) { uses.remove(use); }
+  bool isConstant() const;
+
+public:
+  virtual void print(std::ostream &os) const = 0;
 }; // class Value
 
 /*!
@@ -208,14 +217,13 @@ protected:
   };
 
 protected:
-  ConstantValue(int value, const std::string &name = "")
-      : Value(Type::getIntType(), name), iScalar(value) {}
-  ConstantValue(float value, const std::string &name = "")
-      : Value(Type::getFloatType(), name), fScalar(value) {}
+  ConstantValue(int value) : Value(Type::getIntType(), ""), iScalar(value) {}
+  ConstantValue(float value)
+      : Value(Type::getFloatType(), ""), fScalar(value) {}
 
 public:
-  static ConstantValue *get(int value, const std::string &name = "");
-  static ConstantValue *get(float value, const std::string &name = "");
+  static ConstantValue *get(int value);
+  static ConstantValue *get(float value);
 
 public:
   int getInt() const {
@@ -226,6 +234,9 @@ public:
     assert(isFloat());
     return fScalar;
   }
+
+public:
+  virtual void print(std::ostream &os) const override;
 }; // class ConstantValue
 
 class BasicBlock;
@@ -246,8 +257,14 @@ protected:
 
 public:
   Argument(Type *type, BasicBlock *block, int index,
-           const std::string &name = "")
-      : Value(type, name), block(block), index(index) {}
+           const std::string &name = "");
+
+public:
+  BasicBlock *getParent() const { return block; }
+  int getIndex() const { return index; }
+
+public:
+  virtual void print(std::ostream &os) const override;
 };
 
 class Instruction;
@@ -276,9 +293,7 @@ protected:
   block_list predecessors;
 
 protected:
-  explicit BasicBlock(Function *parent, const std::string &name = "")
-      : Value(Type::getLabelType(), name), parent(parent), instructions(),
-        arguments(), successors(), predecessors() {}
+  explicit BasicBlock(Function *parent, const std::string &name = "");
 
 public:
   int getNumInstructions() const { return instructions.size(); }
@@ -287,7 +302,7 @@ public:
   int getNumSuccessors() const { return successors.size(); }
   Function *getParent() const { return parent; }
   inst_list &getInstructions() { return instructions; }
-  arg_list &getArguments() { return arguments; }
+  auto getArguments() const { return make_range(arguments); }
   block_list &getPredecessors() { return predecessors; }
   block_list &getSuccessors() { return successors; }
   iterator begin() { return instructions.begin(); }
@@ -297,6 +312,9 @@ public:
     arguments.emplace_back(type, this, arguments.size(), name);
     return &arguments.back();
   };
+
+public:
+  virtual void print(std::ostream &os) const override;
 }; // class BasicBlock
 
 //! User is the abstract base type of `Value` types which use other `Value` as
@@ -311,17 +329,25 @@ protected:
       : Value(type, name), operands() {}
 
 public:
-  struct operand_iterator : std::vector<Use>::iterator {
-    using Base = std::vector<Use>::iterator;
-    using Base::Base;
+  using use_iterator = std::vector<Use>::const_iterator;
+  struct operand_iterator : public std::vector<Use>::const_iterator {
+    using Base = std::vector<Use>::const_iterator;
+    operand_iterator(const Base &iter) : Base(iter) {}
     using value_type = Value *;
-    value_type operator->() { return operator*().getValue(); }
+    value_type operator->() { return Base::operator*().getValue(); }
+    value_type operator*() { return Base::operator*().getValue(); }
   };
+  // struct const_operand_iterator : std::vector<Use>::const_iterator {
+  //   using Base = std::vector<Use>::const_iterator;
+  //   const_operand_iterator(const Base &iter) : Base(iter) {}
+  //   using value_type = Value *;
+  //   value_type operator->() { return operator*().getValue(); }
+  // };
 
 public:
   int getNumOperands() const { return operands.size(); }
-  auto operand_begin() const { return operands.begin(); }
-  auto operand_end() const { return operands.end(); }
+  operand_iterator operand_begin() const { return operands.begin(); }
+  operand_iterator operand_end() const { return operands.end(); }
   auto getOperands() const {
     return make_range(operand_begin(), operand_end());
   }
@@ -336,7 +362,6 @@ public:
   }
   void replaceOperand(int index, Value *value);
   void setOperand(int index, Value *value);
-  const std::string &getName() const { return name; }
 }; // class User
 
 /*!
@@ -372,7 +397,7 @@ public:
     // Unary
     kNeg = 0x1UL << 25,
     kNot = 0x1UL << 26,
-    kFNeg = 0x1UL << 26,
+    kFNeg = 0x1UL << 27,
     kFtoI = 0x1UL << 28,
     kIToF = 0x1UL << 29,
     // call
@@ -395,12 +420,12 @@ protected:
 
 protected:
   Instruction(Kind kind, Type *type, BasicBlock *parent = nullptr,
-              const std::string &name = "")
-      : User(type, name), kind(kind), parent(parent) {}
+              const std::string &name = "");
 
 public:
   Kind getKind() const { return kind; }
   BasicBlock *getParent() const { return parent; }
+  Function *getFunction() const { return parent->getParent(); }
   void setParent(BasicBlock *bb) { parent = bb; }
 
   bool isBinary() const {
@@ -452,10 +477,13 @@ protected:
            BasicBlock *parent = nullptr, const std::string &name = "");
 
 public:
-  Function *getCallee();
-  auto getArguments() {
+  Function *getCallee() const;
+  auto getArguments() const {
     return make_range(std::next(operand_begin()), operand_end());
   }
+
+public:
+  virtual void print(std::ostream &os) const override;
 }; // class CallInst
 
 //! Unary instruction, includes '!', '-' and type conversion.
@@ -471,6 +499,9 @@ protected:
 
 public:
   Value *getOperand() const { return User::getOperand(0); }
+
+public:
+  virtual void print(std::ostream &os) const override;
 }; // class UnaryInst
 
 //! Binary instruction, e.g., arithmatic, relation, logic, etc.
@@ -488,6 +519,9 @@ protected:
 public:
   Value *getLhs() const { return getOperand(0); }
   Value *getRhs() const { return getOperand(1); }
+
+public:
+  virtual void print(std::ostream &os) const override;
 }; // class BinaryInst
 
 //! The return statement
@@ -506,6 +540,9 @@ public:
   Value *getReturnValue() const {
     return hasReturnValue() ? getOperand(0) : nullptr;
   }
+
+public:
+  virtual void print(std::ostream &os) const override;
 }; // class ReturnInst
 
 //! Unconditional branch
@@ -526,8 +563,11 @@ public:
     return dynamic_cast<BasicBlock *>(getOperand(0));
   }
   auto getArguments() const {
-    return make_range(std::next(operands.begin()), operands.end());
+    return make_range(std::next(operand_begin()), operand_end());
   }
+
+public:
+  virtual void print(std::ostream &os) const override;
 }; // class UncondBrInst
 
 //! Conditional branch
@@ -549,22 +589,27 @@ protected:
   }
 
 public:
+  Value *getCondition() const { return getOperand(0); }
   BasicBlock *getThenBlock() const {
-    return dynamic_cast<BasicBlock *>(getOperand(0));
-  }
-  BasicBlock *getElseBlock() const {
     return dynamic_cast<BasicBlock *>(getOperand(1));
   }
+  BasicBlock *getElseBlock() const {
+    return dynamic_cast<BasicBlock *>(getOperand(2));
+  }
   auto getThenArguments() const {
-    auto begin = operands.begin() + 2;
-    auto end = begin + getThenBlock()->getNumArguments();
+    auto begin = std::next(operand_begin(), 3);
+    auto end = std::next(begin, getThenBlock()->getNumArguments());
     return make_range(begin, end);
   }
   auto getElseArguments() const {
-    auto begin = operands.begin() + 2 + getThenBlock()->getNumArguments();
-    auto end = operands.end();
+    auto begin =
+        std::next(operand_begin(), 3 + getThenBlock()->getNumArguments());
+    auto end = operand_end();
     return make_range(begin, end);
   }
+
+public:
+  virtual void print(std::ostream &os) const override;
 }; // class CondBrInst
 
 //! Allocate memory for stack variables, used for non-global variable declartion
@@ -582,6 +627,8 @@ public:
   int getNumDims() const { return getNumOperands(); }
   auto getDims() const { return getOperands(); }
   Value *getDim(int index) { return getOperand(index); }
+public:
+  virtual void print(std::ostream &os) const override;
 }; // class AllocaInst
 
 //! Load a value from memory address specified by a pointer value
@@ -593,6 +640,7 @@ protected:
            BasicBlock *parent = nullptr, const std::string &name = "")
       : Instruction(kLoad, pointer->getType()->as<PointerType>()->getBaseType(),
                     parent, name) {
+    addOperand(pointer);
     addOperands(indices);
   }
 
@@ -603,6 +651,8 @@ public:
     return make_range(std::next(operand_begin()), operand_end());
   }
   Value *getIndex(int index) const { return getOperand(index + 1); }
+public:
+  virtual void print(std::ostream &os) const override;
 }; // class LoadInst
 
 //! Store a value to memory address specified by a pointer value
@@ -624,9 +674,11 @@ public:
   Value *getValue() const { return getOperand(0); }
   Value *getPointer() const { return getOperand(1); }
   auto getIndices() const {
-    return make_range(operand_begin() + 2, operand_end());
+    return make_range(std::next(operand_begin(), 2), operand_end());
   }
   Value *getIndex(int index) const { return getOperand(index + 2); }
+public:
+  virtual void print(std::ostream &os) const override;
 }; // class StoreInst
 
 class Module;
@@ -636,7 +688,7 @@ class Function : public Value {
 
 protected:
   Function(Module *parent, Type *type, const std::string &name)
-      : Value(type, name), parent(parent), blocks() {
+      : Value(type, name), parent(parent), variableID(0), blocks() {
     blocks.emplace_back(new BasicBlock(this, "entry"));
   }
 
@@ -645,6 +697,8 @@ public:
 
 protected:
   Module *parent;
+  int variableID;
+  int blockID;
   block_list blocks;
 
 public:
@@ -654,8 +708,8 @@ public:
   auto getParamTypes() const {
     return getType()->as<FunctionType>()->getParamTypes();
   }
-  auto getBasicBlocks() { return make_range(blocks); }
-  BasicBlock *getEntryBlock() { return blocks.front().get(); }
+  auto getBasicBlocks() const { return make_range(blocks); }
+  BasicBlock *getEntryBlock() const { return blocks.front().get(); }
   BasicBlock *addBasicBlock(const std::string &name = "") {
     blocks.emplace_back(new BasicBlock(this, name));
     return blocks.back().get();
@@ -665,7 +719,29 @@ public:
       return block == b.get();
     });
   }
+  int allocateVariableID() { return variableID++; }
+  int allocateblockID() { return blockID++; }
+public:
+  virtual void print(std::ostream &os) const override;
 }; // class Function
+
+class ArrayValue : public User {
+protected:
+  ArrayValue(Type *type, const std::vector<Value *> &values = {})
+      : User(type, "") {
+    addOperands(values);
+  }
+
+public:
+  static ArrayValue *get(Type *type, const std::vector<Value *> &values);
+  static ArrayValue *get(const std::vector<int> &values);
+  static ArrayValue *get(const std::vector<float> &values);
+
+public:
+  auto getValues() const { return getOperands(); }
+public:
+  virtual void print(std::ostream &os) const override {};
+}; // class ConstantArray
 
 //! Global value declared at file scope
 class GlobalValue : public User {
@@ -674,6 +750,7 @@ class GlobalValue : public User {
 protected:
   Module *parent;
   bool hasInit;
+  bool isConst;
 
 protected:
   GlobalValue(Module *parent, Type *type, const std::string &name,
@@ -689,6 +766,8 @@ public:
   Value *init() const { return hasInit ? operands.back().getValue() : nullptr; }
   int getNumDims() const { return getNumOperands() - (hasInit ? 1 : 0); }
   Value *getDim(int index) { return getOperand(index); }
+public:
+  virtual void print(std::ostream &os) const override {};
 }; // class GlobalValue
 
 //! IR unit for representing a SysY compile unit
@@ -708,9 +787,10 @@ public:
     return result.first->second.get();
   };
   GlobalValue *createGlobalValue(const std::string &name, Type *type,
-                                 const std::vector<Value *> &dims = {}) {
-    auto result =
-        globals.try_emplace(name, new GlobalValue(this, type, name, dims));
+                                 const std::vector<Value *> &dims = {},
+                                 Value *init = nullptr) {
+    auto result = globals.try_emplace(
+        name, new GlobalValue(this, type, name, dims, init));
     if (not result.second)
       return nullptr;
     return result.first->second.get();
@@ -727,9 +807,21 @@ public:
       return nullptr;
     return result->second.get();
   }
+public:
+  void print(std::ostream &os) const;
 }; // class Module
 
 /*!
  * @}
  */
+inline std::ostream &operator<<(std::ostream &os, const Type &type) {
+  type.print(os);
+  return os;
+}
+
+inline std::ostream &operator<<(std::ostream &os, const Value &value) {
+  value.print(os);
+  return os;
+}
+
 } // namespace sysy

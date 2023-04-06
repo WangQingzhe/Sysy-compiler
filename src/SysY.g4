@@ -99,9 +99,7 @@ btype: INT | FLOAT;
 
 varDef: lValue (ASSIGN initValue)?;
 
-initValue:
-	exp											# scalarInitValue
-	| LBRACE (initValue (COMMA initValue)*)?	# arrayInitValue;
+initValue: exp | LBRACE (initValue (COMMA initValue)*)?;
 
 func: funcType ID LPAREN funcFParams? RPAREN blockStmt;
 

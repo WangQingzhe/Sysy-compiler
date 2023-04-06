@@ -1,4 +1,3 @@
-#include "ASTPrinter.h"
 #include "tree/ParseTreeWalker.h"
 #include <cstdlib>
 #include <fstream>
@@ -7,7 +6,7 @@ using namespace std;
 #include "SysYLexer.h"
 #include "SysYParser.h"
 using namespace antlr4;
-#include "SysYFormatter.h"
+// #include "SysYFormatter.h"
 #include "SysYIRGenerator.h"
 using namespace sysy;
 
@@ -25,10 +24,12 @@ int main(int argc, char **argv) {
   SysYLexer lexer(&input);
   CommonTokenStream tokens(&lexer);
   SysYParser parser(&tokens);
-  auto module = parser.module();
+  auto moduleAST = parser.module();
 
   SysYIRGenerator generator;
-  generator.visitModule(module);
-
+  generator.visitModule(moduleAST);
+  auto moduleIR = generator.get();
+  moduleIR->print(cout);
+  
   return EXIT_SUCCESS;
 }
