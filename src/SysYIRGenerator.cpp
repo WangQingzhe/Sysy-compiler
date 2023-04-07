@@ -149,7 +149,7 @@ any SysYIRGenerator::visitLValueExp(SysYParser::LValueExpContext *ctx) {
   Value *value = symbols.lookup(name);
   if (not value)
     error(ctx, "undefined variable");
-  auto  a = dynamic_cast<Argument *>(value);
+  auto a = dynamic_cast<Instruction *>(value);
   if (dynamic_cast<GlobalValue *>(value) or
       (dynamic_cast<Instruction *>(value) and
        dynamic_cast<AllocaInst *>(value)))

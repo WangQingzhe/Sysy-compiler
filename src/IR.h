@@ -48,7 +48,7 @@ public:
 
 protected:
   Type(Kind kind) : kind(kind) {}
-  virtual ~Type() {}
+  virtual ~Type() = default;
 
 public:
   static Type *getIntType();
@@ -236,7 +236,7 @@ public:
   }
 
 public:
-  virtual void print(std::ostream &os) const override;
+  void print(std::ostream &os) const override;
 }; // class ConstantValue
 
 class BasicBlock;
@@ -258,14 +258,13 @@ protected:
 public:
   Argument(Type *type, BasicBlock *block, int index,
            const std::string &name = "");
-  virtual ~Argument() = default;
 
 public:
   BasicBlock *getParent() const { return block; }
   int getIndex() const { return index; }
 
 public:
-  virtual void print(std::ostream &os) const override;
+  void print(std::ostream &os) const override;
 };
 
 class Instruction;
@@ -315,7 +314,7 @@ public:
   };
 
 public:
-  virtual void print(std::ostream &os) const override;
+  void print(std::ostream &os) const override;
 }; // class BasicBlock
 
 //! User is the abstract base type of `Value` types which use other `Value` as
@@ -329,8 +328,6 @@ protected:
   User(Type *type, const std::string &name = "")
       : Value(type, name), operands() {}
 
-public:
-  virtual ~User() = default;
 public:
   using use_iterator = std::vector<Use>::const_iterator;
   struct operand_iterator : public std::vector<Use>::const_iterator {
@@ -486,7 +483,7 @@ public:
   }
 
 public:
-  virtual void print(std::ostream &os) const override;
+  void print(std::ostream &os) const override;
 }; // class CallInst
 
 //! Unary instruction, includes '!', '-' and type conversion.
@@ -504,7 +501,7 @@ public:
   Value *getOperand() const { return User::getOperand(0); }
 
 public:
-  virtual void print(std::ostream &os) const override;
+  void print(std::ostream &os) const override;
 }; // class UnaryInst
 
 //! Binary instruction, e.g., arithmatic, relation, logic, etc.
@@ -524,7 +521,7 @@ public:
   Value *getRhs() const { return getOperand(1); }
 
 public:
-  virtual void print(std::ostream &os) const override;
+  void print(std::ostream &os) const override;
 }; // class BinaryInst
 
 //! The return statement
@@ -545,7 +542,7 @@ public:
   }
 
 public:
-  virtual void print(std::ostream &os) const override;
+  void print(std::ostream &os) const override;
 }; // class ReturnInst
 
 //! Unconditional branch
@@ -570,7 +567,7 @@ public:
   }
 
 public:
-  virtual void print(std::ostream &os) const override;
+  void print(std::ostream &os) const override;
 }; // class UncondBrInst
 
 //! Conditional branch
@@ -612,7 +609,7 @@ public:
   }
 
 public:
-  virtual void print(std::ostream &os) const override;
+  void print(std::ostream &os) const override;
 }; // class CondBrInst
 
 //! Allocate memory for stack variables, used for non-global variable declartion
@@ -632,7 +629,7 @@ public:
   Value *getDim(int index) { return getOperand(index); }
 
 public:
-  virtual void print(std::ostream &os) const override;
+  void print(std::ostream &os) const override;
 }; // class AllocaInst
 
 //! Load a value from memory address specified by a pointer value
@@ -657,7 +654,7 @@ public:
   Value *getIndex(int index) const { return getOperand(index + 1); }
 
 public:
-  virtual void print(std::ostream &os) const override;
+  void print(std::ostream &os) const override;
 }; // class LoadInst
 
 //! Store a value to memory address specified by a pointer value
@@ -684,7 +681,7 @@ public:
   Value *getIndex(int index) const { return getOperand(index + 2); }
 
 public:
-  virtual void print(std::ostream &os) const override;
+  void print(std::ostream &os) const override;
 }; // class StoreInst
 
 class Module;
@@ -729,7 +726,7 @@ public:
   int allocateblockID() { return blockID++; }
 
 public:
-  virtual void print(std::ostream &os) const override;
+  void print(std::ostream &os) const override;
 }; // class Function
 
 class ArrayValue : public User {
@@ -748,7 +745,7 @@ public:
   auto getValues() const { return getOperands(); }
 
 public:
-  virtual void print(std::ostream &os) const override{};
+  void print(std::ostream &os) const override{};
 }; // class ConstantArray
 
 //! Global value declared at file scope
@@ -771,15 +768,12 @@ protected:
   }
 
 public:
-  virtual ~GlobalValue() = default;
-
-public:
   Value *init() const { return hasInit ? operands.back().getValue() : nullptr; }
   int getNumDims() const { return getNumOperands() - (hasInit ? 1 : 0); }
   Value *getDim(int index) { return getOperand(index); }
 
 public:
-  virtual void print(std::ostream &os) const override{};
+  void print(std::ostream &os) const override{};
 }; // class GlobalValue
 
 //! IR unit for representing a SysY compile unit
