@@ -175,17 +175,20 @@ public:
 }; // class Use
 
 template <typename T>
-inline std::enable_if_t<std::is_base_of_v<Value, T>, bool> isa(const Value *value) {
+inline std::enable_if_t<std::is_base_of_v<Value, T>, bool>
+isa(const Value *value) {
   return T::classof(value);
 }
 
 template <typename T>
-inline std::enable_if_t<std::is_base_of_v<Value, T>, T *> dyncast(Value *value) {
+inline std::enable_if_t<std::is_base_of_v<Value, T>, T *>
+dyncast(Value *value) {
   return isa<T>(value) ? static_cast<T *>(value) : nullptr;
 }
 
 template <typename T>
-inline std::enable_if_t<std::is_base_of_v<Value, T>, const T *> dyncast(const Value *value) {
+inline std::enable_if_t<std::is_base_of_v<Value, T>, const T *>
+dyncast(const Value *value) {
   return isa<T>(value) ? static_cast<const T *>(value) : nullptr;
 }
 
@@ -253,6 +256,8 @@ protected:
 protected:
   Value(Kind kind, Type *type, const std::string &name = "")
       : kind(kind), type(type), name(name), uses() {}
+
+public:
   virtual ~Value() = default;
 
 public:
@@ -301,7 +306,9 @@ public:
   static ConstantValue *get(float value);
 
 public:
-  static bool classof(const Value *value) { return value->getKind() == kConstant; }
+  static bool classof(const Value *value) {
+    return value->getKind() == kConstant;
+  }
 
 public:
   int getInt() const {
@@ -338,7 +345,9 @@ public:
            const std::string &name = "");
 
 public:
-  static bool classof(const Value *value) { return value->getKind() == kConstant; }
+  static bool classof(const Value *value) {
+    return value->getKind() == kConstant;
+  }
 
 public:
   BasicBlock *getParent() const { return block; }
@@ -377,7 +386,9 @@ protected:
   explicit BasicBlock(Function *parent, const std::string &name = "");
 
 public:
-  static bool classof(const Value *value) { return value->getKind() == kBasicBlock; }
+  static bool classof(const Value *value) {
+    return value->getKind() == kBasicBlock;
+  }
 
 public:
   int getNumInstructions() const { return instructions.size(); }
@@ -642,7 +653,9 @@ protected:
   }
 
 public:
-  static bool classof(const Value *value) { return value->getKind() == kReturn; }
+  static bool classof(const Value *value) {
+    return value->getKind() == kReturn;
+  }
 
 public:
   bool hasReturnValue() const { return not operands.empty(); }
@@ -671,9 +684,7 @@ public:
   static bool classof(const Value *value) { return value->getKind() == kBr; }
 
 public:
-  BasicBlock *getBlock() const {
-    return dyncast<BasicBlock>(getOperand(0));
-  }
+  BasicBlock *getBlock() const { return dyncast<BasicBlock>(getOperand(0)); }
   auto getArguments() const {
     return make_range(std::next(operand_begin()), operand_end());
   }
@@ -701,7 +712,9 @@ protected:
   }
 
 public:
-  static bool classof(const Value *value) { return value->getKind() == kCondBr; }
+  static bool classof(const Value *value) {
+    return value->getKind() == kCondBr;
+  }
 
 public:
   Value *getCondition() const { return getOperand(0); }
@@ -739,7 +752,9 @@ protected:
   }
 
 public:
-  static bool classof(const Value *value) { return value->getKind() == kAlloca; }
+  static bool classof(const Value *value) {
+    return value->getKind() == kAlloca;
+  }
 
 public:
   int getNumDims() const { return getNumOperands(); }
@@ -820,7 +835,9 @@ protected:
   }
 
 public:
-  static bool classof(const Value *value) { return value->getKind() == kFunction; }
+  static bool classof(const Value *value) {
+    return value->getKind() == kFunction;
+  }
 
 public:
   using block_list = std::list<std::unique_ptr<BasicBlock>>;
@@ -895,7 +912,10 @@ protected:
   }
 
 public:
-  static bool classof(const Value *value) { return value->getKind() == kGlobal; }
+  static bool classof(const Value *value) {
+    return value->getKind() == kGlobal;
+  }
+
 public:
   Value *init() const { return hasInit ? operands.back().getValue() : nullptr; }
   int getNumDims() const { return getNumOperands() - (hasInit ? 1 : 0); }
@@ -908,39 +928,45 @@ public:
 //! IR unit for representing a SysY compile unit
 class Module {
 protected:
-  std::map<std::string, std::unique_ptr<Function>> functions;
-  std::map<std::string, std::unique_ptr<GlobalValue>> globals;
+  std::vector<std::unique_ptr<Value>> children;
+  std::map<std::string, Function *> functions;
+  std::map<std::string, GlobalValue *> globals;
 
 public:
   Module() = default;
 
 public:
   Function *createFunction(const std::string &name, Type *type) {
-    auto result = functions.try_emplace(name, new Function(this, type, name));
-    if (not result.second)
+    if (functions.count(name))
       return nullptr;
-    return result.first->second.get();
+    auto func = new Function(this, type, name);
+    assert(func);
+    children.emplace_back(func);
+    functions.emplace(name, func);
+    return func;
   };
   GlobalValue *createGlobalValue(const std::string &name, Type *type,
                                  const std::vector<Value *> &dims = {},
                                  Value *init = nullptr) {
-    auto result = globals.try_emplace(
-        name, new GlobalValue(this, type, name, dims, init));
-    if (not result.second)
+    if (globals.count(name))
       return nullptr;
-    return result.first->second.get();
+    auto global = new GlobalValue(this, type, name, dims, init);
+    assert(global);
+    children.emplace_back(global);
+    globals.emplace(name, global);
+    return global;
   }
   Function *getFunction(const std::string &name) const {
     auto result = functions.find(name);
     if (result == functions.end())
       return nullptr;
-    return result->second.get();
+    return result->second;
   }
   GlobalValue *getGlobalValue(const std::string &name) const {
     auto result = globals.find(name);
     if (result == globals.end())
       return nullptr;
-    return result->second.get();
+    return result->second;
   }
 
 public:

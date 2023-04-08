@@ -470,10 +470,8 @@ void Function::print(std::ostream &os) const {
 }
 
 void Module::print(std::ostream &os) const {
-  for (auto &g : globals)
-    os << *g.second << '\n';
-  for (auto &f : functions)
-    os << *f.second << '\n';
+  for (auto &value : children)
+    os << *value << '\n';
 }
 
 // ArrayValue *ArrayValue::get(Type *type, const vector<Value *> &values) {
