@@ -28,7 +28,7 @@ ostream &interleave(ostream &os, const T &container, const string sep = ", ") {
   return os;
 }
 static inline ostream &printVarName(ostream &os, const Value *var) {
-  return os << (dynamic_cast<const GlobalValue *>(var) ? '@' : '%')
+  return os << (dyncast<GlobalValue>(var) ? '@' : '%')
             << var->getName();
 }
 static inline ostream &printBlockName(ostream &os, const BasicBlock *block) {
@@ -38,7 +38,7 @@ static inline ostream &printFunctionName(ostream &os, const Function *fn) {
   return os << '@' << fn->getName();
 }
 static inline ostream &printOperand(ostream &os, const Value *value) {
-  auto constant = dynamic_cast<const ConstantValue *>(value);
+  auto constant = dyncast<ConstantValue>(value);
   if (constant) {
     constant->print(os);
     return os;
@@ -162,16 +162,16 @@ void Value::replaceAllUsesWith(Value *value) {
 }
 
 bool Value::isConstant() const {
-  if (dynamic_cast<const ConstantValue *>(this))
+  if (dyncast<ConstantValue>(this))
     return true;
-  if (dynamic_cast<const GlobalValue *>(this) or
-      dynamic_cast<const Function *>(this))
+  if (dyncast<GlobalValue>(this) or
+      dyncast<Function>(this))
     return true;
-  if (auto array = dynamic_cast<const ArrayValue *>(this)) {
-    auto elements = array->getValues();
-    return all_of(elements.begin(), elements.end(),
-                  [](Value *v) -> bool { return v->isConstant(); });
-  }
+  // if (auto array = dyncast<const ArrayValue *>(this)) {
+  //   auto elements = array->getValues();
+  //   return all_of(elements.begin(), elements.end(),
+  //                 [](Value *v) -> bool { return v->isConstant(); });
+  // }
   return false;
 }
 
@@ -206,7 +206,7 @@ void ConstantValue::print(ostream &os) const {
 
 Argument::Argument(Type *type, BasicBlock *block, int index,
                    const std::string &name)
-    : Value(type, name), block(block), index(index) {
+    : Value(kArgument, type, name), block(block), index(index) {
   if (not hasName())
     setName(to_string(block->getParent()->allocateVariableID()));
 }
@@ -217,8 +217,8 @@ void Argument::print(std::ostream &os) const {
 }
 
 BasicBlock::BasicBlock(Function *parent, const std::string &name)
-    : Value(Type::getLabelType(), name), parent(parent), instructions(),
-      arguments(), successors(), predecessors() {
+    : Value(kBasicBlock, Type::getLabelType(), name), parent(parent),
+      instructions(), arguments(), successors(), predecessors() {
   if (not hasName())
     setName("bb" + to_string(getParent()->allocateblockID()));
 }
@@ -230,11 +230,13 @@ void BasicBlock::print(std::ostream &os) const {
   auto args = getArguments();
   auto b = args.begin(), e = args.end();
   if (b != e) {
-    printVarName(os, &*b) << ": " << *b->getType();
-    for (auto arg : make_range(std::next(b), e)) {
+    os << '(';
+    printVarName(os, b->get()) << ": " << *b->get()->getType();
+    for (auto &arg : make_range(std::next(b), e)) {
       os << ", ";
-      printVarName(os, &arg) << ": " << arg.getType();
+      printVarName(os, arg.get()) << ": " << *arg->getType();
     }
+    os << ')';
   }
   os << ":\n";
   for (auto &inst : instructions) {
@@ -244,14 +246,14 @@ void BasicBlock::print(std::ostream &os) const {
 
 Instruction::Instruction(Kind kind, Type *type, BasicBlock *parent,
                          const std::string &name)
-    : User(type, name), kind(kind), parent(parent) {
+    : User(kind, type, name), kind(kind), parent(parent) {
   if (not type->isVoid() and not hasName())
     setName(to_string(getFunction()->allocateVariableID()));
 }
 
 void CallInst::print(std::ostream &os) const {
   if (not getType()->isVoid())
-    printVarName(os, this) << " = ";
+    printVarName(os, this) << " = call ";
   printFunctionName(os, getCallee()) << '(';
   auto args = getArguments();
   auto b = args.begin(), e = args.end();
@@ -361,6 +363,7 @@ void BinaryInst::print(std::ostream &os) const {
   default:
     assert(false);
   }
+  os << ' ';
   printOperand(os, getLhs()) << ", ";
   printOperand(os, getRhs()) << " : " << *getType();
 }
@@ -453,8 +456,13 @@ void Function::print(std::ostream &os) const {
   auto paramTypes = getParamTypes();
   os << *returnType << ' ';
   printFunctionName(os, this) << '(';
-  interleave(os, paramTypes) << ')';
-  os << "{\n";
+  auto b = paramTypes.begin(), e = paramTypes.end();
+  if (b != e) {
+    os << *(*b);
+    for (auto type : make_range(std::next(b), e))
+      os << ", " << *type;
+  }
+  os << ") {\n";
   for (auto &bb : getBasicBlocks()) {
     os << *bb << '\n';
   }
@@ -468,35 +476,35 @@ void Module::print(std::ostream &os) const {
     os << *f.second << '\n';
 }
 
-ArrayValue *ArrayValue::get(Type *type, const vector<Value *> &values) {
-  static map<pair<Type *, size_t>, unique_ptr<ArrayValue>> arrayConstants;
-  hash<string> hasher;
-  auto key = make_pair(
-      type, hasher(string(reinterpret_cast<const char *>(values.data()),
-                          values.size() * sizeof(Value *))));
+// ArrayValue *ArrayValue::get(Type *type, const vector<Value *> &values) {
+//   static map<pair<Type *, size_t>, unique_ptr<ArrayValue>> arrayConstants;
+//   hash<string> hasher;
+//   auto key = make_pair(
+//       type, hasher(string(reinterpret_cast<const char *>(values.data()),
+//                           values.size() * sizeof(Value *))));
 
-  auto iter = arrayConstants.find(key);
-  if (iter != arrayConstants.end())
-    return iter->second.get();
-  auto constant = new ArrayValue(type, values);
-  assert(constant);
-  auto result = arrayConstants.emplace(key, constant);
-  return result.first->second.get();
-}
+//   auto iter = arrayConstants.find(key);
+//   if (iter != arrayConstants.end())
+//     return iter->second.get();
+//   auto constant = new ArrayValue(type, values);
+//   assert(constant);
+//   auto result = arrayConstants.emplace(key, constant);
+//   return result.first->second.get();
+// }
 
-ArrayValue *ArrayValue::get(const std::vector<int> &values) {
-  vector<Value *> vals(values.size(), nullptr);
-  std::transform(values.begin(), values.end(), vals.begin(),
-                 [](int v) { return ConstantValue::get(v); });
-  return get(Type::getIntType(), vals);
-}
+// ArrayValue *ArrayValue::get(const std::vector<int> &values) {
+//   vector<Value *> vals(values.size(), nullptr);
+//   std::transform(values.begin(), values.end(), vals.begin(),
+//                  [](int v) { return ConstantValue::get(v); });
+//   return get(Type::getIntType(), vals);
+// }
 
-ArrayValue *ArrayValue::get(const std::vector<float> &values) {
-  vector<Value *> vals(values.size(), nullptr);
-  std::transform(values.begin(), values.end(), vals.begin(),
-                 [](float v) { return ConstantValue::get(v); });
-  return get(Type::getFloatType(), vals);
-}
+// ArrayValue *ArrayValue::get(const std::vector<float> &values) {
+//   vector<Value *> vals(values.size(), nullptr);
+//   std::transform(values.begin(), values.end(), vals.begin(),
+//                  [](float v) { return ConstantValue::get(v); });
+//   return get(Type::getFloatType(), vals);
+// }
 
 void User::setOperand(int index, Value *value) {
   assert(index < getNumOperands());
@@ -519,7 +527,7 @@ CallInst::CallInst(Function *callee, const std::vector<Value *> &args,
 }
 
 Function *CallInst::getCallee() const {
-  return dynamic_cast<Function *>(getOperand(0));
+  return dyncast<Function>(getOperand(0));
 }
 
 } // namespace sysy

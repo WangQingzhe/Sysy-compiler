@@ -71,8 +71,6 @@ any SysYIRGenerator::visitLocalDecl(SysYParser::DeclContext *ctx) {
 }
 
 any SysYIRGenerator::visitFunc(SysYParser::FuncContext *ctx) {
-  // create the function scope
-  SymbolTable::FunctionScope scope(symbols);
   // obtain function name and type signature
   auto name = ctx->ID()->getText();
   vector<Type *> paramTypes;
@@ -88,6 +86,10 @@ any SysYIRGenerator::visitFunc(SysYParser::FuncContext *ctx) {
   auto funcType = Type::getFunctionType(returnType, paramTypes);
   // create the IR function
   auto function = module->createFunction(name, funcType);
+  // update the symbol table
+  symbols.insert(name, function);
+  // create the function scope
+  SymbolTable::FunctionScope scope(symbols);
   // create the entry block with the same parameters as the function,
   // and update the symbol table
   auto entry = function->getEntryBlock();
@@ -149,10 +151,7 @@ any SysYIRGenerator::visitLValueExp(SysYParser::LValueExpContext *ctx) {
   Value *value = symbols.lookup(name);
   if (not value)
     error(ctx, "undefined variable");
-  auto a = dynamic_cast<Instruction *>(value);
-  if (dynamic_cast<GlobalValue *>(value) or
-      (dynamic_cast<Instruction *>(value) and
-       dynamic_cast<AllocaInst *>(value)))
+  if (isa<GlobalValue>(value) or isa<AllocaInst>(value))
     value = builder.createLoadInst(value);
   return value;
 }
@@ -217,7 +216,7 @@ any SysYIRGenerator::visitReturnStmt(SysYParser::ReturnStmtContext *ctx) {
 
 any SysYIRGenerator::visitCall(SysYParser::CallContext *ctx) {
   auto funcName = ctx->ID()->getText();
-  auto func = dynamic_cast<Function *>(symbols.lookup(funcName));
+  auto func = dyncast<Function>(symbols.lookup(funcName));
   assert(func);
   vector<Value *> args;
   if (auto rArgs = ctx->funcRParams()) {

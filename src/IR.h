@@ -2,6 +2,7 @@
 
 #include "range.h"
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <iterator>
@@ -173,17 +174,90 @@ public:
   void setValue(Value *value) { value = value; }
 }; // class Use
 
+template <typename T>
+inline std::enable_if_t<std::is_base_of_v<Value, T>, bool> isa(const Value *value) {
+  return T::classof(value);
+}
+
+template <typename T>
+inline std::enable_if_t<std::is_base_of_v<Value, T>, T *> dyncast(Value *value) {
+  return isa<T>(value) ? static_cast<T *>(value) : nullptr;
+}
+
+template <typename T>
+inline std::enable_if_t<std::is_base_of_v<Value, T>, const T *> dyncast(const Value *value) {
+  return isa<T>(value) ? static_cast<const T *>(value) : nullptr;
+}
+
 //! The base class of all value types
 class Value {
+public:
+  enum Kind : uint64_t {
+    kInvalid,
+    // Instructions
+    // Binary
+    kAdd = 0x1UL << 0,
+    kSub = 0x1UL << 1,
+    kMul = 0x1UL << 2,
+    kDiv = 0x1UL << 3,
+    kRem = 0x1UL << 4,
+    kICmpEQ = 0x1UL << 5,
+    kICmpNE = 0x1UL << 6,
+    kICmpLT = 0x1UL << 7,
+    kICmpGT = 0x1UL << 8,
+    kICmpLE = 0x1UL << 9,
+    kICmpGE = 0x1UL << 10,
+    kFAdd = 0x1UL << 14,
+    kFSub = 0x1UL << 15,
+    kFMul = 0x1UL << 16,
+    kFDiv = 0x1UL << 17,
+    kFRem = 0x1UL << 18,
+    kFCmpEQ = 0x1UL << 19,
+    kFCmpNE = 0x1UL << 20,
+    kFCmpLT = 0x1UL << 21,
+    kFCmpGT = 0x1UL << 22,
+    kFCmpLE = 0x1UL << 23,
+    kFCmpGE = 0x1UL << 24,
+    // Unary
+    kNeg = 0x1UL << 25,
+    kNot = 0x1UL << 26,
+    kFNeg = 0x1UL << 27,
+    kFtoI = 0x1UL << 28,
+    kIToF = 0x1UL << 29,
+    // call
+    kCall = 0x1UL << 30,
+    // terminator
+    kCondBr = 0x1UL << 31,
+    kBr = 0x1UL << 32,
+    kReturn = 0x1UL << 33,
+    // mem op
+    kAlloca = 0x1UL << 34,
+    kLoad = 0x1UL << 35,
+    kStore = 0x1UL << 36,
+    kFirstInst = kAdd,
+    kLastInst = kStore,
+    // others
+    kArgument = 0x1UL << 37,
+    kBasicBlock = 0x1UL << 38,
+    kFunction = 0x1UL << 39,
+    kConstant = 0x1UL << 40,
+    kGlobal = 0x1UL << 41,
+  };
+
 protected:
+  Kind kind;
   Type *type;
   std::string name;
   std::list<Use *> uses;
 
 protected:
-  Value(Type *type, const std::string &name = "")
-      : type(type), name(name), uses() {}
+  Value(Kind kind, Type *type, const std::string &name = "")
+      : kind(kind), type(type), name(name), uses() {}
   virtual ~Value() = default;
+
+public:
+  Kind getKind() const { return kind; }
+  static bool classof(const Value *) { return true; }
 
 public:
   Type *getType() const { return type; }
@@ -200,7 +274,7 @@ public:
   bool isConstant() const;
 
 public:
-  virtual void print(std::ostream &os) const = 0;
+  virtual void print(std::ostream &os) const {};
 }; // class Value
 
 /*!
@@ -217,13 +291,17 @@ protected:
   };
 
 protected:
-  ConstantValue(int value) : Value(Type::getIntType(), ""), iScalar(value) {}
+  ConstantValue(int value)
+      : Value(kConstant, Type::getIntType(), ""), iScalar(value) {}
   ConstantValue(float value)
-      : Value(Type::getFloatType(), ""), fScalar(value) {}
+      : Value(kConstant, Type::getFloatType(), ""), fScalar(value) {}
 
 public:
   static ConstantValue *get(int value);
   static ConstantValue *get(float value);
+
+public:
+  static bool classof(const Value *value) { return value->getKind() == kConstant; }
 
 public:
   int getInt() const {
@@ -260,6 +338,9 @@ public:
            const std::string &name = "");
 
 public:
+  static bool classof(const Value *value) { return value->getKind() == kConstant; }
+
+public:
   BasicBlock *getParent() const { return block; }
   int getIndex() const { return index; }
 
@@ -282,7 +363,7 @@ class BasicBlock : public Value {
 public:
   using inst_list = std::list<std::unique_ptr<Instruction>>;
   using iterator = inst_list::iterator;
-  using arg_list = std::vector<Argument>;
+  using arg_list = std::vector<std::unique_ptr<Argument>>;
   using block_list = std::vector<BasicBlock *>;
 
 protected:
@@ -294,6 +375,9 @@ protected:
 
 protected:
   explicit BasicBlock(Function *parent, const std::string &name = "");
+
+public:
+  static bool classof(const Value *value) { return value->getKind() == kBasicBlock; }
 
 public:
   int getNumInstructions() const { return instructions.size(); }
@@ -309,8 +393,10 @@ public:
   iterator end() { return instructions.end(); }
   iterator terminator() { return std::prev(end()); }
   Argument *createArgument(Type *type, const std::string &name = "") {
-    arguments.emplace_back(type, this, arguments.size(), name);
-    return &arguments.back();
+    auto arg = new Argument(type, this, arguments.size(), name);
+    assert(arg);
+    arguments.emplace_back(arg);
+    return arguments.back().get();
   };
 
 public:
@@ -325,8 +411,8 @@ protected:
   std::vector<Use> operands;
 
 protected:
-  User(Type *type, const std::string &name = "")
-      : Value(type, name), operands() {}
+  User(Kind kind, Type *type, const std::string &name = "")
+      : Value(kind, type, name), operands() {}
 
 public:
   using use_iterator = std::vector<Use>::const_iterator;
@@ -369,50 +455,50 @@ public:
  */
 class Instruction : public User {
 public:
-  enum Kind : uint64_t {
-    kInvalid = 0x0UL,
-    // Binary
-    kAdd = 0x1UL << 0,
-    kSub = 0x1UL << 1,
-    kMul = 0x1UL << 2,
-    kDiv = 0x1UL << 3,
-    kRem = 0x1UL << 4,
-    kICmpEQ = 0x1UL << 5,
-    kICmpNE = 0x1UL << 6,
-    kICmpLT = 0x1UL << 7,
-    kICmpGT = 0x1UL << 8,
-    kICmpLE = 0x1UL << 9,
-    kICmpGE = 0x1UL << 10,
-    kFAdd = 0x1UL << 14,
-    kFSub = 0x1UL << 15,
-    kFMul = 0x1UL << 16,
-    kFDiv = 0x1UL << 17,
-    kFRem = 0x1UL << 18,
-    kFCmpEQ = 0x1UL << 19,
-    kFCmpNE = 0x1UL << 20,
-    kFCmpLT = 0x1UL << 21,
-    kFCmpGT = 0x1UL << 22,
-    kFCmpLE = 0x1UL << 23,
-    kFCmpGE = 0x1UL << 24,
-    // Unary
-    kNeg = 0x1UL << 25,
-    kNot = 0x1UL << 26,
-    kFNeg = 0x1UL << 27,
-    kFtoI = 0x1UL << 28,
-    kIToF = 0x1UL << 29,
-    // call
-    kCall = 0x1UL << 30,
-    // terminator
-    kCondBr = 0x1UL << 31,
-    kBr = 0x1UL << 32,
-    kReturn = 0x1UL << 33,
-    // mem op
-    kAlloca = 0x1UL << 34,
-    kLoad = 0x1UL << 35,
-    kStore = 0x1UL << 36,
-    // constant
-    // kConstant = 0x1UL << 37,
-  };
+  // enum Kind : uint64_t {
+  //   kInvalid = 0x0UL,
+  //   // Binary
+  //   kAdd = 0x1UL << 0,
+  //   kSub = 0x1UL << 1,
+  //   kMul = 0x1UL << 2,
+  //   kDiv = 0x1UL << 3,
+  //   kRem = 0x1UL << 4,
+  //   kICmpEQ = 0x1UL << 5,
+  //   kICmpNE = 0x1UL << 6,
+  //   kICmpLT = 0x1UL << 7,
+  //   kICmpGT = 0x1UL << 8,
+  //   kICmpLE = 0x1UL << 9,
+  //   kICmpGE = 0x1UL << 10,
+  //   kFAdd = 0x1UL << 14,
+  //   kFSub = 0x1UL << 15,
+  //   kFMul = 0x1UL << 16,
+  //   kFDiv = 0x1UL << 17,
+  //   kFRem = 0x1UL << 18,
+  //   kFCmpEQ = 0x1UL << 19,
+  //   kFCmpNE = 0x1UL << 20,
+  //   kFCmpLT = 0x1UL << 21,
+  //   kFCmpGT = 0x1UL << 22,
+  //   kFCmpLE = 0x1UL << 23,
+  //   kFCmpGE = 0x1UL << 24,
+  //   // Unary
+  //   kNeg = 0x1UL << 25,
+  //   kNot = 0x1UL << 26,
+  //   kFNeg = 0x1UL << 27,
+  //   kFtoI = 0x1UL << 28,
+  //   kIToF = 0x1UL << 29,
+  //   // call
+  //   kCall = 0x1UL << 30,
+  //   // terminator
+  //   kCondBr = 0x1UL << 31,
+  //   kBr = 0x1UL << 32,
+  //   kReturn = 0x1UL << 33,
+  //   // mem op
+  //   kAlloca = 0x1UL << 34,
+  //   kLoad = 0x1UL << 35,
+  //   kStore = 0x1UL << 36,
+  //   // constant
+  //   // kConstant = 0x1UL << 37,
+  // };
 
 protected:
   Kind kind;
@@ -421,6 +507,11 @@ protected:
 protected:
   Instruction(Kind kind, Type *type, BasicBlock *parent = nullptr,
               const std::string &name = "");
+
+public:
+  static bool classof(const Value *value) {
+    return value->getKind() >= kFirstInst and value->getKind() <= kLastInst;
+  }
 
 public:
   Kind getKind() const { return kind; }
@@ -477,6 +568,9 @@ protected:
            BasicBlock *parent = nullptr, const std::string &name = "");
 
 public:
+  static bool classof(const Value *value) { return value->getKind() == kCall; }
+
+public:
   Function *getCallee() const;
   auto getArguments() const {
     return make_range(std::next(operand_begin()), operand_end());
@@ -495,6 +589,12 @@ protected:
             const std::string &name = "")
       : Instruction(kind, type, parent, name) {
     addOperand(operand);
+  }
+
+public:
+  static bool classof(const Value *value) {
+    return Instruction::classof(value) and
+           static_cast<const Instruction *>(value)->isUnary();
   }
 
 public:
@@ -517,6 +617,12 @@ protected:
   }
 
 public:
+  static bool classof(const Value *value) {
+    return Instruction::classof(value) and
+           static_cast<const Instruction *>(value)->isBinary();
+  }
+
+public:
   Value *getLhs() const { return getOperand(0); }
   Value *getRhs() const { return getOperand(1); }
 
@@ -534,6 +640,9 @@ protected:
     if (value)
       addOperand(value);
   }
+
+public:
+  static bool classof(const Value *value) { return value->getKind() == kReturn; }
 
 public:
   bool hasReturnValue() const { return not operands.empty(); }
@@ -559,8 +668,11 @@ protected:
   }
 
 public:
+  static bool classof(const Value *value) { return value->getKind() == kBr; }
+
+public:
   BasicBlock *getBlock() const {
-    return dynamic_cast<BasicBlock *>(getOperand(0));
+    return dyncast<BasicBlock>(getOperand(0));
   }
   auto getArguments() const {
     return make_range(std::next(operand_begin()), operand_end());
@@ -589,12 +701,15 @@ protected:
   }
 
 public:
+  static bool classof(const Value *value) { return value->getKind() == kCondBr; }
+
+public:
   Value *getCondition() const { return getOperand(0); }
   BasicBlock *getThenBlock() const {
-    return dynamic_cast<BasicBlock *>(getOperand(1));
+    return dyncast<BasicBlock>(getOperand(1));
   }
   BasicBlock *getElseBlock() const {
-    return dynamic_cast<BasicBlock *>(getOperand(2));
+    return dyncast<BasicBlock>(getOperand(2));
   }
   auto getThenArguments() const {
     auto begin = std::next(operand_begin(), 3);
@@ -624,6 +739,9 @@ protected:
   }
 
 public:
+  static bool classof(const Value *value) { return value->getKind() == kAlloca; }
+
+public:
   int getNumDims() const { return getNumOperands(); }
   auto getDims() const { return getOperands(); }
   Value *getDim(int index) { return getOperand(index); }
@@ -644,6 +762,9 @@ protected:
     addOperand(pointer);
     addOperands(indices);
   }
+
+public:
+  static bool classof(const Value *value) { return value->getKind() == kLoad; }
 
 public:
   int getNumIndices() const { return getNumOperands() - 1; }
@@ -672,6 +793,9 @@ protected:
   }
 
 public:
+  static bool classof(const Value *value) { return value->getKind() == kStore; }
+
+public:
   int getNumIndices() const { return getNumOperands() - 2; }
   Value *getValue() const { return getOperand(0); }
   Value *getPointer() const { return getOperand(1); }
@@ -691,9 +815,12 @@ class Function : public Value {
 
 protected:
   Function(Module *parent, Type *type, const std::string &name)
-      : Value(type, name), parent(parent), variableID(0), blocks() {
+      : Value(kFunction, type, name), parent(parent), variableID(0), blocks() {
     blocks.emplace_back(new BasicBlock(this, "entry"));
   }
+
+public:
+  static bool classof(const Value *value) { return value->getKind() == kFunction; }
 
 public:
   using block_list = std::list<std::unique_ptr<BasicBlock>>;
@@ -729,24 +856,24 @@ public:
   void print(std::ostream &os) const override;
 }; // class Function
 
-class ArrayValue : public User {
-protected:
-  ArrayValue(Type *type, const std::vector<Value *> &values = {})
-      : User(type, "") {
-    addOperands(values);
-  }
+// class ArrayValue : public User {
+// protected:
+//   ArrayValue(Type *type, const std::vector<Value *> &values = {})
+//       : User(type, "") {
+//     addOperands(values);
+//   }
 
-public:
-  static ArrayValue *get(Type *type, const std::vector<Value *> &values);
-  static ArrayValue *get(const std::vector<int> &values);
-  static ArrayValue *get(const std::vector<float> &values);
+// public:
+//   static ArrayValue *get(Type *type, const std::vector<Value *> &values);
+//   static ArrayValue *get(const std::vector<int> &values);
+//   static ArrayValue *get(const std::vector<float> &values);
 
-public:
-  auto getValues() const { return getOperands(); }
+// public:
+//   auto getValues() const { return getOperands(); }
 
-public:
-  void print(std::ostream &os) const override{};
-}; // class ConstantArray
+// public:
+//   void print(std::ostream &os) const override{};
+// }; // class ConstantArray
 
 //! Global value declared at file scope
 class GlobalValue : public User {
@@ -760,13 +887,15 @@ protected:
 protected:
   GlobalValue(Module *parent, Type *type, const std::string &name,
               const std::vector<Value *> &dims = {}, Value *init = nullptr)
-      : User(type, name), parent(parent), hasInit(init) {
+      : User(kGlobal, type, name), parent(parent), hasInit(init) {
     assert(type->isPointer());
     addOperands(dims);
     if (init)
       addOperand(init);
   }
 
+public:
+  static bool classof(const Value *value) { return value->getKind() == kGlobal; }
 public:
   Value *init() const { return hasInit ? operands.back().getValue() : nullptr; }
   int getNumDims() const { return getNumOperands() - (hasInit ? 1 : 0); }
