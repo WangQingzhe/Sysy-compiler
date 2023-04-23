@@ -260,6 +260,7 @@ namespace sysy
   {
     // generate condition expression
     auto cond = any_cast<Value *>(ctx->exp()->accept(this));
+    cond->setName("flag");
     auto current_block = builder.getBasicBlock();
     auto func = current_block->getParent();
     // create then basicblock
@@ -336,4 +337,74 @@ namespace sysy
     builder.setPosition(exitblock, exitblock->begin());
     return builder.getBasicBlock();
   }
+  //******************Revised by lyq BEGIN*************************************
+  any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
+  {
+    // generate the operands
+    auto hs = any_cast<Value *>(ctx->exp()->accept(this));
+
+    Value *result = nullptr;
+    if (ctx->SUB())
+      result = builder.createNegInst(hs);
+    else if (ctx->NOT())
+      result = builder.createNotInst(hs);
+    else if (ctx->ADD())
+      result = hs;
+    return result;
+  }
+
+  any SysYIRGenerator::visitRelationExp(SysYParser::RelationExpContext *ctx)
+  {
+    // generate the operands
+    auto lhs = any_cast<Value *>(ctx->exp(0)->accept(this));
+    auto rhs = any_cast<Value *>(ctx->exp(1)->accept(this));
+    // create convert instruction if needed
+    auto lhsTy = lhs->getType();
+    auto rhsTy = rhs->getType();
+    auto type = getArithmeticResultType(lhsTy, rhsTy);
+    if (lhsTy != type)
+      lhs = builder.createIToFInst(lhs);
+    if (rhsTy != type)
+      rhs = builder.createIToFInst(rhs);
+
+    Value *result = nullptr;
+    if (ctx->LT())
+      result = type->isInt() ? builder.createICmpLTInst(lhs, rhs)
+                             : builder.createFCmpLTInst(lhs, rhs);
+    else if (ctx->GT())
+      result = type->isInt() ? builder.createICmpGTInst(lhs, rhs)
+                             : builder.createFCmpGTInst(lhs, rhs);
+    else if (ctx->LE())
+      result = type->isInt() ? builder.createICmpLEInst(lhs, rhs)
+                             : builder.createFCmpLEInst(lhs, rhs);
+    else if (ctx->GE())
+      result = type->isInt() ? builder.createICmpGEInst(lhs, rhs)
+                             : builder.createFCmpGEInst(lhs, rhs);
+    return result;
+  }
+
+  any SysYIRGenerator::visitEqualExp(SysYParser::EqualExpContext *ctx)
+  {
+    // generate the operands
+    auto lhs = any_cast<Value *>(ctx->exp(0)->accept(this));
+    auto rhs = any_cast<Value *>(ctx->exp(1)->accept(this));
+    // create convert instruction if needed
+    auto lhsTy = lhs->getType();
+    auto rhsTy = rhs->getType();
+    auto type = getArithmeticResultType(lhsTy, rhsTy);
+    if (lhsTy != type)
+      lhs = builder.createIToFInst(lhs);
+    if (rhsTy != type)
+      rhs = builder.createIToFInst(rhs);
+
+    Value *result = nullptr;
+    if (ctx->EQ())
+      result = type->isInt() ? builder.createICmpEQInst(lhs, rhs)
+                             : builder.createFCmpEQInst(lhs, rhs);
+    else if (ctx->NE())
+      result = type->isInt() ? builder.createICmpNEInst(lhs, rhs)
+                             : builder.createFCmpNEInst(lhs, rhs);
+    return result;
+  }
+  //******************Revised by lyq END***************************************
 } // namespace sysy

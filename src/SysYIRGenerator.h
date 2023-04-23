@@ -173,10 +173,7 @@ namespace sysy
     }
 
     virtual std::any
-    visitRelationExp(SysYParser::RelationExpContext *ctx) override
-    {
-      return visitChildren(ctx);
-    }
+    visitRelationExp(SysYParser::RelationExpContext *ctx) override;
 
     virtual std::any
     visitMultiplicativeExp(SysYParser::MultiplicativeExpContext *ctx) override;
@@ -190,10 +187,7 @@ namespace sysy
       return visitChildren(ctx);
     }
 
-    virtual std::any visitUnaryExp(SysYParser::UnaryExpContext *ctx) override
-    {
-      return visitChildren(ctx);
-    }
+    virtual std::any visitUnaryExp(SysYParser::UnaryExpContext *ctx) override;
 
     virtual std::any visitParenExp(SysYParser::ParenExpContext *ctx) override
     {
@@ -218,10 +212,7 @@ namespace sysy
     virtual std::any
     visitAdditiveExp(SysYParser::AdditiveExpContext *ctx) override;
 
-    virtual std::any visitEqualExp(SysYParser::EqualExpContext *ctx) override
-    {
-      return visitChildren(ctx);
-    }
+    virtual std::any visitEqualExp(SysYParser::EqualExpContext *ctx) override;
 
     virtual std::any visitCall(SysYParser::CallContext *ctx) override;
 
