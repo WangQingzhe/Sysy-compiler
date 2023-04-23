@@ -1,0 +1,16 @@
+//test add
+
+int mul(int x, int y) {
+    return x * y;
+}
+
+int main(){
+    int a, b;
+    a = 10;
+    b = 0;
+    if(a>0)
+    	a = mul(a, b);
+    else
+    	b = mul(a, b);S
+    return a + b;
+}

@@ -1,0 +1,17 @@
+//test add
+
+int mul(int x, int y) {
+    return x * y;
+}
+
+int main(){
+    int a, b;
+    a = 10;
+    b = 0;
+    a = mul(a, b);
+    while(a)
+    {
+    	a=a+1;
+    }
+    return a + b;
+}
