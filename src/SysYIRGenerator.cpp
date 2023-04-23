@@ -256,10 +256,6 @@ namespace sysy
     return call;
   }
 
-  any SysYIRGenerator::visitCondExp(SysYParser::ExpContext *ctx)
-  {
-  }
-
   any SysYIRGenerator::visitIfStmt(SysYParser::IfStmtContext *ctx)
   {
     // generate condition expression

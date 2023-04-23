@@ -246,7 +246,7 @@ namespace sysy
       return visitChildren(ctx);
     }
     virtual std::any
-    visitCondExp(SysYParser::ExpContext *ctx) override;
+    visitCondExp(SysYParser::ExpContext *ctx) { return visitChildren(ctx); }
 
   private:
     std::any visitGlobalDecl(SysYParser::DeclContext *ctx);
