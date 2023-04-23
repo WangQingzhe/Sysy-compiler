@@ -32,7 +32,7 @@ namespace sysy
 
   any SysYIRGenerator::visitGlobalDecl(SysYParser::DeclContext *ctx)
   {
-    error(ctx, "not implemented yet");
+    // error(ctx, "not implemented yet");
     std::vector<Value *> values;
     bool isConst = ctx->CONST();
     auto type = any_cast<Type *>(visitBtype(ctx->btype()));
@@ -317,6 +317,7 @@ namespace sysy
     // Value *Current_uncondbr = builder.createUncondBrInst(headerblock, vector<Value *>());
     // generate condition expression
     auto cond = any_cast<Value *>(ctx->exp()->accept(this));
+    cond->setName("flag");
     // create body basicblock
     auto bodyblock = func->addBasicBlock("body");
     headerblock->getSuccessors().push_back(bodyblock);
