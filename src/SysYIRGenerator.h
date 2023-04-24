@@ -153,16 +153,10 @@ namespace sysy
 
     virtual std::any visitWhileStmt(SysYParser::WhileStmtContext *ctx) override;
 
-    virtual std::any visitBreakStmt(SysYParser::BreakStmtContext *ctx) override
-    {
-      return visitChildren(ctx);
-    }
+    virtual std::any visitBreakStmt(SysYParser::BreakStmtContext *ctx) override;
 
     virtual std::any
-    visitContinueStmt(SysYParser::ContinueStmtContext *ctx) override
-    {
-      return visitChildren(ctx);
-    }
+    visitContinueStmt(SysYParser::ContinueStmtContext *ctx) override;
 
     virtual std::any
     visitReturnStmt(SysYParser::ReturnStmtContext *ctx) override;

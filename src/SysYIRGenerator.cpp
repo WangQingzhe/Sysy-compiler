@@ -258,17 +258,24 @@ namespace sysy
 
   any SysYIRGenerator::visitIfStmt(SysYParser::IfStmtContext *ctx)
   {
+    builder.if_add();
     // generate condition expression
     auto cond = any_cast<Value *>(ctx->exp()->accept(this));
-    cond->setName("flag");
+    char flagname[20];
+    sprintf(flagname, "flag%d", builder.get_ifcnt() + builder.get_whilecnt());
+    cond->setName(flagname);
     auto current_block = builder.getBasicBlock();
     auto func = current_block->getParent();
     // create then basicblock
-    auto thenblock = func->addBasicBlock("then");
+    char thenname[20];
+    sprintf(thenname, "then%d", builder.get_ifcnt());
+    auto thenblock = func->addBasicBlock(thenname);
     current_block->getSuccessors().push_back(thenblock);
     thenblock->getPredecessors().push_back(current_block);
     // create exit basicblock
-    auto exitblock = func->addBasicBlock("exit");
+    char exitname[20];
+    sprintf(exitname, "exit%d", builder.get_ifcnt() + builder.get_whilecnt());
+    auto exitblock = func->addBasicBlock(exitname);
     exitblock->getPredecessors().push_back(thenblock);
     thenblock->getSuccessors().push_back(exitblock);
     // create condbr instr
@@ -287,7 +294,9 @@ namespace sysy
     {
       // if-then-else
       // create else basicblock
-      auto elseblock = func->addBasicBlock("else");
+      char elsename[20];
+      sprintf(elsename, "else%d", builder.get_ifcnt());
+      auto elseblock = func->addBasicBlock(elsename);
       current_block->getSuccessors().push_back(elseblock);
       elseblock->getPredecessors().push_back(current_block);
       elseblock->getSuccessors().push_back(exitblock);
@@ -307,36 +316,60 @@ namespace sysy
 
   any SysYIRGenerator::visitWhileStmt(SysYParser::WhileStmtContext *ctx)
   {
+    builder.while_add();
     auto current_block = builder.getBasicBlock();
     auto func = current_block->getParent();
     // create header basicblock
-    auto headerblock = func->addBasicBlock("header");
+    char headername[20];
+    sprintf(headername, "header%d", builder.get_whilecnt());
+    auto headerblock = func->addBasicBlock(headername);
     current_block->getSuccessors().push_back(headerblock);
     headerblock->getPredecessors().push_back(current_block);
     // uncondbr:current->header
     // Value *Current_uncondbr = builder.createUncondBrInst(headerblock, vector<Value *>());
     // generate condition expression
+    builder.setPosition(headerblock, headerblock->begin());
     auto cond = any_cast<Value *>(ctx->exp()->accept(this));
-    cond->setName("flag");
+    char flagname[20];
+    sprintf(flagname, "flag%d", builder.get_ifcnt() + builder.get_whilecnt());
+    cond->setName(flagname);
     // create body basicblock
-    auto bodyblock = func->addBasicBlock("body");
+    char bodyname[20];
+    sprintf(bodyname, "body%d", builder.get_whilecnt());
+    auto bodyblock = func->addBasicBlock(bodyname);
     headerblock->getSuccessors().push_back(bodyblock);
     bodyblock->getPredecessors().push_back(headerblock);
     // create exit basicblock
-    auto exitblock = func->addBasicBlock("exit");
+    char exitname[20];
+    sprintf(exitname, "exit%d", builder.get_whilecnt() + builder.get_ifcnt());
+    auto exitblock = func->addBasicBlock(exitname);
     headerblock->getSuccessors().push_back(exitblock);
     exitblock->getPredecessors().push_back(headerblock);
+    // push header&exit into loopstack
+    builder.pushheader(headerblock);
+    builder.pushexit(exitblock);
     // create condbr in header
-    builder.setPosition(headerblock, headerblock->begin());
     Value *header_condbr = builder.createCondBrInst(cond, bodyblock, exitblock, vector<Value *>(), vector<Value *>());
     // generate code in body block
     builder.setPosition(bodyblock, bodyblock->begin());
     visitStmt(ctx->stmt());
+    // pop header&exit from loopstack
+    builder.poploop();
     // create uncondbr in body block
     Value *body_uncondbr = builder.createUncondBrInst(headerblock, vector<Value *>());
     // setup the instruction insert position
     builder.setPosition(exitblock, exitblock->begin());
     return builder.getBasicBlock();
+  }
+  any SysYIRGenerator::visitBreakStmt(SysYParser::BreakStmtContext *ctx)
+  {
+    Value *uncondbr = builder.createUncondBrInst(builder.getExit(), vector<Value *>());
+    return uncondbr;
+  }
+  any SysYIRGenerator::visitContinueStmt(SysYParser::ContinueStmtContext *ctx)
+  {
+    Value *uncondbr = builder.createUncondBrInst(builder.getHeader(), vector<Value *>());
+    return uncondbr;
   }
   //******************Revised by lyq BEGIN*************************************
   any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
