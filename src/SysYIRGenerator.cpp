@@ -259,11 +259,6 @@ namespace sysy
   any SysYIRGenerator::visitIfStmt(SysYParser::IfStmtContext *ctx)
   {
     builder.if_add();
-    // generate condition expression
-    auto cond = any_cast<Value *>(ctx->exp()->accept(this));
-    char flagname[20];
-    sprintf(flagname, "flag%d", builder.get_ifcnt() + builder.get_whilecnt());
-    cond->setName(flagname);
     auto current_block = builder.getBasicBlock();
     auto func = current_block->getParent();
     // create then basicblock
@@ -278,11 +273,20 @@ namespace sysy
     auto exitblock = func->addBasicBlock(exitname);
     exitblock->getPredecessors().push_back(thenblock);
     thenblock->getSuccessors().push_back(exitblock);
+
     // create condbr instr
     // visit thenblock(and elseblock)
     if (ctx->stmt().size() == 1)
     {
       // if-then
+      // generate condition expression
+      builder.push_truetarget(thenblock);
+      builder.push_falsetarget(exitblock);
+      auto cond = any_cast<Value *>(ctx->exp()->accept(this));
+      builder.poptarget();
+      char flagname[20];
+      sprintf(flagname, "flag%d", builder.get_ifcnt() + builder.get_whilecnt());
+      cond->setName(flagname);
       current_block->getSuccessors().push_back(exitblock);
       exitblock->getPredecessors().push_back(current_block);
       Value *CondBr = builder.createCondBrInst(cond, thenblock, exitblock, vector<Value *>(), vector<Value *>());
@@ -301,6 +305,11 @@ namespace sysy
       elseblock->getPredecessors().push_back(current_block);
       elseblock->getSuccessors().push_back(exitblock);
       exitblock->getPredecessors().push_back(current_block);
+      // generate condition expression
+      builder.push_truetarget(thenblock);
+      builder.push_falsetarget(elseblock);
+      auto cond = any_cast<Value *>(ctx->exp()->accept(this));
+      builder.poptarget();
       CondBrInst *CondBr = builder.createCondBrInst(cond, thenblock, elseblock, vector<Value *>(), vector<Value *>());
       builder.setPosition(thenblock, thenblock->begin());
       visitStmt(ctx->stmt()[0]);
@@ -323,16 +332,11 @@ namespace sysy
     char headername[20];
     sprintf(headername, "header%d", builder.get_whilecnt());
     auto headerblock = func->addBasicBlock(headername);
+    builder.setPosition(headerblock, headerblock->begin());
     current_block->getSuccessors().push_back(headerblock);
     headerblock->getPredecessors().push_back(current_block);
     // uncondbr:current->header
     // Value *Current_uncondbr = builder.createUncondBrInst(headerblock, vector<Value *>());
-    // generate condition expression
-    builder.setPosition(headerblock, headerblock->begin());
-    auto cond = any_cast<Value *>(ctx->exp()->accept(this));
-    char flagname[20];
-    sprintf(flagname, "flag%d", builder.get_ifcnt() + builder.get_whilecnt());
-    cond->setName(flagname);
     // create body basicblock
     char bodyname[20];
     sprintf(bodyname, "body%d", builder.get_whilecnt());
@@ -348,6 +352,14 @@ namespace sysy
     // push header&exit into loopstack
     builder.pushheader(headerblock);
     builder.pushexit(exitblock);
+    // generate condition expression
+    builder.push_truetarget(bodyblock);
+    builder.push_falsetarget(exitblock);
+    auto cond = any_cast<Value *>(ctx->exp()->accept(this));
+    builder.poptarget();
+    char flagname[20];
+    sprintf(flagname, "flag%d", builder.get_ifcnt() + builder.get_whilecnt());
+    cond->setName(flagname);
     // create condbr in header
     Value *header_condbr = builder.createCondBrInst(cond, bodyblock, exitblock, vector<Value *>(), vector<Value *>());
     // generate code in body block
@@ -441,4 +453,43 @@ namespace sysy
     return result;
   }
   //******************Revised by lyq END***************************************
+
+  any SysYIRGenerator::visitAndExp(SysYParser::AndExpContext *ctx)
+  {
+    // get lhs value
+    auto lhs = any_cast<Value *>(ctx->exp()[0]->accept(this));
+    // create rhs block
+    builder.rhs_add();
+    auto current_block = builder.getBasicBlock();
+    auto func = current_block->getParent();
+    char rhs_name[20];
+    sprintf(rhs_name, "rhs%d", builder.get_rhscnt());
+    auto rhs_block = func->addBasicBlock(rhs_name);
+    rhs_block->getPredecessors().push_back(current_block);
+    current_block->getSuccessors().push_back(rhs_block);
+    // create condbr instr
+    Value *condbr = builder.createCondBrInst(lhs, rhs_block, builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
+    // generate code for rhs block
+    builder.setPosition(rhs_block, rhs_block->begin());
+    return (ctx->exp()[1]->accept(this));
+  }
+  any SysYIRGenerator::visitOrExp(SysYParser::OrExpContext *ctx)
+  {
+    // get lhs value
+    auto lhs = any_cast<Value *>(ctx->exp()[0]->accept(this));
+    // create rhs block
+    builder.rhs_add();
+    auto current_block = builder.getBasicBlock();
+    auto func = current_block->getParent();
+    char rhs_name[20];
+    sprintf(rhs_name, "rhs%d", builder.get_rhscnt());
+    auto rhs_block = func->addBasicBlock(rhs_name);
+    rhs_block->getPredecessors().push_back(current_block);
+    current_block->getSuccessors().push_back(rhs_block);
+    // create condbr instr
+    Value *condbr = builder.createCondBrInst(lhs, builder.get_truetarget(), rhs_block, vector<Value *>(), vector<Value *>());
+    // generate code for rhs block
+    builder.setPosition(rhs_block, rhs_block->begin());
+    return (ctx->exp()[1]->accept(this));
+  }
 } // namespace sysy

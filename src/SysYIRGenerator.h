@@ -176,10 +176,7 @@ namespace sysy
 
     virtual std::any visitNumberExp(SysYParser::NumberExpContext *ctx) override;
 
-    virtual std::any visitAndExp(SysYParser::AndExpContext *ctx) override
-    {
-      return visitChildren(ctx);
-    }
+    virtual std::any visitAndExp(SysYParser::AndExpContext *ctx) override;
 
     virtual std::any visitUnaryExp(SysYParser::UnaryExpContext *ctx) override;
 
@@ -193,10 +190,7 @@ namespace sysy
       return visitChildren(ctx);
     }
 
-    virtual std::any visitOrExp(SysYParser::OrExpContext *ctx) override
-    {
-      return visitChildren(ctx);
-    }
+    virtual std::any visitOrExp(SysYParser::OrExpContext *ctx) override;
 
     virtual std::any visitCallExp(SysYParser::CallExpContext *ctx) override
     {
