@@ -180,10 +180,7 @@ namespace sysy
 
     virtual std::any visitUnaryExp(SysYParser::UnaryExpContext *ctx) override;
 
-    virtual std::any visitParenExp(SysYParser::ParenExpContext *ctx) override
-    {
-      return visitChildren(ctx);
-    }
+    virtual std::any visitParenExp(SysYParser::ParenExpContext *ctx) override;
 
     virtual std::any visitStringExp(SysYParser::StringExpContext *ctx) override
     {

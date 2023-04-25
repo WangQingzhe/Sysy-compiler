@@ -492,4 +492,8 @@ namespace sysy
     builder.setPosition(rhs_block, rhs_block->begin());
     return (ctx->exp()[1]->accept(this));
   }
+  any SysYIRGenerator::visitParenExp(SysYParser::ParenExpContext *ctx)
+  {
+    return ctx->exp()->accept(this);
+  }
 } // namespace sysy
