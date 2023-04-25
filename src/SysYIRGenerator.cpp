@@ -160,7 +160,20 @@ namespace sysy
     Value *result = nullptr;
     assert(ctx->number()->ILITERAL() or ctx->number()->FLITERAL());
     if (auto iLiteral = ctx->number()->ILITERAL())
-      result = ConstantValue::get(std::stoi(iLiteral->getText()));
+    {
+      std::string s = iLiteral->getText();
+      int base = 10;
+      // hex
+      if (s.length() > 2 && s[0] == '0' && (s[1] == 'X' || s[1] == 'x'))
+        base = 16;
+      // oct
+      else if (s[0] == '0')
+        base = 8;
+      // dec
+      else
+        base = 10;
+      result = ConstantValue::get(std::stoi(iLiteral->getText(), 0, base));
+    }
     else
       result =
           ConstantValue::get(std::stof(ctx->number()->FLITERAL()->getText()));
