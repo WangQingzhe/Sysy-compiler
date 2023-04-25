@@ -35,4 +35,4 @@ set(ANTLR_BUILD_CPP_TESTS OFF) # Only for ANTLR 4.10.0 and later versions
 add_subdirectory(${ANTLR_RUNTIME})
 
 # Project source files
-add_subdirectory(src)
+add_subdirectory(src) 
