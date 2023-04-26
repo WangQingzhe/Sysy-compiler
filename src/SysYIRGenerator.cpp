@@ -35,7 +35,7 @@ namespace sysy
     // error(ctx, "not implemented yet");
     std::vector<Value *> values;
     bool isConst = ctx->CONST();
-    auto type = any_cast<Type *>(visitBtype(ctx->btype()));
+    auto type = Type::getPointerType(any_cast<Type *>(visitBtype(ctx->btype())));
     for (auto varDef : ctx->varDef())
     {
       auto name = varDef->lValue()->ID()->getText();
@@ -45,7 +45,9 @@ namespace sysy
       auto init = varDef->ASSIGN()
                       ? any_cast<Value *>(visitInitValue(varDef->initValue()))
                       : nullptr;
-      values.push_back(module->createGlobalValue(name, type, dims, init));
+      auto global_value = module->createGlobalValue(name, type, dims, init);
+      symbols.insert(name, global_value);
+      values.push_back(global_value);
     }
     // FIXME const
     return values;

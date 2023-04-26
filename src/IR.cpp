@@ -505,6 +505,18 @@ namespace sysy
     printOperand(os, getPointer()) << " : " << *getValue()->getType();
   }
 
+  void GlobalValue::print(std::ostream &os) const
+  {
+    auto type = getType();
+    printVarName(os, this) << ' ';
+    if (isConst)
+      os << " const ";
+    os << *static_cast<const PointerType *>(getType())->getBaseType()
+       << " : " << *type << ' ';
+    if (init())
+      os << *init();
+  }
+
   void Function::print(std::ostream &os) const
   {
     auto returnType = getReturnType();
