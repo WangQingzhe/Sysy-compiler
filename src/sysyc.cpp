@@ -8,15 +8,25 @@ using namespace std;
 using namespace antlr4;
 // #include "SysYFormatter.h"
 #include "SysYIRGenerator.h"
+#include "backend/codegen.hpp"
 using namespace sysy;
+using backend::CodeGen;
 
-int main(int argc, char **argv) {
-  if (argc != 2) {
-    cerr << "Usage: " << argv[0] << "inputfile\n";
+int main(int argc, char **argv)
+{
+  if (argc > 3)
+  {
+    cerr << "Usage: " << argv[0] << "inputfile [ir]\n";
     return EXIT_FAILURE;
   }
+  bool genir = false;
+  if (argc > 2)
+  {
+    genir = true;
+  }
   ifstream fin(argv[1]);
-  if (not fin) {
+  if (not fin)
+  {
     cerr << "Failed to open file " << argv[1];
     return EXIT_FAILURE;
   }
@@ -29,7 +39,17 @@ int main(int argc, char **argv) {
   SysYIRGenerator generator;
   generator.visitModule(moduleAST);
   auto moduleIR = generator.get();
-  moduleIR->print(cout);
-  
+  // only generate SysY IR code
+  if (genir)
+  {
+    moduleIR->print(cout);
+    return EXIT_SUCCESS;
+  }
+
+  CodeGen codegen(moduleIR);
+  string asmCode = codegen.code_gen();
+  cout << asmCode << endl;
+  ;
+
   return EXIT_SUCCESS;
 }

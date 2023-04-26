@@ -1053,6 +1053,16 @@ namespace sysy
 
   public:
     void print(std::ostream &os) const;
+
+  public:
+    std::map<std::string, Function *> *getFunctions()
+    {
+      return &functions;
+    }
+    std::map<std::string, GlobalValue *> *getGlobalValues()
+    {
+      return &globals;
+    }
   }; // class Module
 
   /*!
