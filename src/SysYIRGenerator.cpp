@@ -18,6 +18,14 @@ namespace sysy
     auto pModule = new Module();
     assert(pModule);
     module.reset(pModule);
+    // create function:getint
+    auto getint_type = Type::getFunctionType(Type::getIntType());
+    auto f_getint = pModule->createFunction("getint", getint_type);
+    symbols.insert("getint", f_getint);
+    // create function:putint
+    auto putint_type = Type::getFunctionType(Type::getVoidType(), vector<Type *>({Type::getIntType()}));
+    auto f_putint = pModule->createFunction("putint", putint_type);
+    symbols.insert("putint", f_putint);
     // generates globals and functions
     visitChildren(ctx);
     // return the IR module

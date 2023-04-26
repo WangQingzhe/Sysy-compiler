@@ -541,7 +541,8 @@ namespace sysy
   void Module::print(std::ostream &os) const
   {
     for (auto &value : children)
-      os << *value << '\n';
+      if (value->getName() != "getint" && value->getName() != "putint")
+        os << *value << '\n';
   }
 
   // ArrayValue *ArrayValue::get(Type *type, const vector<Value *> &values) {
