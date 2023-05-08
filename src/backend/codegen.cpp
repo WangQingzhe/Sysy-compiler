@@ -18,11 +18,16 @@ namespace backend
         string textCode;
         // clear last module's label record
         clearModuleRecord(module);
-        // generate asmcode for all global values
-        dataCode += globaldata_gen();
-
         code += space + ".arch armv7ve " + endl;
         code += space + ".text " + endl;
+        // generate asmcode for all global values
+        auto global_values = module->getGlobalValues();
+        for (auto iter = global_values->begin(); iter != global_values->end(); ++iter)
+        {
+            GlobalValue *glbvl = iter->second;
+            dataCode += globaldata_gen(glbvl);
+        }
+        // generate asmcode for all functions
         auto functions = module->getFunctions();
 
         for (auto iter = functions->begin(); iter != functions->end(); ++iter)
@@ -310,12 +315,44 @@ namespace backend
         return code;
     }
     //
-    string CodeGen::globaldata_gen()
+    string CodeGen::globaldata_gen(GlobalValue *glbvl)
     {
         string asmCode;
-        /**
-         *code in here
-         */
+        string name = glbvl->getName();
+
+        asmCode += space + ".global\t" + name + endl;
+        auto type = static_cast<const PointerType *>(glbvl->getType())->getBaseType();
+        // has init
+        if (glbvl->init())
+        {
+            asmCode += space + ".data" + endl;
+            {
+                asmCode += space + ".align\t2" + endl;
+            }
+            asmCode += space + ".type\t" + name + ", " + "%" + "object" + endl;
+            asmCode += space + ".size\t" + name + ", 4" + endl;
+            asmCode += name + ":\n";
+            auto value = dyncast<ConstantValue>(glbvl->getOperand(0));
+            std::stringstream ss;
+            if (type->isInt())
+                ss << value->getInt();
+            else if (type->isFloat())
+                ss << value->getFloat();
+            asmCode += space + ".word\t" + ss.str() + endl;
+        }
+        // no init
+        else
+        {
+            asmCode += space + ".bss" + endl;
+            {
+                asmCode += space + ".align\t2" + endl;
+            }
+            asmCode += space + ".type\t" + name + ", %object" + endl;
+            asmCode += space + ".size\t" + name + ", 4" + endl;
+            asmCode += name + ":\n";
+            asmCode += space + ".space\t4" + endl;
+        }
+
         return asmCode;
     }
 

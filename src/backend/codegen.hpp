@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <IR.h>
 #include <vector>
+#include <sstream>
 
 using namespace sysy;
 using std::find;
@@ -190,7 +191,7 @@ namespace backend
         string function_gen(Function *func);
         string basicBlock_gen(BasicBlock *bb);
         string instruction_gen(Instruction *instr);
-        string globaldata_gen();
+        string globaldata_gen(GlobalValue *glbvl);
         string prologueCode_gen(Function *func);
         string epilogueCode_gen(Function *func);
         string literalPoolsCode_gen(Function *func);
