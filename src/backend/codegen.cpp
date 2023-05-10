@@ -326,6 +326,10 @@ namespace backend
         if (glbvl->init())
         {
             asmCode += space + ".data" + endl;
+            //******************Revised by lyq BEGIN***************************************
+            if(glbvl->isconst())
+                asmCode += space + ".section" + space + "rodata" + endl;
+            //******************Revised by lyq END*****************************************
             {
                 asmCode += space + ".align\t2" + endl;
             }
@@ -344,6 +348,10 @@ namespace backend
         else
         {
             asmCode += space + ".bss" + endl;
+            //******************Revised by lyq BEGIN***************************************
+            if(glbvl->isconst())
+                asmCode += space + ".section" + space + "rodata" + endl;
+            //******************Revised by lyq END*****************************************
             {
                 asmCode += space + ".align\t2" + endl;
             }

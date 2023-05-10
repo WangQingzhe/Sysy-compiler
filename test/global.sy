@@ -5,6 +5,10 @@
 int g1;
 int g2 = 5;
 int g3 = 6;
+const int g4;
+int ff = 3;
+const int g5 = 55;
+int g6;
 
 int main(){
     int a, b;

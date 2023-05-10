@@ -53,7 +53,9 @@ namespace sysy
       auto init = varDef->ASSIGN()
                       ? any_cast<Value *>(visitInitValue(varDef->initValue()))
                       : nullptr;
-      auto global_value = module->createGlobalValue(name, type, dims, init);
+ //******************Revised by lyq BEGIN***************************************
+      auto global_value = module->createGlobalValue(name, type, dims, init, isConst);
+//******************Revised by lyq END*****************************************
       symbols.insert(name, global_value);
       values.push_back(global_value);
     }

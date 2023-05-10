@@ -1,4 +1,4 @@
-# Install script for directory: /home/wqz/sysy/sysy
+# Install script for directory: /home/lyq/Desktop/Sysy/sysY_backend/sysy
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -44,12 +44,12 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("/home/wqz/sysy/sysy/build/antlr/antlr4-runtime/cmake_install.cmake")
+  include("/home/lyq/Desktop/Sysy/sysY_backend/sysy/build/antlr/antlr4-runtime/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("/home/wqz/sysy/sysy/build/src/cmake_install.cmake")
+  include("/home/lyq/Desktop/Sysy/sysY_backend/sysy/build/src/cmake_install.cmake")
 endif()
 
 if(CMAKE_INSTALL_COMPONENT)
@@ -60,5 +60,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/home/wqz/sysy/sysy/build/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/lyq/Desktop/Sysy/sysY_backend/sysy/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

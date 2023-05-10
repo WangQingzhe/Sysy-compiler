@@ -977,9 +977,11 @@ namespace sysy
     bool isConst;
 
   protected:
+  //******************Revised by lyq BEGIN***************************************
     GlobalValue(Module *parent, Type *type, const std::string &name,
-                const std::vector<Value *> &dims = {}, Value *init = nullptr)
-        : User(kGlobal, type, name), parent(parent), hasInit(init)
+                const std::vector<Value *> &dims = {}, Value *init = nullptr, bool isconst = false)
+        : User(kGlobal, type, name), parent(parent), hasInit(init), isConst(isconst)
+  //******************Revised by lyq END*****************************************
     {
       assert(type->isPointer());
       addOperands(dims);
@@ -997,7 +999,9 @@ namespace sysy
     Value *init() const { return hasInit ? operands.back().getValue() : nullptr; }
     int getNumDims() const { return getNumOperands() - (hasInit ? 1 : 0); }
     Value *getDim(int index) { return getOperand(index); }
-
+    //******************Revised by lyq BEGIN***************************************
+    bool isconst() {return isConst; }
+    //******************Revised by lyq END*****************************************
   public:
     void print(std::ostream &os) const override;
   }; // class GlobalValue
@@ -1024,18 +1028,21 @@ namespace sysy
       functions.emplace(name, func);
       return func;
     };
+    //******************Revised by lyq BEGIN***************************************
     GlobalValue *createGlobalValue(const std::string &name, Type *type,
                                    const std::vector<Value *> &dims = {},
-                                   Value *init = nullptr)
+                                   Value *init = nullptr,
+                                   bool isconst = false)
     {
       if (globals.count(name))
         return nullptr;
-      auto global = new GlobalValue(this, type, name, dims, init);
+      auto global = new GlobalValue(this, type, name, dims, init, isconst);
       assert(global);
       children.emplace_back(global);
       globals.emplace(name, global);
       return global;
     }
+    //******************Revised by lyq END*****************************************
     Function *getFunction(const std::string &name) const
     {
       auto result = functions.find(name);

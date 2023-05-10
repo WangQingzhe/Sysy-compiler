@@ -1,2 +1,2 @@
 # Hashes of file build rules.
-8b397515d969cd62b53020c27889a296 src/SysYLexer.interp
+3e240e2e67674917eb8452d5f5844d36 src/SysYLexer.interp

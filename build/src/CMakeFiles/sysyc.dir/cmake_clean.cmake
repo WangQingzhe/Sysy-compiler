@@ -7,6 +7,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/sysyc.dir/IR.cpp.o.d"
   "CMakeFiles/sysyc.dir/SysYIRGenerator.cpp.o"
   "CMakeFiles/sysyc.dir/SysYIRGenerator.cpp.o.d"
+  "CMakeFiles/sysyc.dir/backend/codegen.cpp.o"
+  "CMakeFiles/sysyc.dir/backend/codegen.cpp.o.d"
   "CMakeFiles/sysyc.dir/sysyc.cpp.o"
   "CMakeFiles/sysyc.dir/sysyc.cpp.o.d"
 )
