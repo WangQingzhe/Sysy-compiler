@@ -83,9 +83,36 @@ namespace backend
     string CodeGen::prologueCode_gen(Function *func)
     {
         string code;
-        /**
-         *code in here
-         */
+        // if there is callinst in function
+        bool haveCall = false;
+        auto bbs = func->getBasicBlocks();
+        for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
+        {
+            auto bb = iter->get();
+            for (auto &instr : bb->getInstructions())
+            {
+                auto instrType = instr->getKind();
+                if (instrType == Value::Kind::kCall)
+                {
+                    haveCall = true;
+                    break;
+                }
+            }
+        }
+        if (haveCall)
+        {
+            // push fp,lr
+            code += space + "push\t{fp,lr}" + endl;
+            // set fp
+            code += space + "add\tfp, sp, #4" + endl;
+        }
+        else
+        {
+            // push fp
+            code += space + "push\t{fp}" + endl;
+            // set fp
+            code += space + "add\tfp, sp, #0" + endl;
+        }
         return code;
     }
 
@@ -98,9 +125,26 @@ namespace backend
     string CodeGen::epilogueCode_gen(Function *func)
     {
         string code;
-        /**
-         *code in here
-         */
+        bool haveCall = false;
+        auto bbs = func->getBasicBlocks();
+        for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
+        {
+            auto bb = iter->get();
+            for (auto &instr : bb->getInstructions())
+            {
+                auto instrType = instr->getKind();
+                if (instrType == Value::Kind::kCall)
+                {
+                    haveCall = true;
+                    break;
+                }
+            }
+        }
+        if (haveCall)
+            code += space + "pop\t{fp,lr}" + endl;
+        else
+            code += space + "pop\t{fp}" + endl;
+        code += space + "bx\t" + endl;
         return code;
     }
 
@@ -327,7 +371,7 @@ namespace backend
         {
             asmCode += space + ".data" + endl;
             //******************Revised by lyq BEGIN***************************************
-            if(glbvl->isconst())
+            if (glbvl->isconst())
                 asmCode += space + ".section" + space + "rodata" + endl;
             //******************Revised by lyq END*****************************************
             {
@@ -349,7 +393,7 @@ namespace backend
         {
             asmCode += space + ".bss" + endl;
             //******************Revised by lyq BEGIN***************************************
-            if(glbvl->isconst())
+            if (glbvl->isconst())
                 asmCode += space + ".section" + space + "rodata" + endl;
             //******************Revised by lyq END*****************************************
             {
