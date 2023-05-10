@@ -1,0 +1,15 @@
+//test globalvalue
+// CMD
+// arm-none-eabi-gcc .\global.c -O0 -S -o .\global.S
+
+int g1;
+int g2 = 5;
+int g3 = 6;
+
+int main(){
+    int a, b;
+    a = 10;
+    b = 2;
+    int c = g2;
+    return a + b + c;
+} 
