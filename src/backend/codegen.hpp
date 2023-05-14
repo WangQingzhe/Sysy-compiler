@@ -182,6 +182,7 @@ namespace backend
         // label manager
         map<BasicBlock *, string> bb_labels;
         uint64_t label_no = 0;
+        int top_offset = 0;
 
     public:
         CodeGen(Module *module) : module(module) {}

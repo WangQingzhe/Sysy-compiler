@@ -105,6 +105,7 @@ namespace backend
             code += space + "push\t{fp,lr}" + endl;
             // set fp
             code += space + "add\tfp, sp, #4" + endl;
+            // top_offset = -8;
         }
         else
         {
@@ -112,6 +113,7 @@ namespace backend
             code += space + "push\t{fp}" + endl;
             // set fp
             code += space + "add\tfp, sp, #0" + endl;
+            // top_offset = -4;
         }
         return code;
     }
@@ -125,6 +127,7 @@ namespace backend
     string CodeGen::epilogueCode_gen(Function *func)
     {
         string code;
+        // if there is callinst in function
         bool haveCall = false;
         auto bbs = func->getBasicBlocks();
         for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
@@ -154,6 +157,7 @@ namespace backend
         clearFunctionRecord(func);
         string bbCode;
         auto bbs = func->getBasicBlocks();
+        top_offset = -8;
         for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
         {
             auto bb = iter->get();
@@ -208,18 +212,29 @@ namespace backend
     CodeGen::allocaInst_gen(AllocaInst *aInst, RegManager::RegId dstRegId)
     {
         string code;
-        /**
-         *code in here
-         */
+        localVarStOffset.emplace(aInst, top_offset);
+        top_offset -= 4;
+
         return {dstRegId, code};
     }
 
     string CodeGen::storeInst_gen(StoreInst *stInst)
     {
         string code;
-        /**
-         *code in here
-         */
+        auto value = dyncast<ConstantValue>(stInst->getValue());
+        auto pointer = dynamic_cast<AllocaInst *>(stInst->getPointer());
+        int offset = localVarStOffset[pointer];
+        std::stringstream ss1;
+        std::stringstream ss2;
+        if (value)
+        {
+            int constant_value = value->getInt();
+            ss1 << constant_value;
+            code += space + "mov\tr3, #" + ss1.str() + endl;
+        }
+        ss2 << offset;
+        code += space + "str\tr3, [fp, #" + ss2.str() + "]" + endl;
+
         return code;
     }
     pair<RegId, string>
