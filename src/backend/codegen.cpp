@@ -47,7 +47,7 @@ namespace backend
     string CodeGen::functionHead_gen(Function *func)
     {
         string code;
-        code += space + ".globl " + func->getName() + endl;
+        code += space + ".global " + func->getName() + endl;
         code += space + ".p2align " + std::to_string(int_p2align) + endl;
         code += space + ".type " + func->getName() + ", %function" + endl;
         code += func->getName() + ":" + endl;
@@ -177,6 +177,7 @@ namespace backend
     string CodeGen::basicBlock_gen(BasicBlock *bb)
     {
         curBB = bb;
+        // string bbLabel = bb->getName();
         string bbLabel = getBBLabel(bb);
         string code;
         code += bbLabel + ":" + endl;
@@ -214,7 +215,7 @@ namespace backend
         string code;
         localVarStOffset.emplace(aInst, top_offset);
         top_offset -= 4;
-
+        dstRegId = RegManager::RNONE;
         return {dstRegId, code};
     }
 
@@ -241,9 +242,36 @@ namespace backend
     CodeGen::loadInst_gen(LoadInst *ldInst, RegId dstRegId)
     {
         string code;
-        /**
-         *code in here
-         */
+        // dst register
+        int reg_num = dstRegId == RegManager::RANY ? stoi(ldInst->getName()) : dstRegId;
+        // variable to be loaded
+        auto var = ldInst->getPointer();
+        // variable's position in the stack
+        int pos;
+        bool found = false;
+        // find var in localvar
+        for (auto local_var : localVarStOffset)
+        {
+            if (local_var.first == var)
+            {
+                pos = local_var.second;
+                found = true;
+                break;
+            }
+        }
+        // if var is not localvar but an argument
+        if (not found)
+        {
+            for (auto arg : paramsStOffset)
+            {
+                if (arg.first == var)
+                {
+                    pos = arg.second;
+                    break;
+                }
+            }
+        }
+        code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
         return {dstRegId, code};
     }
     string CodeGen::returnInst_gen(ReturnInst *retInst)
@@ -274,9 +302,30 @@ namespace backend
     CodeGen::callInst_gen(CallInst *callInst, RegId dstRegId)
     {
         string code;
-        /**
-         *code in here
-         */
+        auto callee_fuc = callInst->getCallee();
+        auto args = callInst->getArguments();
+        RegId dst_reg = RegManager::R0;
+        int arg_num = 0;
+        int para_offset = 0;
+        for (auto arg : args)
+        {
+            arg_num++;
+            if (arg_num > 4)
+            {
+                int reg_num = stoi(arg->getName());
+                if (para_offset == 0)
+                    code += space + "str\tr" + to_string(reg_num) + ", [sp]" + endl;
+                else
+                    code += space + "str\tr" + to_string(reg_num) + ", [sp, #" + to_string(para_offset) + "]" + endl;
+                para_offset += 4;
+                continue;
+            }
+            // int src_reg = stoi(arg->getName()) + 4;
+            int src_reg = stoi(arg->getName());
+            code += space + "mov\tr" + to_string(arg_num - 1) + ", r" + to_string(src_reg) + endl;
+            // code += space + "mov\tr" + to_string(arg_num - 1) + ", r" + src + endl;
+        }
+        code += space + "bl\t" + callee_fuc->getName() + endl;
         return {dstRegId, code};
     }
 
