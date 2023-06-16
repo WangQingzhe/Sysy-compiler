@@ -166,9 +166,16 @@ namespace backend
             }
         }
         if (haveCall)
+        {
+            code += space + "sub\tsp, fp, #4" + endl;
             code += space + "pop\t{fp,lr}" + endl;
+        }
+
         else
+        {
+            code += space + "add\tsp, fp, #0" + endl;
             code += space + "pop\t{fp}" + endl;
+        }
         code += space + "bx\tlr" + endl;
         return code;
     }
@@ -345,6 +352,15 @@ namespace backend
         /**
          *code in here
          */
+        auto retval = retInst->getReturnValue();
+        if (isa<ConstantValue>(retval))
+        {
+            code += space + "mov\tr0, " + to_string(dynamic_cast<ConstantValue *>(retval)->getInt()) + endl;
+        }
+        else
+        {
+            code += space + "mov\tr0, r" + retval->getName() + endl;
+        }
         return code;
     }
     string CodeGen::uncondBrInst_gen(UncondBrInst *ubInst)
@@ -446,7 +462,7 @@ namespace backend
         case Instruction::kReturn:
         {
             ReturnInst *retInst = dynamic_cast<ReturnInst *>(instr);
-            code += M_emitComment("return inst");
+            // code += M_emitComment("return inst");
             code += returnInst_gen(retInst);
             return code;
             break;
