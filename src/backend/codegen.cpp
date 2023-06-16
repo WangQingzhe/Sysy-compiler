@@ -198,6 +198,26 @@ namespace backend
         /**
          *code in here
          */
+        string lname, rname;
+        auto lhs = bInst->getLhs();
+        if (isa<ConstantValue>(lhs))
+            lname = to_string(dynamic_cast<ConstantValue *>(lhs)->getInt());
+        else
+            lname = "r" + lhs->getName();
+        auto rhs = bInst->getRhs();
+        if (isa<ConstantValue>(rhs))
+            rname = to_string(dynamic_cast<ConstantValue *>(rhs)->getInt());
+        else
+            rname = "r" + rhs->getName();
+        auto res = stoi(bInst->getName());
+        if (bInst->getKind() == Instruction::kAdd)
+            code += space + "add\tr" + to_string(res) + ", " + lname + ", " + rname + endl;
+        else if (bInst->getKind() == Instruction::kSub)
+            code += space + "sub\tr" + to_string(res) + ", " + lname + ", " + rname + endl;
+        else if (bInst->getKind() == Instruction::kMul)
+            code += space + "mul\tr" + to_string(res) + ", " + lname + ", " + rname + endl;
+        else if (bInst->getKind() == Instruction::kDiv)
+            code += space + "div\tr" + to_string(res) + ", " + lname + ", " + rname + endl;
         return {dstRegId, code};
     }
 
