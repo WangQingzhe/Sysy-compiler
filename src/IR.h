@@ -365,7 +365,7 @@ namespace sysy
   public:
     static bool classof(const Value *value)
     {
-      return value->getKind() == kConstant;
+      return value->getKind() == kArgument;
     }
 
   public:
@@ -977,11 +977,11 @@ namespace sysy
     bool isConst;
 
   protected:
-  //******************Revised by lyq BEGIN***************************************
+    //******************Revised by lyq BEGIN***************************************
     GlobalValue(Module *parent, Type *type, const std::string &name,
                 const std::vector<Value *> &dims = {}, Value *init = nullptr, bool isconst = false)
         : User(kGlobal, type, name), parent(parent), hasInit(init), isConst(isconst)
-  //******************Revised by lyq END*****************************************
+    //******************Revised by lyq END*****************************************
     {
       assert(type->isPointer());
       addOperands(dims);
@@ -1000,7 +1000,7 @@ namespace sysy
     int getNumDims() const { return getNumOperands() - (hasInit ? 1 : 0); }
     Value *getDim(int index) { return getOperand(index); }
     //******************Revised by lyq BEGIN***************************************
-    bool isconst() {return isConst; }
+    bool isconst() { return isConst; }
     //******************Revised by lyq END*****************************************
   public:
     void print(std::ostream &os) const override;
