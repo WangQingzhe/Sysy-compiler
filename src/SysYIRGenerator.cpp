@@ -53,9 +53,9 @@ namespace sysy
       auto init = varDef->ASSIGN()
                       ? any_cast<Value *>(visitInitValue(varDef->initValue()))
                       : nullptr;
- //******************Revised by lyq BEGIN***************************************
+      //******************Revised by lyq BEGIN***************************************
       auto global_value = module->createGlobalValue(name, type, dims, init, isConst);
-//******************Revised by lyq END*****************************************
+      //******************Revised by lyq END*****************************************
       symbols.insert(name, global_value);
       values.push_back(global_value);
     }
@@ -101,7 +101,7 @@ namespace sysy
       auto params = ctx->funcFParams()->funcFParam();
       for (auto param : params)
       {
-        paramTypes.push_back(any_cast<Type *>(visitBtype(param->btype())));
+        paramTypes.push_back(Type::getPointerType(any_cast<Type *>(visitBtype(param->btype()))));
         paramNames.push_back(param->ID()->getText());
       }
     }
@@ -198,7 +198,7 @@ namespace sysy
     Value *value = symbols.lookup(name);
     if (not value)
       error(ctx, "undefined variable");
-    if (isa<GlobalValue>(value) or isa<AllocaInst>(value))
+    if (isa<GlobalValue>(value) or isa<AllocaInst>(value) or isa<Argument>(value))
       value = builder.createLoadInst(value);
     return value;
   }
