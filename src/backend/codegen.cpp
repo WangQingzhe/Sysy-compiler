@@ -99,21 +99,43 @@ namespace backend
                 }
             }
         }
+        // put arguments in the stack
+        auto entry_block = func->getEntryBlock();
+        auto args = entry_block->getArguments();
+        int arg_num = 0;
+        for (auto arg = args.begin(); arg != args.end(); ++arg)
+        {
+            // r0-r3
+            if (arg_num < 4)
+            {
+                paramsStOffset.emplace(arg->get(), top_offset);
+                code += space + "str\tr" + to_string(arg_num) + ", [fp, #" + to_string(top_offset) + "]" + endl;
+                top_offset -= 4;
+            }
+            // other
+            else
+            {
+                paramsStOffset.emplace(arg->get(), above_offset);
+                above_offset += 4;
+            }
+            arg_num++;
+        }
+        if (max_param > 4)
+            top_offset -= (max_param - 4) * 4;
+        code = space + "sub\tsp, sp, #" + to_string(-top_offset - 4) + endl + code;
         if (haveCall)
         {
-            // push fp,lr
-            code += space + "push\t{fp,lr}" + endl;
             // set fp
-            code += space + "add\tfp, sp, #4" + endl;
-            // top_offset = -8;
+            code = space + "add\tfp, sp, #4" + endl + code;
+            // push fp,lr
+            code = space + "push\t{fp,lr}" + endl + code;
         }
         else
         {
-            // push fp
-            code += space + "push\t{fp}" + endl;
             // set fp
-            code += space + "add\tfp, sp, #0" + endl;
-            // top_offset = -4;
+            code = space + "add\tfp, sp, #0" + endl + code;
+            // push fp
+            code = space + "push\t{fp}" + endl + code;
         }
         return code;
     }
@@ -147,7 +169,7 @@ namespace backend
             code += space + "pop\t{fp,lr}" + endl;
         else
             code += space + "pop\t{fp}" + endl;
-        code += space + "bx\t" + endl;
+        code += space + "bx\tlr" + endl;
         return code;
     }
 
@@ -158,6 +180,9 @@ namespace backend
         string bbCode;
         auto bbs = func->getBasicBlocks();
         top_offset = -8;
+        above_offset = 4;
+        max_param = 0;
+        backpatch.clear();
         for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
         {
             auto bb = iter->get();
@@ -168,9 +193,18 @@ namespace backend
         string prologueCode = prologueCode_gen(func);
         string epilogueCode = epilogueCode_gen(func);
         string literalPoolsCode = literalPoolsCode_gen(func);
-        //
-        code = funcHead + prologueCode + bbCode +
-               epilogueCode + literalPoolsCode;
+        // backpatch parasoffset
+        int start_pos = 0;
+        int index = 0;
+        while ((start_pos = bbCode.find("unk", start_pos)) != std::string::npos)
+        {
+            int arg_offset = paramsStOffset[backpatch[index++]];
+            bbCode.replace(start_pos, 3, to_string(arg_offset));
+            start_pos += to_string(arg_offset).length();
+        }
+        code += funcHead + prologueCode + bbCode +
+                epilogueCode + literalPoolsCode;
+
         return code;
     }
 
@@ -242,20 +276,23 @@ namespace backend
     string CodeGen::storeInst_gen(StoreInst *stInst)
     {
         string code;
-        auto value = dyncast<ConstantValue>(stInst->getValue());
-        auto pointer = dynamic_cast<AllocaInst *>(stInst->getPointer());
-        int offset = localVarStOffset[pointer];
-        std::stringstream ss1;
-        std::stringstream ss2;
-        if (value)
+        auto value = stInst->getValue();
+        auto pointer = stInst->getPointer();
+        int offset;
+        if (localVarStOffset.find(dynamic_cast<Instruction *>(pointer)) != localVarStOffset.end())
+            offset = localVarStOffset[dynamic_cast<Instruction *>(pointer)];
+        else if (paramsStOffset.find(dynamic_cast<Argument *>(pointer)) != paramsStOffset.end())
+            offset = paramsStOffset[dynamic_cast<Argument *>(pointer)];
+        if (isa<ConstantValue>(value))
         {
-            int constant_value = value->getInt();
-            ss1 << constant_value;
-            code += space + "mov\tr3, #" + ss1.str() + endl;
+            int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
+            code += space + "mov\tr3, #" + to_string(constant_value) + endl;
+            code += space + "str\tr3, [fp, #" + to_string(offset) + "]" + endl;
         }
-        ss2 << offset;
-        code += space + "str\tr3, [fp, #" + ss2.str() + "]" + endl;
-
+        else
+        {
+            code += space + "str\tr" + value->getName() + ", [fp, #" + to_string(offset) + "]" + endl;
+        }
         return code;
     }
     pair<RegId, string>
@@ -270,28 +307,36 @@ namespace backend
         int pos;
         bool found = false;
         // find var in localvar
+        // if (localVarStOffset.find(dynamic_cast<Instruction *>(var)) != localVarStOffset.end())
+        //     pos = localVarStOffset[dynamic_cast<Instruction *>(var)];
         for (auto local_var : localVarStOffset)
         {
+            // code += "load var in localvar\n";
             if (local_var.first == var)
             {
                 pos = local_var.second;
                 found = true;
+                code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
                 break;
             }
         }
         // if var is not localvar but an argument
         if (not found)
         {
-            for (auto arg : paramsStOffset)
-            {
-                if (arg.first == var)
-                {
-                    pos = arg.second;
-                    break;
-                }
-            }
+            code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #unk]" + endl;
+            backpatch.push_back(dynamic_cast<Argument *>(var));
         }
-        code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+        // {
+        //     code += "load var in paramvar\n";
+        //     for (auto arg : paramsStOffset)
+        //     {
+        //         if (arg.first == var)
+        //         {
+        //             // pos = arg.second;
+        //             break;
+        //         }
+        //     }
+        // }
         return {dstRegId, code};
     }
     string CodeGen::returnInst_gen(ReturnInst *retInst)
@@ -327,6 +372,8 @@ namespace backend
         RegId dst_reg = RegManager::R0;
         int arg_num = 0;
         int para_offset = 0;
+        // the max number of all subfunctions' arguments
+        max_param = args.size() > max_param ? args.size() : max_param;
         for (auto arg : args)
         {
             arg_num++;
@@ -374,7 +421,7 @@ namespace backend
         {
             LoadInst *ldInst = dynamic_cast<LoadInst *>(instr);
             tmp = loadInst_gen(ldInst, RegManager::RANY);
-            code += M_emitComment("load inst");
+            // code += M_emitComment("load inst");
             code += tmp.second;
             dstRegId = tmp.first;
             break;
@@ -382,7 +429,7 @@ namespace backend
         case Instruction::kStore:
         {
             StoreInst *stInst = dynamic_cast<StoreInst *>(instr);
-            code += M_emitComment("store inst");
+            // code += M_emitComment("store inst");
             code += storeInst_gen(stInst);
             return code;
             break;
@@ -391,7 +438,7 @@ namespace backend
         {
             AllocaInst *aInst = dynamic_cast<AllocaInst *>(instr);
             tmp = allocaInst_gen(aInst, RegManager::RANY);
-            code += M_emitComment("alloca inst");
+            // code += M_emitComment("alloca inst");
             code += tmp.second;
             dstRegId = tmp.first;
             break;

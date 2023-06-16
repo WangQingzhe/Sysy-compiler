@@ -183,6 +183,10 @@ namespace backend
         map<BasicBlock *, string> bb_labels;
         uint64_t label_no = 0;
         int top_offset = 0;
+        int above_offset = 4;
+        int max_param = 0;
+        // record arguments need to be backpatched
+        vector<Argument *> backpatch;
 
     public:
         CodeGen(Module *module) : module(module) {}
