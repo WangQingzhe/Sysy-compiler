@@ -55,7 +55,7 @@ using std::vector;
 
 namespace backend
 {
-    static const string space = string(4, ' ');
+    static const string space = "\t";
     static const string endl = "\n";
     // only for armv7
     static const int int_align = 4;

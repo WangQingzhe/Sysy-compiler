@@ -48,6 +48,7 @@ namespace backend
     {
         string code;
         code += space + ".global " + func->getName() + endl;
+        code += space + ".arm" + endl;
         code += space + ".p2align " + std::to_string(int_p2align) + endl;
         code += space + ".type " + func->getName() + ", %function" + endl;
         code += func->getName() + ":" + endl;
@@ -242,12 +243,12 @@ namespace backend
         string lname, rname;
         auto lhs = bInst->getLhs();
         if (isa<ConstantValue>(lhs))
-            lname = to_string(dynamic_cast<ConstantValue *>(lhs)->getInt());
+            lname = "#" + to_string(dynamic_cast<ConstantValue *>(lhs)->getInt());
         else
             lname = "r" + lhs->getName();
         auto rhs = bInst->getRhs();
         if (isa<ConstantValue>(rhs))
-            rname = to_string(dynamic_cast<ConstantValue *>(rhs)->getInt());
+            rname = "#" + to_string(dynamic_cast<ConstantValue *>(rhs)->getInt());
         else
             rname = "r" + rhs->getName();
         auto res = stoi(bInst->getName());
@@ -295,6 +296,10 @@ namespace backend
             int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
             code += space + "mov\tr3, #" + to_string(constant_value) + endl;
             code += space + "str\tr3, [fp, #" + to_string(offset) + "]" + endl;
+        }
+        else if (isa<CallInst>(value))
+        {
+            code += space + "str\tr0, [fp, #" + to_string(offset) + "]" + endl;
         }
         else
         {
