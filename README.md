@@ -74,3 +74,77 @@ doxygen doc/Doxyfile
 ```
 
 上述命令执行完毕后，将在doxygen/html下找到生成的代码文档。
+
+## 实验3：从SysY IR 生成ARMv7汇编代码
+### 后端相关源码
+当前ref2分支为ARMv7后端代码实验,已经包含了后端代码生成的代码框架,包含
+
+- 后端生成代码源文件`src/backend/codegen.cpp`  
+- 后端生成代码头文件`src/backend/codegen.hpp`
+
+本实验需要基于以上两个源文件添加ARMv7后端生成代码(也可以按照自己的设计重头编写整个后端生成代码),完成这两个源文件中所有空函数的实现.不局限于本实验提供的后端代码框架,自由设计自己的ARMv7后端实现.
+
+### 后端代码的编译与运行  
+本实验也修改了驱动代码sysyc.cpp, sysyc.cpp可以调用后端生成的最顶层函数接口code_gen().该函数会逐层调用各层级的代码生产函数并最终生成ARMv7汇编代码并打印至屏幕.通过下列命令编译
+```bash 
+cmake -S . -B build
+cmake --build build
+```
+通过下列命令运行编译产生的sysyc 
+```bash  
+./sysyc 01_add.sy
+```
+或者通过下列命令只生成SysY IR代码
+```bash  
+./sysyc 01_add.sy ir
+```
+### 测试  
+本实验提供了两个sysy源文件用于测试,分别是位于sysy-backend/test的01_add.sy  11_add2.sy; 当完成sysyc的编译器后端后,可以通过sysy-backend/test下的Makefile文件编译生成测试程序的可执行二进制.
+
+#### 在x86平台编译运行测试代码
+##### 下载并配置ARMv7交叉编译器工具链
+在[Arm GNU Toolchain](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)下载安装交叉编译工具链,并设置环境变量PATH来使用交叉编译工具链
+```bash  
+export PATH=${your_arm-gnu-toolchain_path}/bin:$PATH;  
+```
+##### 安装qemu模拟器
+```bash 
+sudo apt update
+sudo apt install qemu-system-arm qemu-user
+```
+##### 编译测试程序
+使用如下命令调用完成后端实现的sysyc生成ARMv7汇编代码,并调用ARMv7交叉编译工具链汇编并连接生成可执行文件.
+```bash 
+cd test
+../build/bin/sysyc 01_add.sy > 01_add.s
+arm-none-linux-gnueabihf-gcc 01_add.s -o 01_add.out -static #注意使用-static选项来静态链接  
+```
+
+##### 使用qemu-arm模拟运行测试程序
+```bash  
+cd test
+qemu-arm ./01_add.out
+echo $? #查看测试程序返回值
+```
+
+##### 使用makefile编译与运行
+```bash
+cd test
+make all -r #利用sysyc编译两个测试程序
+make run -r #使用qemu-arm模拟运行两个测试程序
+```
+#### 在树莓派上编译运行测试代码
+参见'Raspberry.pptx'设置树莓派的编译运行环境,也可以在自己的x86电脑上利用ARMv7交叉编译工具链来编译测试程序, 将编译产生的可执行文件上传到树莓派上运行.
+
+
+### 交叉编译器生成汇编代码
+可以通过如下的命令让交叉编译器生成汇编代码,以参考gcc后端的编译行为.  
+```bash  
+cd test  
+cp 01_add.sy 01_add.c # 修改代码后缀名  
+arm-none-linux-gnueabihf-gcc 01_add.c  -O0 -S  -o 01_add.S #O0编译优化  
+```
+请自己构造一些简单的c程序,阅读交叉编译器编译产生的汇编代码来理解ARMv7汇编代码与编译器后端行为.  
+
+### 参考文档
+参见doc/backend/下的ARMv7相关文档
