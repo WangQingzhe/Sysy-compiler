@@ -219,8 +219,8 @@ namespace backend
     string CodeGen::basicBlock_gen(BasicBlock *bb)
     {
         curBB = bb;
-        // string bbLabel = bb->getName();
-        string bbLabel = getBBLabel(bb);
+        string bbLabel = bb->getName();
+        // string bbLabel = getBBLabel(bb);
         string code;
         code += bbLabel + ":" + endl;
         for (auto &instr : bb->getInstructions())
@@ -244,11 +244,15 @@ namespace backend
         auto lhs = bInst->getLhs();
         if (isa<ConstantValue>(lhs))
             lname = "#" + to_string(dynamic_cast<ConstantValue *>(lhs)->getInt());
+        else if (isa<CallInst>(lhs))
+            lname = "r0";
         else
             lname = "r" + lhs->getName();
         auto rhs = bInst->getRhs();
         if (isa<ConstantValue>(rhs))
             rname = "#" + to_string(dynamic_cast<ConstantValue *>(rhs)->getInt());
+        else if (isa<CallInst>(lhs))
+            lname = "r0";
         else
             rname = "r" + rhs->getName();
         auto res = stoi(bInst->getName());
@@ -260,6 +264,18 @@ namespace backend
             code += space + "mul\tr" + to_string(res) + ", " + lname + ", " + rname + endl;
         else if (bInst->getKind() == Instruction::kDiv)
             code += space + "div\tr" + to_string(res) + ", " + lname + ", " + rname + endl;
+        else if (bInst->getKind() == Instruction::kICmpEQ)
+            code += space + "cmp\t" + lname + ", " + rname + endl;
+        else if (bInst->getKind() == Instruction::kICmpGE)
+            code += space + "cmp\t" + lname + ", " + rname + endl;
+        else if (bInst->getKind() == Instruction::kICmpGT)
+            code += space + "cmp\t" + lname + ", " + rname + endl;
+        else if (bInst->getKind() == Instruction::kICmpLE)
+            code += space + "cmp\t" + lname + ", " + rname + endl;
+        else if (bInst->getKind() == Instruction::kICmpLT)
+            code += space + "cmp\t" + lname + ", " + rname + endl;
+        else if (bInst->getKind() == Instruction::kICmpNE)
+            code += space + "cmp\t" + lname + ", " + rname + endl;
         return {dstRegId, code};
     }
 
@@ -338,17 +354,6 @@ namespace backend
             code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #unk]" + endl;
             backpatch.push_back(dynamic_cast<Argument *>(var));
         }
-        // {
-        //     code += "load var in paramvar\n";
-        //     for (auto arg : paramsStOffset)
-        //     {
-        //         if (arg.first == var)
-        //         {
-        //             // pos = arg.second;
-        //             break;
-        //         }
-        //     }
-        // }
         return {dstRegId, code};
     }
     string CodeGen::returnInst_gen(ReturnInst *retInst)
@@ -374,6 +379,8 @@ namespace backend
         /**
          *code in here
          */
+        auto goal = ubInst->getBlock();
+        code += space + "b\t" + goal->getName() + endl;
         return code;
     }
     string CodeGen::condBrInst_gen(CondBrInst *cbInst)
@@ -382,6 +389,51 @@ namespace backend
         /**
          *code in here
          */
+        auto cond = cbInst->getCondition();
+        auto then_block = cbInst->getThenBlock();
+        auto else_block = cbInst->getElseBlock();
+        if (cond->getKind())
+        {
+            BinaryInst *bInst = dynamic_cast<BinaryInst *>(cond);
+            // auto lhs = bInst->getLhs();
+            // auto rhs = bInst->getRhs();
+            if (bInst->getKind() == Instruction::kICmpEQ)
+            {
+                // code += binaryInst_gen(bInst, RegManager::RANY).second;
+                code += space + "beq\t" + then_block->getName() + endl;
+                code += space + "b\t" + else_block->getName() + endl;
+            }
+            else if (bInst->getKind() == Instruction::kICmpGE)
+            {
+                // code += binaryInst_gen(bInst, RegManager::RANY).second;
+                code += space + "bge\t" + then_block->getName() + endl;
+                code += space + "b\t" + else_block->getName() + endl;
+            }
+            else if (bInst->getKind() == Instruction::kICmpGT)
+            {
+                // code += binaryInst_gen(bInst, RegManager::RANY).second;
+                code += space + "bgt\t" + then_block->getName() + endl;
+                code += space + "b\t" + else_block->getName() + endl;
+            }
+            else if (bInst->getKind() == Instruction::kICmpLE)
+            {
+                // code += binaryInst_gen(bInst, RegManager::RANY).second;
+                code += space + "ble\t" + then_block->getName() + endl;
+                code += space + "b\t" + else_block->getName() + endl;
+            }
+            else if (bInst->getKind() == Instruction::kICmpLT)
+            {
+                // code += binaryInst_gen(bInst, RegManager::RANY).second;
+                code += space + "blt\t" + then_block->getName() + endl;
+                code += space + "b\t" + else_block->getName() + endl;
+            }
+            else if (bInst->getKind() == Instruction::kICmpNE)
+            {
+                // code += binaryInst_gen(bInst, RegManager::RANY).second;
+                code += space + "bne\t" + then_block->getName() + endl;
+                code += space + "b\t" + else_block->getName() + endl;
+            }
+        }
         return code;
     }
     pair<RegId, string>
@@ -427,9 +479,16 @@ namespace backend
         switch (instrType)
         {
         // binary inst
+        case Instruction::kICmpEQ:
+        case Instruction::kICmpGE:
+        case Instruction::kICmpGT:
+        case Instruction::kICmpLE:
+        case Instruction::kICmpLT:
+        case Instruction::kICmpNE:
         case Instruction::kAdd:
         case Instruction::kMul:
         case Instruction::kSub:
+        case Instruction::kDiv:
         {
             BinaryInst *bInst = dynamic_cast<BinaryInst *>(instr);
             // registers are used only for instruction operation, consider use which register (any one that is free for use)

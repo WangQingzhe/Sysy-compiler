@@ -13,7 +13,7 @@ namespace sysy
     BasicBlock *block;
     BasicBlock::iterator position;
     std::stack<BasicBlock *> headers, exits;
-    int if_cnt, while_cnt, rhs_cnt;
+    int if_cnt, while_cnt, rhs_cnt, func_cnt;
     std::stack<BasicBlock *> truetargets, falsetargets;
 
   public:
@@ -22,17 +22,20 @@ namespace sysy
       if_cnt = 0;
       while_cnt = 0;
       rhs_cnt = 0;
+      func_cnt = 0;
     }
     IRBuilder(BasicBlock *block) : block(block), position(block->end())
     {
       if_cnt = 0;
       while_cnt = 0;
+      func_cnt = 0;
     }
     IRBuilder(BasicBlock *block, BasicBlock::iterator position)
         : block(block), position(position)
     {
       if_cnt = 0;
       while_cnt = 0;
+      func_cnt = 0;
     }
 
   public:
@@ -56,9 +59,11 @@ namespace sysy
     void if_add() { if_cnt++; }
     void while_add() { while_cnt++; }
     void rhs_add() { rhs_cnt++; }
+    void func_add() { func_cnt++; }
     int get_ifcnt() { return if_cnt; }
     int get_whilecnt() { return while_cnt; }
     int get_rhscnt() { return rhs_cnt; }
+    int get_funccnt() { return func_cnt; }
     void push_truetarget(BasicBlock *truetarget) { truetargets.push(truetarget); }
     void push_falsetarget(BasicBlock *falsetarget) { falsetargets.push(falsetarget); }
     void poptarget()

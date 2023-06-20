@@ -724,7 +724,7 @@ namespace sysy
   protected:
     UncondBrInst(BasicBlock *block, std::vector<Value *> args,
                  BasicBlock *parent = nullptr)
-        : Instruction(kCondBr, Type::getVoidType(), parent, "")
+        : Instruction(kBr, Type::getVoidType(), parent, "")
     {
       assert(block->getNumArguments() == args.size());
       addOperand(block);
@@ -901,7 +901,7 @@ namespace sysy
     Function(Module *parent, Type *type, const std::string &name)
         : Value(kFunction, type, name), parent(parent), variableID(0), blocks()
     {
-      blocks.emplace_back(new BasicBlock(this, "entry"));
+      // blocks.emplace_back(new BasicBlock(this, "entry"));
     }
 
   public:

@@ -18,14 +18,14 @@ namespace sysy
     auto pModule = new Module();
     assert(pModule);
     module.reset(pModule);
-    // create function:getint
-    auto getint_type = Type::getFunctionType(Type::getIntType());
-    auto f_getint = pModule->createFunction("getint", getint_type);
-    symbols.insert("getint", f_getint);
-    // create function:putint
-    auto putint_type = Type::getFunctionType(Type::getVoidType(), vector<Type *>({Type::getIntType()}));
-    auto f_putint = pModule->createFunction("putint", putint_type);
-    symbols.insert("putint", f_putint);
+    // // create function:getint
+    // auto getint_type = Type::getFunctionType(Type::getIntType());
+    // auto f_getint = pModule->createFunction("getint", getint_type);
+    // symbols.insert("getint", f_getint);
+    // // create function:putint
+    // auto putint_type = Type::getFunctionType(Type::getVoidType(), vector<Type *>({Type::getIntType()}));
+    // auto f_putint = pModule->createFunction("putint", putint_type);
+    // symbols.insert("putint", f_putint);
     // generates globals and functions
     visitChildren(ctx);
     // return the IR module
@@ -93,6 +93,7 @@ namespace sysy
   any SysYIRGenerator::visitFunc(SysYParser::FuncContext *ctx)
   {
     // obtain function name and type signature
+    builder.func_add();
     auto name = ctx->ID()->getText();
     vector<Type *> paramTypes;
     vector<string> paramNames;
@@ -109,13 +110,16 @@ namespace sysy
     auto funcType = Type::getFunctionType(returnType, paramTypes);
     // create the IR function
     auto function = module->createFunction(name, funcType);
+    char entry_name[10];
+    sprintf(entry_name, "entry%d", builder.get_funccnt());
     // update the symbol table
     symbols.insert(name, function);
     // create the function scope
     SymbolTable::FunctionScope scope(symbols);
     // create the entry block with the same parameters as the function,
     // and update the symbol table
-    auto entry = function->getEntryBlock();
+    auto entry = function->addBasicBlock(entry_name);
+    // auto entry = function->getEntryBlock();
     for (auto i = 0; i < paramTypes.size(); ++i)
     {
       auto arg = entry->createArgument(paramTypes[i], paramNames[i]);
@@ -292,32 +296,33 @@ namespace sysy
     auto thenblock = func->addBasicBlock(thenname);
     current_block->getSuccessors().push_back(thenblock);
     thenblock->getPredecessors().push_back(current_block);
-    // create exit basicblock
-    char exitname[20];
-    sprintf(exitname, "exit%d", builder.get_ifcnt() + builder.get_whilecnt());
-    auto exitblock = func->addBasicBlock(exitname);
-    exitblock->getPredecessors().push_back(thenblock);
-    thenblock->getSuccessors().push_back(exitblock);
-
     // create condbr instr
     // visit thenblock(and elseblock)
     if (ctx->stmt().size() == 1)
     {
       // if-then
       // generate condition expression
+      // create exit basicblock
+      char exitname[20];
+      sprintf(exitname, "exit%d", builder.get_ifcnt() + builder.get_whilecnt());
+      auto exitblock = func->addBasicBlock(exitname);
+      exitblock->getPredecessors().push_back(thenblock);
+      thenblock->getSuccessors().push_back(exitblock);
       builder.push_truetarget(thenblock);
       builder.push_falsetarget(exitblock);
       auto cond = any_cast<Value *>(ctx->exp()->accept(this));
       builder.poptarget();
       char flagname[20];
       sprintf(flagname, "flag%d", builder.get_ifcnt() + builder.get_whilecnt());
-      cond->setName(flagname);
+      // cond->setName(flagname);
       current_block->getSuccessors().push_back(exitblock);
       exitblock->getPredecessors().push_back(current_block);
       Value *CondBr = builder.createCondBrInst(cond, thenblock, exitblock, vector<Value *>(), vector<Value *>());
       builder.setPosition(thenblock, thenblock->begin());
       visitStmt(ctx->stmt()[0]);
       Value *then_br = builder.createUncondBrInst(exitblock, vector<Value *>());
+      // setup the instruction insert position
+      builder.setPosition(exitblock, exitblock->begin());
     }
     if (ctx->stmt().size() == 2)
     {
@@ -326,6 +331,12 @@ namespace sysy
       char elsename[20];
       sprintf(elsename, "else%d", builder.get_ifcnt());
       auto elseblock = func->addBasicBlock(elsename);
+      // create exit basicblock
+      char exitname[20];
+      sprintf(exitname, "exit%d", builder.get_ifcnt() + builder.get_whilecnt());
+      auto exitblock = func->addBasicBlock(exitname);
+      exitblock->getPredecessors().push_back(thenblock);
+      thenblock->getSuccessors().push_back(exitblock);
       current_block->getSuccessors().push_back(elseblock);
       elseblock->getPredecessors().push_back(current_block);
       elseblock->getSuccessors().push_back(exitblock);
@@ -342,9 +353,9 @@ namespace sysy
       builder.setPosition(elseblock, elseblock->begin());
       visitStmt(ctx->stmt()[1]);
       Value *else_br = builder.createUncondBrInst(exitblock, vector<Value *>());
+      // setup the instruction insert position
+      builder.setPosition(exitblock, exitblock->begin());
     }
-    // setup the instruction insert position
-    builder.setPosition(exitblock, exitblock->begin());
     return builder.getBasicBlock();
   }
 
@@ -382,9 +393,9 @@ namespace sysy
     builder.push_falsetarget(exitblock);
     auto cond = any_cast<Value *>(ctx->exp()->accept(this));
     builder.poptarget();
-    char flagname[20];
-    sprintf(flagname, "flag%d", builder.get_ifcnt() + builder.get_whilecnt());
-    cond->setName(flagname);
+    // char flagname[20];
+    // sprintf(flagname, "flag%d", builder.get_ifcnt() + builder.get_whilecnt());
+    // cond->setName(flagname);
     // create condbr in header
     Value *header_condbr = builder.createCondBrInst(cond, bodyblock, exitblock, vector<Value *>(), vector<Value *>());
     // generate code in body block
