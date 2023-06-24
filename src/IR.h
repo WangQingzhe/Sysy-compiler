@@ -945,6 +945,7 @@ namespace sysy
     {
       // move(exit_blocks.back());
       blocks.emplace_back(move(exit_blocks.back()));
+      exit_blocks.pop_back();
     }
     void removeBasicBlock(BasicBlock *block)
     {

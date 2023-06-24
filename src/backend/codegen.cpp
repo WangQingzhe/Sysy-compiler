@@ -242,28 +242,97 @@ namespace backend
          */
         string lname, rname;
         auto lhs = bInst->getLhs();
+        bool lconst = false, rconst = false;
         if (isa<ConstantValue>(lhs))
+        {
             lname = "#" + to_string(dynamic_cast<ConstantValue *>(lhs)->getInt());
+            lconst = true;
+        }
         else if (isa<CallInst>(lhs))
             lname = "r0";
         else
             lname = "r" + lhs->getName();
         auto rhs = bInst->getRhs();
         if (isa<ConstantValue>(rhs))
+        {
             rname = "#" + to_string(dynamic_cast<ConstantValue *>(rhs)->getInt());
+            rconst = true;
+        }
         else if (isa<CallInst>(lhs))
             lname = "r0";
         else
             rname = "r" + rhs->getName();
-        auto res = stoi(bInst->getName());
+        auto res = bInst->getName();
         if (bInst->getKind() == Instruction::kAdd)
-            code += space + "add\tr" + to_string(res) + ", " + lname + ", " + rname + endl;
+        {
+            if (lconst && rconst)
+            {
+                int val = dynamic_cast<ConstantValue *>(lhs)->getInt() + dynamic_cast<ConstantValue *>(rhs)->getInt();
+                if (val >= 0)
+                    code += space + "mov\tr" + res + ", #" + to_string(val) + endl;
+                else
+                {
+                    code += space + "mov\tr" + res + ", #" + to_string(-val) + endl;
+                    code += space + "mvn\tr" + res + ", #1" + endl;
+                }
+            }
+            else if (lconst)
+            {
+                code += space + "mov\tr" + res + ", " + lname + endl;
+                code += space + "add\tr" + res + ", r" + res + ", " + rname + endl;
+            }
+            else
+                code += space + "add\tr" + res + ", " + lname + ", " + rname + endl;
+        }
         else if (bInst->getKind() == Instruction::kSub)
-            code += space + "sub\tr" + to_string(res) + ", " + lname + ", " + rname + endl;
+        {
+            if (lconst && rconst)
+            {
+                int val = dynamic_cast<ConstantValue *>(lhs)->getInt() - dynamic_cast<ConstantValue *>(rhs)->getInt();
+                if (val >= 0)
+                    code += space + "mov\tr" + res + ", #" + to_string(val) + endl;
+                else
+                {
+                    code += space + "mov\tr" + res + ", #" + to_string(-val) + endl;
+                    code += space + "mvn\tr" + res + ", #1" + endl;
+                }
+            }
+            else if (lconst)
+            {
+                code += space + "mov\tr" + res + ", " + lname + endl;
+                code += space + "sub\tr" + res + ", r" + res + ", " + rname + endl;
+            }
+            else
+                code += space + "sub\tr" + res + ", " + lname + ", " + rname + endl;
+        }
         else if (bInst->getKind() == Instruction::kMul)
-            code += space + "mul\tr" + to_string(res) + ", " + lname + ", " + rname + endl;
+        {
+            if (lconst && rconst)
+            {
+                int val = dynamic_cast<ConstantValue *>(lhs)->getInt() * dynamic_cast<ConstantValue *>(rhs)->getInt();
+                if (val >= 0)
+                    code += space + "mov\tr" + res + ", #" + to_string(val) + endl;
+                else
+                {
+                    code += space + "mov\tr" + res + ", #" + to_string(-val) + endl;
+                    code += space + "mvn\tr" + res + ", #1" + endl;
+                }
+            }
+            else if (lconst)
+            {
+                code += space + "mov\tr" + res + ", " + lname + endl;
+                code += space + "mul\tr" + res + ", r" + res + ", " + rname + endl;
+            }
+            else if (rconst)
+            {
+                code += space + "mov\tr" + res + ", " + rname + endl;
+                code += space + "mul\tr" + res + ", " + lname + ", r" + res + endl;
+            }
+            else
+                code += space + "mul\tr" + res + ", " + lname + ", " + rname + endl;
+        }
         else if (bInst->getKind() == Instruction::kDiv)
-            code += space + "div\tr" + to_string(res) + ", " + lname + ", " + rname + endl;
+            code += space + "div\tr" + res + ", " + lname + ", " + rname + endl;
         else if (bInst->getKind() == Instruction::kICmpEQ)
             code += space + "cmp\t" + lname + ", " + rname + endl;
         else if (bInst->getKind() == Instruction::kICmpGE)

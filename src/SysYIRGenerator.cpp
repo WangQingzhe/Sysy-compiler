@@ -312,7 +312,6 @@ namespace sysy
       builder.push_truetarget(thenblock);
       builder.push_falsetarget(exitblock);
       auto cond = any_cast<Value *>(ctx->exp()->accept(this));
-      func->moveExitBlock();
       char flagname[20];
       sprintf(flagname, "flag%d", builder.get_ifcnt() + builder.get_whilecnt());
       // cond->setName(flagname);
@@ -325,6 +324,7 @@ namespace sysy
       Value *then_br = builder.createUncondBrInst(exitblock, vector<Value *>());
       // setup the instruction insert position
       builder.setPosition(exitblock, exitblock->begin());
+      func->moveExitBlock();
     }
     if (ctx->stmt().size() == 2)
     {
@@ -348,7 +348,6 @@ namespace sysy
       builder.push_truetarget(thenblock);
       builder.push_falsetarget(elseblock);
       auto cond = any_cast<Value *>(ctx->exp()->accept(this));
-      func->moveExitBlock();
       CondBrInst *CondBr = builder.createCondBrInst(cond, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
       builder.poptarget();
       builder.setPosition(thenblock, thenblock->begin());
@@ -359,6 +358,7 @@ namespace sysy
       Value *else_br = builder.createUncondBrInst(exitblock, vector<Value *>());
       // setup the instruction insert position
       builder.setPosition(exitblock, exitblock->begin());
+      func->moveExitBlock();
     }
     return builder.getBasicBlock();
   }
@@ -396,7 +396,6 @@ namespace sysy
     builder.push_truetarget(bodyblock);
     builder.push_falsetarget(exitblock);
     auto cond = any_cast<Value *>(ctx->exp()->accept(this));
-    func->moveExitBlock();
     // char flagname[20];
     // sprintf(flagname, "flag%d", builder.get_ifcnt() + builder.get_whilecnt());
     // cond->setName(flagname);
@@ -412,6 +411,7 @@ namespace sysy
     Value *body_uncondbr = builder.createUncondBrInst(headerblock, vector<Value *>());
     // setup the instruction insert position
     builder.setPosition(exitblock, exitblock->begin());
+    func->moveExitBlock();
     return builder.getBasicBlock();
   }
   any SysYIRGenerator::visitBreakStmt(SysYParser::BreakStmtContext *ctx)
