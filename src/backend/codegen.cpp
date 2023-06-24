@@ -47,10 +47,10 @@ namespace backend
     string CodeGen::functionHead_gen(Function *func)
     {
         string code;
-        code += space + ".global " + func->getName() + endl;
+        code += space + ".global\t" + func->getName() + endl;
         code += space + ".arm" + endl;
-        code += space + ".p2align " + std::to_string(int_p2align) + endl;
-        code += space + ".type " + func->getName() + ", %function" + endl;
+        code += space + ".align\t" + std::to_string(int_p2align) + endl;
+        code += space + ".type\t" + func->getName() + ", %function" + endl;
         code += func->getName() + ":" + endl;
         return code;
     }
@@ -285,6 +285,22 @@ namespace backend
         /**
          *code in here
          */
+        auto val = uInst->getOperand();
+        string val_name;
+        if (uInst->getKind() == Instruction::kNeg)
+        {
+            if (isa<ConstantValue>(val))
+            {
+                val_name = to_string(dynamic_cast<ConstantValue *>(val)->getInt());
+                code += space + "mov\tr" + uInst->getName() + ", #" + val_name + endl;
+                code += space + "mvn\tr" + uInst->getName() + ", #1" + endl;
+            }
+            else
+            {
+                val_name = "r" + val->getName();
+                code += space + "rsb\tr" + uInst->getName() + ", " + val_name + ", #0" + endl;
+            }
+        }
         return {dstRegId, code};
     }
     pair<RegId, string>
@@ -392,7 +408,7 @@ namespace backend
         auto cond = cbInst->getCondition();
         auto then_block = cbInst->getThenBlock();
         auto else_block = cbInst->getElseBlock();
-        if (cond->getKind())
+        if (isa<BinaryInst>(cond))
         {
             BinaryInst *bInst = dynamic_cast<BinaryInst *>(cond);
             // auto lhs = bInst->getLhs();
@@ -433,6 +449,25 @@ namespace backend
                 code += space + "bne\t" + then_block->getName() + endl;
                 code += space + "b\t" + else_block->getName() + endl;
             }
+            else
+            {
+                code += space + "cmp\tr" + bInst->getName() + ", #0" + endl;
+                code += space + "bne\t" + then_block->getName() + endl;
+                code += space + "b\t" + else_block->getName() + endl;
+            }
+        }
+        else if (isa<ConstantValue>(cond))
+        {
+            if (dynamic_cast<ConstantValue *>(cond)->getInt())
+                code += space + "b\t" + then_block->getName() + endl;
+            else
+                code += space + "b\t" + else_block->getName() + endl;
+        }
+        else
+        {
+            code += space + "cmp\tr" + cond->getName() + ", #0" + endl;
+            code += space + "bne\t" + then_block->getName() + endl;
+            code += space + "b\t" + else_block->getName() + endl;
         }
         return code;
     }
@@ -553,6 +588,16 @@ namespace backend
             CondBrInst *cbInst = dynamic_cast<CondBrInst *>(instr);
             code += condBrInst_gen(cbInst);
             return code;
+            break;
+        }
+        case Instruction::kNeg:
+        case Instruction::kNot:
+        {
+            UnaryInst *uInst = dynamic_cast<UnaryInst *>(instr);
+            tmp = unaryInst_gen(uInst, RegManager::RANY);
+            // code += "unary instr\n";
+            code += tmp.second;
+            dstRegId = tmp.first;
             break;
         }
         default:
