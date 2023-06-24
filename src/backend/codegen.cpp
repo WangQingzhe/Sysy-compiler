@@ -387,6 +387,26 @@ namespace backend
         string code;
         auto value = stInst->getValue();
         auto pointer = stInst->getPointer();
+        if (globalval.find(dynamic_cast<GlobalValue *>(pointer)) != globalval.end())
+        {
+            code += space + "movw\tr10, #:lower16:" + pointer->getName() + endl;
+            code += space + "movt\tr10, #:upper16:" + pointer->getName() + endl;
+            if (isa<ConstantValue>(value))
+            {
+                int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
+                code += space + "mov\tr3, #" + to_string(constant_value) + endl;
+                code += space + "str\tr3, [r10]" + endl;
+            }
+            else if (isa<CallInst>(value))
+            {
+                code += space + "str\tr0, [r10]" + endl;
+            }
+            else
+            {
+                code += space + "str\tr" + value->getName() + ", [r10]" + endl;
+            }
+            return code;
+        }
         int offset;
         if (localVarStOffset.find(dynamic_cast<Instruction *>(pointer)) != localVarStOffset.end())
             offset = localVarStOffset[dynamic_cast<Instruction *>(pointer)];
@@ -420,21 +440,20 @@ namespace backend
         int pos;
         bool found = false;
         // find var in localvar
-        // if (localVarStOffset.find(dynamic_cast<Instruction *>(var)) != localVarStOffset.end())
-        //     pos = localVarStOffset[dynamic_cast<Instruction *>(var)];
-        for (auto local_var : localVarStOffset)
+        if (localVarStOffset.find(dynamic_cast<Instruction *>(var)) != localVarStOffset.end())
         {
-            // code += "load var in localvar\n";
-            if (local_var.first == var)
-            {
-                pos = local_var.second;
-                found = true;
-                code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
-                break;
-            }
+            pos = localVarStOffset[dynamic_cast<Instruction *>(var)];
+            code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
         }
-        // if var is not localvar but an argument
-        if (not found)
+        // if var is a globalvalue
+        else if (globalval.find(dynamic_cast<GlobalValue *>(var)) != globalval.end())
+        {
+            code += space + "movw\tr10, #:lower16:" + var->getName() + endl;
+            code += space + "movt\tr10, #:upper16:" + var->getName() + endl;
+            code += space + "ldr\tr" + to_string(reg_num) + ", [r10]" + endl;
+        }
+        // if var is an argument
+        else
         {
             code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #unk]" + endl;
             backpatch.push_back(dynamic_cast<Argument *>(var));
@@ -688,6 +707,7 @@ namespace backend
     {
         string asmCode;
         string name = glbvl->getName();
+        globalval.insert(glbvl);
 
         asmCode += space + ".global\t" + name + endl;
         auto type = static_cast<const PointerType *>(glbvl->getType())->getBaseType();
@@ -697,7 +717,7 @@ namespace backend
             asmCode += space + ".data" + endl;
             //******************Revised by lyq BEGIN***************************************
             if (glbvl->isconst())
-                asmCode += space + ".section" + space + "rodata" + endl;
+                asmCode += space + ".section" + space + ".rodata" + endl;
             //******************Revised by lyq END*****************************************
             {
                 asmCode += space + ".align\t2" + endl;

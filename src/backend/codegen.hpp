@@ -177,6 +177,7 @@ namespace backend
         // function params, return value and localVar
         map<Argument *, int> paramsStOffset;
         map<Instruction *, int> localVarStOffset;
+        set<GlobalValue *> globalval;
         int retValueStOffset = 0;
         size_t stOffsetAcc = 0;
         // label manager
