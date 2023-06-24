@@ -918,6 +918,7 @@ namespace sysy
     int variableID;
     int blockID;
     block_list blocks;
+    block_list exit_blocks;
 
   public:
     Type *getReturnType() const
@@ -934,6 +935,16 @@ namespace sysy
     {
       blocks.emplace_back(new BasicBlock(this, name));
       return blocks.back().get();
+    }
+    BasicBlock *addExitBlock(const std::string &name = "")
+    {
+      exit_blocks.emplace_back(new BasicBlock(this, name));
+      return exit_blocks.back().get();
+    }
+    void moveExitBlock()
+    {
+      // move(exit_blocks.back());
+      blocks.emplace_back(move(exit_blocks.back()));
     }
     void removeBasicBlock(BasicBlock *block)
     {

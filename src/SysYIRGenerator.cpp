@@ -305,19 +305,21 @@ namespace sysy
       // create exit basicblock
       char exitname[20];
       sprintf(exitname, "exit%d", builder.get_ifcnt() + builder.get_whilecnt());
-      auto exitblock = func->addBasicBlock(exitname);
+      auto exitblock = func->addExitBlock(exitname);
+      // auto exitblock = func->addBasicBlock(exitname);
       exitblock->getPredecessors().push_back(thenblock);
       thenblock->getSuccessors().push_back(exitblock);
       builder.push_truetarget(thenblock);
       builder.push_falsetarget(exitblock);
       auto cond = any_cast<Value *>(ctx->exp()->accept(this));
-      builder.poptarget();
+      func->moveExitBlock();
       char flagname[20];
       sprintf(flagname, "flag%d", builder.get_ifcnt() + builder.get_whilecnt());
       // cond->setName(flagname);
       current_block->getSuccessors().push_back(exitblock);
       exitblock->getPredecessors().push_back(current_block);
-      Value *CondBr = builder.createCondBrInst(cond, thenblock, exitblock, vector<Value *>(), vector<Value *>());
+      Value *CondBr = builder.createCondBrInst(cond, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
+      builder.poptarget();
       builder.setPosition(thenblock, thenblock->begin());
       visitStmt(ctx->stmt()[0]);
       Value *then_br = builder.createUncondBrInst(exitblock, vector<Value *>());
@@ -334,7 +336,8 @@ namespace sysy
       // create exit basicblock
       char exitname[20];
       sprintf(exitname, "exit%d", builder.get_ifcnt() + builder.get_whilecnt());
-      auto exitblock = func->addBasicBlock(exitname);
+      // auto exitblock = func->addBasicBlock(exitname);
+      auto exitblock = func->addExitBlock(exitname);
       exitblock->getPredecessors().push_back(thenblock);
       thenblock->getSuccessors().push_back(exitblock);
       current_block->getSuccessors().push_back(elseblock);
@@ -345,8 +348,9 @@ namespace sysy
       builder.push_truetarget(thenblock);
       builder.push_falsetarget(elseblock);
       auto cond = any_cast<Value *>(ctx->exp()->accept(this));
+      func->moveExitBlock();
+      CondBrInst *CondBr = builder.createCondBrInst(cond, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
       builder.poptarget();
-      CondBrInst *CondBr = builder.createCondBrInst(cond, thenblock, elseblock, vector<Value *>(), vector<Value *>());
       builder.setPosition(thenblock, thenblock->begin());
       visitStmt(ctx->stmt()[0]);
       Value *then_br = builder.createUncondBrInst(exitblock, vector<Value *>());
@@ -382,7 +386,7 @@ namespace sysy
     // create exit basicblock
     char exitname[20];
     sprintf(exitname, "exit%d", builder.get_whilecnt() + builder.get_ifcnt());
-    auto exitblock = func->addBasicBlock(exitname);
+    auto exitblock = func->addExitBlock(exitname);
     headerblock->getSuccessors().push_back(exitblock);
     exitblock->getPredecessors().push_back(headerblock);
     // push header&exit into loopstack
@@ -392,12 +396,13 @@ namespace sysy
     builder.push_truetarget(bodyblock);
     builder.push_falsetarget(exitblock);
     auto cond = any_cast<Value *>(ctx->exp()->accept(this));
-    builder.poptarget();
+    func->moveExitBlock();
     // char flagname[20];
     // sprintf(flagname, "flag%d", builder.get_ifcnt() + builder.get_whilecnt());
     // cond->setName(flagname);
     // create condbr in header
-    Value *header_condbr = builder.createCondBrInst(cond, bodyblock, exitblock, vector<Value *>(), vector<Value *>());
+    Value *header_condbr = builder.createCondBrInst(cond, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
+    builder.poptarget();
     // generate code in body block
     builder.setPosition(bodyblock, bodyblock->begin());
     visitStmt(ctx->stmt());
@@ -423,15 +428,29 @@ namespace sysy
   any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
   {
     // generate the operands
-    auto hs = any_cast<Value *>(ctx->exp()->accept(this));
 
     Value *result = nullptr;
     if (ctx->SUB())
+    {
+      auto hs = any_cast<Value *>(ctx->exp()->accept(this));
       result = builder.createNegInst(hs);
+    }
     else if (ctx->NOT())
-      result = builder.createNotInst(hs);
-    else if (ctx->ADD())
+    // result = builder.createNotInst(hs);
+    {
+      auto true_target = builder.get_falsetarget();
+      auto false_target = builder.get_truetarget();
+      builder.poptarget();
+      builder.push_truetarget(true_target);
+      builder.push_falsetarget(false_target);
+      auto hs = any_cast<Value *>(ctx->exp()->accept(this));
       result = hs;
+    }
+    else if (ctx->ADD())
+    {
+      auto hs = any_cast<Value *>(ctx->exp()->accept(this));
+      result = hs;
+    }
     return result;
   }
 
