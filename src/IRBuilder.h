@@ -306,6 +306,7 @@ namespace sysy
                                const std::vector<Value *> &indices = {},
                                const std::string &name = "")
     {
+      block->getParent()->resetVariableID();
       auto inst = new StoreInst(value, pointer, indices, block, name);
       assert(inst);
       block->getInstructions().emplace(position, inst);

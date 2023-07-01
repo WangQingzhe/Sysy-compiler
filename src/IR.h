@@ -953,6 +953,7 @@ namespace sysy
                        { return block == b.get(); });
     }
     int allocateVariableID() { return variableID++; }
+    void resetVariableID() { variableID = 0; }
     int allocateblockID() { return blockID++; }
 
   public:

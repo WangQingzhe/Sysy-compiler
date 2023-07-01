@@ -333,6 +333,8 @@ namespace backend
         }
         else if (bInst->getKind() == Instruction::kDiv)
             code += space + "div\tr" + res + ", " + lname + ", " + rname + endl;
+        else if (lconst && rconst)
+            return {dstRegId, code};
         else if (bInst->getKind() == Instruction::kICmpEQ)
             code += space + "cmp\t" + lname + ", " + rname + endl;
         else if (bInst->getKind() == Instruction::kICmpGE)
@@ -469,8 +471,10 @@ namespace backend
         auto retval = retInst->getReturnValue();
         if (isa<ConstantValue>(retval))
         {
-            code += space + "mov\tr0, " + to_string(dynamic_cast<ConstantValue *>(retval)->getInt()) + endl;
+            code += space + "mov\tr0, #" + to_string(dynamic_cast<ConstantValue *>(retval)->getInt()) + endl;
         }
+        else if (isa<CallInst>(retval))
+            ;
         else
         {
             code += space + "mov\tr0, r" + retval->getName() + endl;
@@ -499,9 +503,50 @@ namespace backend
         if (isa<BinaryInst>(cond))
         {
             BinaryInst *bInst = dynamic_cast<BinaryInst *>(cond);
-            // auto lhs = bInst->getLhs();
-            // auto rhs = bInst->getRhs();
-            if (bInst->getKind() == Instruction::kICmpEQ)
+            auto lhs = bInst->getLhs();
+            auto rhs = bInst->getRhs();
+            if (isa<ConstantValue>(lhs) && isa<ConstantValue>(rhs))
+            {
+                int lvalue = dynamic_cast<ConstantValue *>(lhs)->getInt();
+                int rvalue = dynamic_cast<ConstantValue *>(rhs)->getInt();
+                if (bInst->getKind() == Instruction::kICmpEQ)
+                    if (lvalue == rvalue)
+                        code += space + "b\t" + then_block->getName() + endl;
+                    else
+                        code += space + "b\t" + else_block->getName() + endl;
+                else if (bInst->getKind() == Instruction::kICmpGE)
+                    if (lvalue >= rvalue)
+                        code += space + "b\t" + then_block->getName() + endl;
+                    else
+                        code += space + "b\t" + else_block->getName() + endl;
+                else if (bInst->getKind() == Instruction::kICmpGT)
+                    if (lvalue > rvalue)
+                        code += space + "b\t" + then_block->getName() + endl;
+                    else
+                        code += space + "b\t" + else_block->getName() + endl;
+                else if (bInst->getKind() == Instruction::kICmpLE)
+                    if (lvalue <= rvalue)
+                        code += space + "b\t" + then_block->getName() + endl;
+                    else
+                        code += space + "b\t" + else_block->getName() + endl;
+                else if (bInst->getKind() == Instruction::kICmpLT)
+                    if (lvalue < rvalue)
+                        code += space + "b\t" + then_block->getName() + endl;
+                    else
+                        code += space + "b\t" + else_block->getName() + endl;
+                else if (bInst->getKind() == Instruction::kICmpNE)
+                    if (lvalue != rvalue)
+                        code += space + "b\t" + then_block->getName() + endl;
+                    else
+                        code += space + "b\t" + else_block->getName() + endl;
+                else
+                {
+                    code += space + "cmp\tr" + bInst->getName() + ", #0" + endl;
+                    code += space + "bne\t" + then_block->getName() + endl;
+                    code += space + "b\t" + else_block->getName() + endl;
+                }
+            }
+            else if (bInst->getKind() == Instruction::kICmpEQ)
             {
                 // code += binaryInst_gen(bInst, RegManager::RANY).second;
                 code += space + "beq\t" + then_block->getName() + endl;
@@ -584,8 +629,12 @@ namespace backend
                 continue;
             }
             // int src_reg = stoi(arg->getName()) + 4;
-            int src_reg = stoi(arg->getName());
-            code += space + "mov\tr" + to_string(arg_num - 1) + ", r" + to_string(src_reg) + endl;
+            string src_name;
+            if (isa<ConstantValue>(arg))
+                src_name = "#" + to_string(dynamic_cast<ConstantValue *>(arg)->getInt());
+            else
+                src_name = "r" + arg->getName();
+            code += space + "mov\tr" + to_string(arg_num - 1) + ", " + src_name + endl;
             // code += space + "mov\tr" + to_string(arg_num - 1) + ", r" + src + endl;
         }
         code += space + "bl\t" + callee_fuc->getName() + endl;
