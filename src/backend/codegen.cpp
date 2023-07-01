@@ -183,6 +183,9 @@ namespace backend
 
     string CodeGen::function_gen(Function *func)
     {
+        string code;
+        if (libfunc.find(func->getName()) != libfunc.end())
+            return code;
         curFunc = func;
         clearFunctionRecord(func);
         string bbCode;
@@ -196,7 +199,6 @@ namespace backend
             auto bb = iter->get();
             bbCode += basicBlock_gen(bb);
         }
-        string code;
         string funcHead = functionHead_gen(func);
         string prologueCode = prologueCode_gen(func);
         string epilogueCode = epilogueCode_gen(func);

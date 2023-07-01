@@ -188,6 +188,7 @@ namespace backend
         int max_param = 0;
         // record arguments need to be backpatched
         vector<Argument *> backpatch;
+        set<string> libfunc = {"getint", "putint"};
 
     public:
         CodeGen(Module *module) : module(module) {}

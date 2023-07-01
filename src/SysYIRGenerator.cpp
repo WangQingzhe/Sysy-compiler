@@ -18,14 +18,18 @@ namespace sysy
     auto pModule = new Module();
     assert(pModule);
     module.reset(pModule);
-    // // create function:getint
-    // auto getint_type = Type::getFunctionType(Type::getIntType());
-    // auto f_getint = pModule->createFunction("getint", getint_type);
-    // symbols.insert("getint", f_getint);
-    // // create function:putint
-    // auto putint_type = Type::getFunctionType(Type::getVoidType(), vector<Type *>({Type::getIntType()}));
-    // auto f_putint = pModule->createFunction("putint", putint_type);
-    // symbols.insert("putint", f_putint);
+    // create function:getint
+    auto getint_type = Type::getFunctionType(Type::getIntType());
+    auto f_getint = pModule->createFunction("getint", getint_type);
+    symbols.insert("getint", f_getint);
+    auto getint_entry = f_getint->addBasicBlock("getint_entry");
+    // create function:putint
+    auto putint_type = Type::getFunctionType(Type::getVoidType(), vector<Type *>({Type::getIntType()}));
+    auto f_putint = pModule->createFunction("putint", putint_type);
+    symbols.insert("putint", f_putint);
+    // SymbolTable::FunctionScope putint_scope(symbols);
+    auto putint_entry = f_putint->addBasicBlock("putint_entry");
+    auto putint_arg = putint_entry->createArgument(Type::getPointerType(Type::getIntType()));
     // generates globals and functions
     visitChildren(ctx);
     // return the IR module
@@ -116,7 +120,7 @@ namespace sysy
     symbols.insert(name, function);
     // create the function scope
     SymbolTable::FunctionScope scope(symbols);
-    // create the entry block with the same parameters as the function,
+    // create the entry block with the same parameters of the function,
     // and update the symbol table
     auto entry = function->addBasicBlock(entry_name);
     // auto entry = function->getEntryBlock();
