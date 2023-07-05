@@ -515,8 +515,6 @@ namespace sysy
 
   any SysYIRGenerator::visitAndExp(SysYParser::AndExpContext *ctx)
   {
-    // get lhs value
-    auto lhs = any_cast<Value *>(ctx->exp()[0]->accept(this));
     // create rhs block
     builder.rhs_add();
     auto current_block = builder.getBasicBlock();
@@ -526,16 +524,19 @@ namespace sysy
     auto rhs_block = func->addBasicBlock(rhs_name);
     rhs_block->getPredecessors().push_back(current_block);
     current_block->getSuccessors().push_back(rhs_block);
+    builder.push_truetarget(rhs_block);
+    builder.push_falsetarget(builder.get_falsetarget());
+    // get lhs value
+    auto lhs = any_cast<Value *>(ctx->exp()[0]->accept(this));
     // create condbr instr
-    Value *condbr = builder.createCondBrInst(lhs, rhs_block, builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
+    Value *condbr = builder.createCondBrInst(lhs, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
+    builder.poptarget();
     // generate code for rhs block
     builder.setPosition(rhs_block, rhs_block->begin());
     return (ctx->exp()[1]->accept(this));
   }
   any SysYIRGenerator::visitOrExp(SysYParser::OrExpContext *ctx)
   {
-    // get lhs value
-    auto lhs = any_cast<Value *>(ctx->exp()[0]->accept(this));
     // create rhs block
     builder.rhs_add();
     auto current_block = builder.getBasicBlock();
@@ -545,8 +546,13 @@ namespace sysy
     auto rhs_block = func->addBasicBlock(rhs_name);
     rhs_block->getPredecessors().push_back(current_block);
     current_block->getSuccessors().push_back(rhs_block);
+    builder.push_truetarget(builder.get_truetarget());
+    builder.push_falsetarget(rhs_block);
+    // get lhs value
+    auto lhs = any_cast<Value *>(ctx->exp()[0]->accept(this));
     // create condbr instr
-    Value *condbr = builder.createCondBrInst(lhs, builder.get_truetarget(), rhs_block, vector<Value *>(), vector<Value *>());
+    Value *condbr = builder.createCondBrInst(lhs, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
+    builder.poptarget();
     // generate code for rhs block
     builder.setPosition(rhs_block, rhs_block->begin());
     return (ctx->exp()[1]->accept(this));
