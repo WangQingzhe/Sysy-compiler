@@ -286,9 +286,10 @@ namespace sysy
     }
     AllocaInst *createAllocaInst(Type *type,
                                  const std::vector<Value *> &dims = {},
-                                 const std::string &name = "")
+                                 const std::string &name = "",
+                                 const bool isConst = false)
     {
-      auto inst = new AllocaInst(type, dims, block, name);
+      auto inst = new AllocaInst(type, dims, block, name, isConst);
       assert(inst);
       block->getInstructions().emplace(position, inst);
       return inst;

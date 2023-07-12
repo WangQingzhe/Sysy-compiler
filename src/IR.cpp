@@ -479,11 +479,13 @@ namespace sysy
 
   void AllocaInst::print(std::ostream &os) const
   {
-    if (getNumDims())
-      cerr << "not implemented yet\n";
     printVarName(os, this) << " = ";
-    os << "alloca "
-       << *static_cast<const PointerType *>(getType())->getBaseType();
+    os << "alloca ";
+    for (auto iter = getDims().begin(); iter != getDims().end(); iter++)
+    {
+      os << "[" << static_cast<const ConstantValue *>(*iter)->getInt() << "]";
+    }
+    os << " " << *static_cast<const PointerType *>(getType())->getBaseType();
     os << " : " << *getType();
   }
 
@@ -511,6 +513,12 @@ namespace sysy
     printVarName(os, this) << ' ';
     if (isConst)
       os << " const ";
+    for (auto iter = getOperands().begin(); iter != getOperands().end(); iter++)
+    {
+      if (hasInit && iter == getOperands().begin())
+        continue;
+      os << "[" << static_cast<const ConstantValue *>(*iter)->getInt() << "]";
+    }
     os << *static_cast<const PointerType *>(getType())->getBaseType()
        << " : " << *type << ' ';
     if (init())

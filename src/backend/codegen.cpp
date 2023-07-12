@@ -47,6 +47,7 @@ namespace backend
     string CodeGen::functionHead_gen(Function *func)
     {
         string code;
+        code += space + ".text" + endl;
         code += space + ".global\t" + func->getName() + endl;
         code += space + ".arm" + endl;
         code += space + ".align\t" + std::to_string(int_p2align) + endl;
@@ -418,9 +419,20 @@ namespace backend
             offset = paramsStOffset[dynamic_cast<Argument *>(pointer)];
         if (isa<ConstantValue>(value))
         {
-            int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-            code += space + "mov\tr3, #" + to_string(constant_value) + endl;
-            code += space + "str\tr3, [fp, #" + to_string(offset) + "]" + endl;
+            if (value->isInt())
+            {
+                int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
+                code += space + "mov\tr3, #" + to_string(constant_value) + endl;
+                code += space + "str\tr3, [fp, #" + to_string(offset) + "]" + endl;
+            }
+            else if (value->isFloat())
+            {
+                float constant_value = dynamic_cast<ConstantValue *>(value)->getFloat();
+                int dec;
+                std::memcpy(&dec, &constant_value, sizeof(dec));
+                code += space + "mov\tr3, #" + to_string(dec) + endl;
+                code += space + "str\tr3, [fp, #" + to_string(offset) + "]\t@ float" + endl;
+            }
         }
         else if (isa<CallInst>(value))
         {

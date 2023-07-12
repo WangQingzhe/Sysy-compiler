@@ -806,8 +806,8 @@ namespace sysy
 
   protected:
     AllocaInst(Type *type, const std::vector<Value *> &dims = {},
-               BasicBlock *parent = nullptr, const std::string &name = "")
-        : Instruction(kAlloca, type, parent, name)
+               BasicBlock *parent = nullptr, const std::string &name = "", const bool isConst = false)
+        : Instruction(kAlloca, type, parent, name), isConst(isConst)
     {
       addOperands(dims);
     }
@@ -818,10 +818,26 @@ namespace sysy
       return value->getKind() == kAlloca;
     }
 
+  protected:
+    bool isConst;
+    int int_value;
+    float float_value;
+    bool Int = false;
+
   public:
     int getNumDims() const { return getNumOperands(); }
     auto getDims() const { return getOperands(); }
     Value *getDim(int index) { return getOperand(index); }
+    bool Const() const { return isConst; }
+    void setInt(int value)
+    {
+      int_value = value;
+      Int = true;
+    }
+    void setFloat(float value) { float_value = value; }
+    int getInt() { return int_value; }
+    float getFloat() { return float_value; }
+    bool isInt() { return Int; }
 
   public:
     void print(std::ostream &os) const override;
