@@ -789,12 +789,18 @@ namespace backend
             asmCode += space + ".size\t" + name + ", 4" + endl;
             asmCode += name + ":\n";
             auto value = dyncast<ConstantValue>(glbvl->getOperand(0));
+            string val;
             std::stringstream ss;
             if (type->isInt())
-                ss << value->getInt();
+                val = to_string(value->getInt());
             else if (type->isFloat())
-                ss << value->getFloat();
-            asmCode += space + ".word\t" + ss.str() + endl;
+            {
+                float constant_value = value->getFloat();
+                int dec;
+                std::memcpy(&dec, &constant_value, sizeof(dec));
+                val = to_string(dec);
+            }
+            asmCode += space + ".word\t" + val + endl;
         }
         // no init
         else
