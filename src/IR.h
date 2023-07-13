@@ -238,7 +238,7 @@ namespace sysy
       kNot = 0x1UL << 26,
       kFNeg = 0x1UL << 27,
       kFtoI = 0x1UL << 28,
-      kIToF = 0x1UL << 29,
+      kItoF = 0x1UL << 29,
       // call
       kCall = 0x1UL << 30,
       // terminator
@@ -525,7 +525,7 @@ namespace sysy
     //   kNot = 0x1UL << 26,
     //   kFNeg = 0x1UL << 27,
     //   kFtoI = 0x1UL << 28,
-    //   kIToF = 0x1UL << 29,
+    //   kItoF = 0x1UL << 29,
     //   // call
     //   kCall = 0x1UL << 30,
     //   // terminator
@@ -571,7 +571,7 @@ namespace sysy
     }
     bool isUnary() const
     {
-      static constexpr uint64_t UnaryOpMask = kNeg | kNot | kFNeg | kFtoI | kIToF;
+      static constexpr uint64_t UnaryOpMask = kNeg | kNot | kFNeg | kFtoI | kItoF;
       return kind & UnaryOpMask;
     }
     bool isMemory() const

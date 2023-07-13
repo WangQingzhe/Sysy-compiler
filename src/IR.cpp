@@ -320,7 +320,7 @@ namespace sysy
     case kFtoI:
       os << "ftoi";
       break;
-    case kIToF:
+    case kItoF:
       os << "itof";
       break;
     default:
