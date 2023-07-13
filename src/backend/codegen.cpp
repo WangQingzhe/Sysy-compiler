@@ -352,6 +352,11 @@ namespace backend
             code += space + "cmp\t" + lname + ", " + rname + endl;
         return {dstRegId, code};
     }
+    pair<RegId, string> CodeGen::binaryFloatInst_gen(BinaryInst *bInst, RegId dstRegId)
+    {
+        string code = "**********\n";
+        return {dstRegId, code};
+    }
 
     pair<RegId, string> CodeGen::unaryInst_gen(UnaryInst *uInst, RegId dstRegId)
     {
@@ -374,6 +379,21 @@ namespace backend
                 val_name = "r" + val->getName();
                 code += space + "rsb\tr" + uInst->getName() + ", " + val_name + ", #0" + endl;
             }
+        }
+        else if (uInst->getKind() == Instruction::kFNeg)
+        {
+            val_name = "s" + to_string(15 - std::stoi(val->getName()));
+            code += space + "vneg.f32\ts" + to_string(15 - std::stoi(uInst->getName())) + ", " + val_name + endl;
+        }
+        else if (uInst->getKind() == Instruction::kFtoI)
+        {
+            val_name = "s" + to_string(15 - std::stoi(val->getName()));
+            code += space + "vcvt.s32.f32\ts" + to_string(15 - std::stoi(uInst->getName())) + "," + val_name + endl;
+        }
+        else if (uInst->getKind() == Instruction::kItoF)
+        {
+            val_name = "s" + to_string(15 - std::stoi(val->getName()));
+            code += space + "vcvt.f32.s32\ts" + to_string(15 - std::stoi(uInst->getName())) + "," + val_name + endl;
         }
         return {dstRegId, code};
     }
@@ -404,11 +424,17 @@ namespace backend
             }
             else if (isa<CallInst>(value))
             {
-                code += space + "str\tr0, [r10]" + endl;
+                if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
+                    code += space + "str\tr0, [r10]" + endl;
+                else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
+                    code += space + "vstr.32\tr0, [r10]" + endl;
             }
             else
             {
-                code += space + "str\tr" + value->getName() + ", [r10]" + endl;
+                if (value->getType()->isInt())
+                    code += space + "str\tr" + value->getName() + ", [r10]" + endl;
+                else if (value->getType()->isFloat())
+                    code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r10]" + endl;
             }
             return code;
         }
@@ -430,22 +456,28 @@ namespace backend
                 float constant_value = dynamic_cast<ConstantValue *>(value)->getFloat();
                 int dec;
                 std::memcpy(&dec, &constant_value, sizeof(dec));
-                code += space + "mov\tr3, #" + to_string(dec) + endl;
+                code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
+                code += space + "movt\tr3, #" + to_string(dec >> 16) + endl;
                 code += space + "str\tr3, [fp, #" + to_string(offset) + "]\t@ float" + endl;
             }
         }
         else if (isa<CallInst>(value))
         {
-            code += space + "str\tr0, [fp, #" + to_string(offset) + "]" + endl;
+            if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
+                code += space + "str\tr0, [fp, #" + to_string(offset) + "]" + endl;
+            else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
+                code += space + "vstr.32\ts0, [fp, #" + to_string(offset) + "]" + endl;
         }
         else
         {
-            code += space + "str\tr" + value->getName() + ", [fp, #" + to_string(offset) + "]" + endl;
+            if (value->getType()->isInt())
+                code += space + "str\tr" + value->getName() + ", [fp, #" + to_string(offset) + "]" + endl;
+            else if (value->getType()->isFloat())
+                code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [fp, #" + to_string(offset) + "]" + endl;
         }
         return code;
     }
-    pair<RegId, string>
-    CodeGen::loadInst_gen(LoadInst *ldInst, RegId dstRegId)
+    pair<RegId, string> CodeGen::loadInst_gen(LoadInst *ldInst, RegId dstRegId)
     {
         string code;
         // dst register
@@ -459,19 +491,28 @@ namespace backend
         if (localVarStOffset.find(dynamic_cast<Instruction *>(var)) != localVarStOffset.end())
         {
             pos = localVarStOffset[dynamic_cast<Instruction *>(var)];
-            code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+            if (var->getType()->as<PointerType>()->getBaseType()->isInt())
+                code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+            else if (var->getType()->as<PointerType>()->getBaseType()->isFloat())
+                code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
         }
         // if var is a globalvalue
         else if (globalval.find(dynamic_cast<GlobalValue *>(var)) != globalval.end())
         {
             code += space + "movw\tr10, #:lower16:" + var->getName() + endl;
             code += space + "movt\tr10, #:upper16:" + var->getName() + endl;
-            code += space + "ldr\tr" + to_string(reg_num) + ", [r10]" + endl;
+            if (var->getType()->as<PointerType>()->getBaseType()->isInt())
+                code += space + "ldr\tr" + to_string(reg_num) + ", [r10]" + endl;
+            else if (var->getType()->as<PointerType>()->getBaseType()->isFloat())
+                code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r10]" + endl;
         }
         // if var is an argument
         else
         {
-            code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #unk]" + endl;
+            if (var->getType()->as<PointerType>()->getBaseType()->isInt())
+                code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #unk]" + endl;
+            else if (var->getType()->as<PointerType>()->getBaseType()->isInt())
+                code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [fp, #unk]" + endl;
             backpatch.push_back(dynamic_cast<Argument *>(var));
         }
         return {dstRegId, code};
@@ -485,13 +526,30 @@ namespace backend
         auto retval = retInst->getReturnValue();
         if (isa<ConstantValue>(retval))
         {
-            code += space + "mov\tr0, #" + to_string(dynamic_cast<ConstantValue *>(retval)->getInt()) + endl;
+            if (retval->getType()->isInt())
+                code += space + "mov\tr0, #" + to_string(dynamic_cast<ConstantValue *>(retval)->getInt()) + endl;
+            else if (retval->getType()->isFloat())
+            {
+                unsigned num1;
+                float val1;
+                val1 = dynamic_cast<ConstantValue *>(retval)->getFloat();
+                memcpy(&num1, &val1, sizeof(val1));
+                code += space + "movw\tr3, #" + to_string(num1 & 0x0000FFFF) + endl;
+                code += space + "movt\tr3, #" + to_string(num1 >> 16) + endl;
+                code += space + "vmov\ts15, r3" + endl;
+                code += space + "vmov.f32\ts0, s15" + endl;
+            }
         }
         else if (isa<CallInst>(retval))
             ;
         else
         {
-            code += space + "mov\tr0, r" + retval->getName() + endl;
+            if (retval->getKind() == Instruction::kFtoI)
+                code += space + "vmov\tr0,s" + to_string(15 - stoi(retval->getName())) + endl;
+            else if (retval->getType()->isInt())
+                code += space + "mov\tr0, r" + retval->getName() + endl;
+            else if (retval->getType()->isFloat())
+                code += space + "vmov.f32\ts0, s" + to_string(15 - stoi(retval->getName())) + endl;
         }
         return code;
     }
@@ -654,7 +712,6 @@ namespace backend
         code += space + "bl\t" + callee_fuc->getName() + endl;
         return {dstRegId, code};
     }
-
     string CodeGen::instruction_gen(Instruction *instr)
     {
         string code;
@@ -664,7 +721,26 @@ namespace backend
         pair<RegId, string> tmp;
         switch (instrType)
         {
-        // binary inst
+        // binary float inst
+        case Instruction::kFAdd:
+        case Instruction::kFSub:
+        case Instruction::kFMul:
+        case Instruction::kFDiv:
+        case Instruction::kFRem:
+        case Instruction::kFCmpEQ:
+        case Instruction::kFCmpNE:
+        case Instruction::kFCmpLT:
+        case Instruction::kFCmpGT:
+        case Instruction::kFCmpLE:
+        case Instruction::kFCmpGE:
+        {
+            BinaryInst *bInst = dynamic_cast<BinaryInst *>(instr);
+            // registers are used only for instruction operation, consider use which register (any one that is free for use)
+            tmp = binaryFloatInst_gen(bInst, RegManager::RANY);
+            code += tmp.second;
+            dstRegId = tmp.first;
+            break;
+        }
         case Instruction::kICmpEQ:
         case Instruction::kICmpGE:
         case Instruction::kICmpGT:
@@ -741,6 +817,8 @@ namespace backend
             return code;
             break;
         }
+        case Instruction::kFNeg:
+        case Instruction::kFtoI:
         case Instruction::kNeg:
         case Instruction::kNot:
         {

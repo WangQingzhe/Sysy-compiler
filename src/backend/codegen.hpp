@@ -216,6 +216,7 @@ namespace backend
         string returnInst_gen(ReturnInst *retInst);
         pair<RegId, string> callInst_gen(CallInst *retInst, RegId dstRegId);
         pair<RegId, string> binaryInst_gen(BinaryInst *bInst, RegId dstRegId);
+        pair<RegId, string> binaryFloatInst_gen(BinaryInst *bInst, RegId dstRegId);
         pair<RegId, string> unaryInst_gen(UnaryInst *bInst, RegId dstRegId);
         string uncondBrInst_gen(UncondBrInst *ubInst);
         string condBrInst_gen(CondBrInst *ubInst);
