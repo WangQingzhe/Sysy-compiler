@@ -652,8 +652,10 @@ namespace sysy
         else
           result = ConstantValue::get(-dynamic_cast<AllocaInst *>(hs)->getFloat());
       }
-      else
+      else if (hs->getType()->isInt())
         result = builder.createNegInst(hs);
+      else if (hs->getType()->isFloat())
+        result = builder.createFNegInst(hs);
     }
     else if (ctx->NOT())
     // result = builder.createNotInst(hs);
