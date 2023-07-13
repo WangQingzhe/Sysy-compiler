@@ -636,7 +636,24 @@ namespace sysy
     if (ctx->SUB())
     {
       auto hs = any_cast<Value *>(ctx->exp()->accept(this));
-      result = builder.createNegInst(hs);
+      if (isa<ConstantValue>(hs))
+      {
+        if (hs->isInt())
+          result = ConstantValue::get(-dynamic_cast<ConstantValue *>(hs)->getInt());
+        else if (hs->isFloat())
+          result = ConstantValue::get(-dynamic_cast<ConstantValue *>(hs)->getFloat());
+      }
+      else if (isa<AllocaInst>(hs) && dynamic_cast<AllocaInst *>(hs)->getNumDims() == 0)
+      {
+        if (dynamic_cast<AllocaInst *>(hs)->isInt())
+        {
+          result = ConstantValue::get(-dynamic_cast<AllocaInst *>(hs)->getInt());
+        }
+        else
+          result = ConstantValue::get(-dynamic_cast<AllocaInst *>(hs)->getFloat());
+      }
+      else
+        result = builder.createNegInst(hs);
     }
     else if (ctx->NOT())
     // result = builder.createNotInst(hs);
