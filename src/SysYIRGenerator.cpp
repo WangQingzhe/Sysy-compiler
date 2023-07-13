@@ -765,6 +765,7 @@ namespace sysy
     // create condbr instr
     Value *condbr = builder.createCondBrInst(lhs, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
     builder.poptarget();
+    func->resetVariableID();
     // generate code for rhs block
     builder.setPosition(rhs_block, rhs_block->begin());
     return (ctx->exp()[1]->accept(this));
@@ -787,6 +788,7 @@ namespace sysy
     // create condbr instr
     Value *condbr = builder.createCondBrInst(lhs, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
     builder.poptarget();
+    func->resetVariableID();
     // generate code for rhs block
     builder.setPosition(rhs_block, rhs_block->begin());
     return (ctx->exp()[1]->accept(this));
