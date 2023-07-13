@@ -108,6 +108,10 @@ namespace sysy
               value = ConstantValue::get((float)dynamic_cast<ConstantValue *>(value)->getInt());
           }
         }
+        else if (alloca->getType()->as<PointerType>()->getBaseType()->isInt() && value->getType()->isFloat())
+          value = builder.createFtoIInst(value);
+        else if (alloca->getType()->as<PointerType>()->getBaseType()->isFloat() && value->getType()->isInt())
+          value = builder.createIToFInst(value);
         auto store = builder.createStoreInst(value, alloca);
         // if var is a constant scalar, store its value to alloca inst
         if (isConst && alloca->getNumDims() == 0)
@@ -215,6 +219,10 @@ namespace sysy
           rhs = ConstantValue::get((float)dynamic_cast<ConstantValue *>(rhs)->getInt());
       }
     }
+    else if (pointer->getType()->as<PointerType>()->getBaseType()->isInt() && rhs->getType()->isFloat())
+      rhs = builder.createFtoIInst(rhs);
+    else if (pointer->getType()->as<PointerType>()->getBaseType()->isFloat() && rhs->getType()->isInt())
+      rhs = builder.createIToFInst(rhs);
     // update the variable
     Value *store = builder.createStoreInst(rhs, pointer);
     return store;
@@ -342,9 +350,13 @@ namespace sysy
     auto lhsTy = lhs->getType();
     auto rhsTy = rhs->getType();
     auto type = getArithmeticResultType(lhsTy, rhsTy);
-    if (lhsTy != type && !lconst)
+    if (lhsTy != type && lconst)
+      lhs = ConstantValue::get((float)(dynamic_cast<ConstantValue *>(lhs)->getInt()));
+    else if (lhsTy != type)
       lhs = builder.createIToFInst(lhs);
-    if (rhsTy != type && !rconst)
+    if (rhsTy != type && rconst)
+      rhs = ConstantValue::get((float)(dynamic_cast<ConstantValue *>(rhs)->getInt()));
+    else if (rhsTy != type)
       rhs = builder.createIToFInst(rhs);
     // create the arithmetic instruction
     Value *result = nullptr;
@@ -429,9 +441,13 @@ namespace sysy
     auto lhsTy = lhs->getType();
     auto rhsTy = rhs->getType();
     auto type = getArithmeticResultType(lhsTy, rhsTy);
-    if (lhsTy != type && !lconst)
+    if (lhsTy != type && lconst)
+      lhs = ConstantValue::get((float)(dynamic_cast<ConstantValue *>(lhs)->getInt()));
+    else if (lhsTy != type)
       lhs = builder.createIToFInst(lhs);
-    if (rhsTy != type && !rconst)
+    if (rhsTy != type && rconst)
+      rhs = ConstantValue::get((float)(dynamic_cast<ConstantValue *>(rhs)->getInt()));
+    else if (rhsTy != type)
       rhs = builder.createIToFInst(rhs);
     // create the arithmetic instruction
     Value *result = nullptr;
