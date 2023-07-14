@@ -1069,6 +1069,7 @@ namespace backend
         case Instruction::kFtoI:
         case Instruction::kNeg:
         case Instruction::kNot:
+        case Instruction::kItoF:
         {
             UnaryInst *uInst = dynamic_cast<UnaryInst *>(instr);
             tmp = unaryInst_gen(uInst, RegManager::RANY);
@@ -1121,7 +1122,7 @@ namespace backend
                 val = to_string(value->getInt());
             else if (type->isFloat())
             {
-                double constant_value = value->getDouble();
+                float constant_value = value->getDouble();
                 int dec;
                 std::memcpy(&dec, &constant_value, sizeof(dec));
                 val = to_string(dec);

@@ -55,7 +55,7 @@ namespace sysy
       for (auto exp : varDef->lValue()->exp())
         dims.push_back(any_cast<Value *>(exp->accept(this)));
       auto init = varDef->ASSIGN()
-                      ? any_cast<Value *>(visitInitValue(varDef->initValue()))
+                      ? any_cast<Value *>((varDef->initValue()->exp()->accept(this)))
                       : nullptr;
       //******************Revised by lyq BEGIN***************************************
       auto global_value = module->createGlobalValue(name, type, dims, init, isConst);
@@ -354,7 +354,7 @@ namespace sysy
       if (lhs->isInt())
       {
         lint = dynamic_cast<ConstantValue *>(lhs)->getInt();
-        lfloat = dynamic_cast<ConstantValue *>(lhs)->getInt();
+        ldouble = dynamic_cast<ConstantValue *>(lhs)->getInt();
       }
       else if (lhs->isFloat())
         // lfloat = dynamic_cast<ConstantValue *>(lhs)->getFloat();
@@ -366,7 +366,7 @@ namespace sysy
       if (dynamic_cast<AllocaInst *>(lhs)->isInt())
       {
         lint = dynamic_cast<AllocaInst *>(lhs)->getInt();
-        lfloat = dynamic_cast<AllocaInst *>(lhs)->getInt();
+        ldouble = dynamic_cast<AllocaInst *>(lhs)->getInt();
       }
       else
         // lfloat = dynamic_cast<AllocaInst *>(lhs)->getFloat();
@@ -383,7 +383,7 @@ namespace sysy
       if (rhs->isInt())
       {
         rint = dynamic_cast<ConstantValue *>(rhs)->getInt();
-        rfloat = dynamic_cast<ConstantValue *>(rhs)->getInt();
+        rdouble = dynamic_cast<ConstantValue *>(rhs)->getInt();
       }
       else if (rhs->isFloat())
         // rfloat = dynamic_cast<ConstantValue *>(rhs)->getFloat();
@@ -395,7 +395,7 @@ namespace sysy
       if (dynamic_cast<AllocaInst *>(rhs)->isInt())
       {
         rint = dynamic_cast<AllocaInst *>(rhs)->getInt();
-        rfloat = dynamic_cast<AllocaInst *>(rhs)->getInt();
+        rdouble = dynamic_cast<AllocaInst *>(rhs)->getInt();
       }
       else
         // rfloat = dynamic_cast<AllocaInst *>(rhs)->getFloat();
@@ -406,11 +406,11 @@ namespace sysy
     auto rhsTy = rhs->getType();
     auto type = getArithmeticResultType(lhsTy, rhsTy);
     if (lhsTy != type && lconst)
-      lhs = ConstantValue::get((float)(dynamic_cast<ConstantValue *>(lhs)->getInt()));
+      lhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(lhs)->getInt()));
     else if (lhsTy != type)
       lhs = builder.createIToFInst(lhs);
     if (rhsTy != type && rconst)
-      rhs = ConstantValue::get((float)(dynamic_cast<ConstantValue *>(rhs)->getInt()));
+      rhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(rhs)->getInt()));
     else if (rhsTy != type)
       rhs = builder.createIToFInst(rhs);
     // create the arithmetic instruction
@@ -452,7 +452,7 @@ namespace sysy
       if (lhs->isInt())
       {
         lint = dynamic_cast<ConstantValue *>(lhs)->getInt();
-        lfloat = dynamic_cast<ConstantValue *>(lhs)->getInt();
+        ldouble = dynamic_cast<ConstantValue *>(lhs)->getInt();
       }
       else if (lhs->isFloat())
         // lfloat = dynamic_cast<ConstantValue *>(lhs)->getFloat();
@@ -464,7 +464,7 @@ namespace sysy
       if (dynamic_cast<AllocaInst *>(lhs)->isInt())
       {
         lint = dynamic_cast<AllocaInst *>(lhs)->getInt();
-        lfloat = dynamic_cast<AllocaInst *>(lhs)->getInt();
+        ldouble = dynamic_cast<AllocaInst *>(lhs)->getInt();
       }
       else
         // lfloat = dynamic_cast<AllocaInst *>(lhs)->getFloat();
@@ -481,7 +481,7 @@ namespace sysy
       if (rhs->isInt())
       {
         rint = dynamic_cast<ConstantValue *>(rhs)->getInt();
-        rfloat = dynamic_cast<ConstantValue *>(rhs)->getInt();
+        rdouble = dynamic_cast<ConstantValue *>(rhs)->getInt();
       }
       else if (rhs->isFloat())
         // rfloat = dynamic_cast<ConstantValue *>(rhs)->getFloat();
@@ -493,7 +493,7 @@ namespace sysy
       if (dynamic_cast<AllocaInst *>(rhs)->isInt())
       {
         rint = dynamic_cast<AllocaInst *>(rhs)->getInt();
-        rfloat = dynamic_cast<AllocaInst *>(rhs)->getInt();
+        rdouble = dynamic_cast<AllocaInst *>(rhs)->getInt();
       }
       else
         // rfloat = dynamic_cast<AllocaInst *>(rhs)->getFloat();
@@ -504,11 +504,11 @@ namespace sysy
     auto rhsTy = rhs->getType();
     auto type = getArithmeticResultType(lhsTy, rhsTy);
     if (lhsTy != type && lconst)
-      lhs = ConstantValue::get((float)(dynamic_cast<ConstantValue *>(lhs)->getInt()));
+      lhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(lhs)->getInt()));
     else if (lhsTy != type)
       lhs = builder.createIToFInst(lhs);
     if (rhsTy != type && rconst)
-      rhs = ConstantValue::get((float)(dynamic_cast<ConstantValue *>(rhs)->getInt()));
+      rhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(rhs)->getInt()));
     else if (rhsTy != type)
       rhs = builder.createIToFInst(rhs);
     // create the arithmetic instruction
