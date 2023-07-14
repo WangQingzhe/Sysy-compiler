@@ -245,6 +245,7 @@ namespace backend
          */
         string lname, rname;
         auto lhs = bInst->getLhs();
+        auto rhs = bInst->getRhs();
         bool lconst = false, rconst = false;
         if (isa<ConstantValue>(lhs))
         {
@@ -252,17 +253,18 @@ namespace backend
             lconst = true;
         }
         else if (isa<CallInst>(lhs))
-            lname = "r0";
+        {
+            lname = "r" + to_string(stoi(lhs->getName()) + 1);
+        }
         else
             lname = "r" + lhs->getName();
-        auto rhs = bInst->getRhs();
         if (isa<ConstantValue>(rhs))
         {
             rname = "#" + to_string(dynamic_cast<ConstantValue *>(rhs)->getInt());
             rconst = true;
         }
-        else if (isa<CallInst>(lhs))
-            lname = "r0";
+        else if (isa<CallInst>(rhs))
+            rname = "r" + to_string(stoi(rhs->getName()) + 1);
         else
             rname = "r" + rhs->getName();
         auto res = bInst->getName();
@@ -352,9 +354,127 @@ namespace backend
             code += space + "cmp\t" + lname + ", " + rname + endl;
         return {dstRegId, code};
     }
+
     pair<RegId, string> CodeGen::binaryFloatInst_gen(BinaryInst *bInst, RegId dstRegId)
     {
-        string code = "**********\n";
+        string code;
+        /**
+         *code in here
+         */
+        // 得到左右操作数和目的寄存器
+        string lname, rname;
+        auto lhs = bInst->getLhs();
+        auto rhs = bInst->getRhs();
+        bool lconst = false, rconst = false;
+        if (isa<ConstantValue>(lhs))
+        {
+            float val = dynamic_cast<ConstantValue *>(lhs)->getFloat();
+            unsigned int num;
+            memcpy(&num, &val, sizeof(val));
+            lname = "#" + to_string(num);
+            lconst = true;
+        }
+        else if (isa<CallInst>(lhs))
+        { // 如果左右操作数都是函数调用返回值，那么先把第一个左操作数的函数返回值放到s1里面，第二个操作数的值仍在s0里
+            lname = 's' + to_string(16 - stoi(lhs->getName()));
+        }
+        else
+            lname = "s" + to_string(15 - std::stoi(lhs->getName()));
+        if (isa<ConstantValue>(rhs))
+        {
+            float val = dynamic_cast<ConstantValue *>(rhs)->getFloat();
+            unsigned int num;
+            memcpy(&num, &val, sizeof(val));
+            rname = "#" + to_string(num);
+            rconst = true;
+        }
+        else if (isa<CallInst>(rhs))
+            rname = 's' + to_string(16 - stoi(rhs->getName()));
+        else
+            rname = "s" + to_string(15 - std::stoi(rhs->getName()));
+        auto res = to_string(15 - std::stoi(bInst->getName()));
+        // 各种指令分开处理
+        if (bInst->getKind() == Instruction::kFAdd)
+        {
+            if (lconst && rconst)
+            {
+                float val = dynamic_cast<ConstantValue *>(lhs)->getFloat() + dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                unsigned num;
+                memcpy(&num, &val, sizeof(val));
+                code += space + "vmov.f32\ts" + res + "#" + to_string(num) + endl;
+            }
+            else if (lconst)
+            {
+                code += space + "vmov.f32\ts" + res + ", " + lname + endl;
+                code += space + "vadd.f32\ts" + res + ", s" + res + ", " + rname + endl;
+            }
+            else
+                code += space + "vadd.f32\ts" + res + ", " + lname + ", " + rname + endl;
+        }
+        else if (bInst->getKind() == Instruction::kSub)
+        {
+            if (lconst && rconst)
+            {
+                int val = dynamic_cast<ConstantValue *>(lhs)->getInt() - dynamic_cast<ConstantValue *>(rhs)->getInt();
+                if (val >= 0)
+                    code += space + "mov\tr" + res + ", #" + to_string(val) + endl;
+                else
+                {
+                    code += space + "mov\tr" + res + ", #" + to_string(-val) + endl;
+                    code += space + "mvn\tr" + res + ", #1" + endl;
+                }
+            }
+            else if (lconst)
+            {
+                code += space + "mov\tr" + res + ", " + lname + endl;
+                code += space + "sub\tr" + res + ", r" + res + ", " + rname + endl;
+            }
+            else
+                code += space + "sub\tr" + res + ", " + lname + ", " + rname + endl;
+        }
+        else if (bInst->getKind() == Instruction::kMul)
+        {
+            if (lconst && rconst)
+            {
+                int val = dynamic_cast<ConstantValue *>(lhs)->getInt() * dynamic_cast<ConstantValue *>(rhs)->getInt();
+                if (val >= 0)
+                    code += space + "mov\tr" + res + ", #" + to_string(val) + endl;
+                else
+                {
+                    code += space + "mov\tr" + res + ", #" + to_string(-val) + endl;
+                    code += space + "mvn\tr" + res + ", #1" + endl;
+                }
+            }
+            else if (lconst)
+            {
+                code += space + "mov\tr" + res + ", " + lname + endl;
+                code += space + "mul\tr" + res + ", r" + res + ", " + rname + endl;
+            }
+            else if (rconst)
+            {
+                code += space + "mov\tr" + res + ", " + rname + endl;
+                code += space + "mul\tr" + res + ", " + lname + ", r" + res + endl;
+            }
+            else
+                code += space + "mul\tr" + res + ", " + lname + ", " + rname + endl;
+        }
+        else if (bInst->getKind() == Instruction::kDiv)
+            code += space + "div\tr" + res + ", " + lname + ", " + rname + endl;
+        else if (lconst && rconst)
+            return {dstRegId, code};
+        else if (bInst->getKind() == Instruction::kICmpEQ)
+            code += space + "cmp\t" + lname + ", " + rname + endl;
+        else if (bInst->getKind() == Instruction::kICmpGE)
+            code += space + "cmp\t" + lname + ", " + rname + endl;
+        else if (bInst->getKind() == Instruction::kICmpGT)
+            code += space + "cmp\t" + lname + ", " + rname + endl;
+        else if (bInst->getKind() == Instruction::kICmpLE)
+            code += space + "cmp\t" + lname + ", " + rname + endl;
+        else if (bInst->getKind() == Instruction::kICmpLT)
+            code += space + "cmp\t" + lname + ", " + rname + endl;
+        else if (bInst->getKind() == Instruction::kICmpNE)
+            code += space + "cmp\t" + lname + ", " + rname + endl;
+
         return {dstRegId, code};
     }
 
@@ -418,9 +538,21 @@ namespace backend
             code += space + "movt\tr10, #:upper16:" + pointer->getName() + endl;
             if (isa<ConstantValue>(value))
             {
-                int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                code += space + "mov\tr3, #" + to_string(constant_value) + endl;
-                code += space + "str\tr3, [r10]" + endl;
+                if (value->isInt())
+                {
+                    int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
+                    code += space + "mov\tr3, #" + to_string(constant_value) + endl;
+                    code += space + "str\tr3, [r10]" + endl;
+                }
+                else if (value->isFloat())
+                {
+                    float constant_value = dynamic_cast<ConstantValue *>(value)->getFloat();
+                    unsigned dec;
+                    std::memcpy(&dec, &constant_value, sizeof(dec));
+                    code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
+                    code += space + "movt\tr3, #" + to_string(dec >> 16) + endl;
+                    code += space + "str\tr3, [r10]\t@ float" + endl;
+                }
             }
             else if (isa<CallInst>(value))
             {
@@ -454,7 +586,7 @@ namespace backend
             else if (value->isFloat())
             {
                 float constant_value = dynamic_cast<ConstantValue *>(value)->getFloat();
-                int dec;
+                unsigned dec;
                 std::memcpy(&dec, &constant_value, sizeof(dec));
                 code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
                 code += space + "movt\tr3, #" + to_string(dec >> 16) + endl;
@@ -710,6 +842,10 @@ namespace backend
             // code += space + "mov\tr" + to_string(arg_num - 1) + ", r" + src + endl;
         }
         code += space + "bl\t" + callee_fuc->getName() + endl;
+        if (callInst->getType()->isInt())
+            code += space + "mov\tr" + to_string(stoi(callInst->getName()) + 1) + ", r0" + endl;
+        else if (callInst->getType()->isFloat())
+            code += space + "vmov\ts" + to_string(16 - stoi(callInst->getName())) + ", s0" + endl;
         return {dstRegId, code};
     }
     string CodeGen::instruction_gen(Instruction *instr)
