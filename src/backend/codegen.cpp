@@ -16,6 +16,7 @@ namespace backend
         string code;
         string dataCode;
         string textCode;
+        string immcode;
         // clear last module's label record
         clearModuleRecord(module);
         code += space + ".arch armv7ve " + endl;
@@ -40,7 +41,20 @@ namespace backend
             // generate asmcode for each function
             textCode += function_gen(func) + endl;
         }
-        code += (dataCode + textCode + endl);
+        if (imms.size())
+            immcode += ".IMM:" + endl;
+        for (auto imm : imms)
+        {
+            double Dimm = imm;
+            long long num;
+            int num1, num2;
+            memcpy(&num, &Dimm, sizeof(Dimm));
+            num1 = (num & 0x00000000FFFFFFFF);
+            num2 = (num >> 32) & 0xFFFFFFFF;
+            immcode += space + ".word\t" + to_string(num1) + endl;
+            immcode += space + ".word\t" + to_string(num2) + endl;
+        }
+        code += (dataCode + textCode + immcode + endl);
         return code;
     }
 
@@ -405,61 +419,152 @@ namespace backend
             }
             else if (lconst)
             {
-                code += space + "vmov.f32\ts" + res + ", " + lname + endl;
-                code += space + "vadd.f32\ts" + res + ", s" + res + ", " + rname + endl;
+                float val_l = dynamic_cast<ConstantValue *>(lhs)->getFloat();
+                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
+                std::string dname = to_string(16 + std::stoi(rhs->getName()));
+                std::string immname = to_string(16 + std::stoi(bInst->getName()));
+                code += space + "vcvt.f64.f32\td" + dname + ", " + rname + endl;
+                // code += space + "vmov.f64\td" + immname + ", " + lname + endl;
+                code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
+                imm_offset += 8;
+                imms.push_back(val_l);
+                code += space + "vadd.f64\td" + immname + ", d" + immname + ", d" + dname + endl;
+                code += space + "vcvt.f32.f64\ts" + to_string(15 - std::stoi(bInst->getName())) + ", d" + immname + endl;
+            }
+            else if (rconst)
+            {
+                float val_r = dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
+                std::string dname = to_string(16 + std::stoi(lhs->getName()));
+                std::string immname = to_string(16 + std::stoi(bInst->getName()));
+                code += space + "vcvt.f64.f32\td" + dname + ", " + lname + endl;
+                code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
+                imm_offset += 8;
+                imms.push_back(val_r);
+                code += space + "vadd.f64\td" + immname + ", d" + immname + ", d" + dname + endl;
+                code += space + "vcvt.f32.f64\ts" + to_string(15 - std::stoi(bInst->getName())) + ", d" + immname + endl;
             }
             else
                 code += space + "vadd.f32\ts" + res + ", " + lname + ", " + rname + endl;
         }
-        else if (bInst->getKind() == Instruction::kSub)
+        else if (bInst->getKind() == Instruction::kFSub)
         {
             if (lconst && rconst)
             {
-                int val = dynamic_cast<ConstantValue *>(lhs)->getInt() - dynamic_cast<ConstantValue *>(rhs)->getInt();
-                if (val >= 0)
-                    code += space + "mov\tr" + res + ", #" + to_string(val) + endl;
-                else
-                {
-                    code += space + "mov\tr" + res + ", #" + to_string(-val) + endl;
-                    code += space + "mvn\tr" + res + ", #1" + endl;
-                }
+                float val = dynamic_cast<ConstantValue *>(lhs)->getFloat() - dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                unsigned num;
+                memcpy(&num, &val, sizeof(val));
+                code += space + "vmov.f32\ts" + res + "#" + to_string(num) + endl;
             }
             else if (lconst)
             {
-                code += space + "mov\tr" + res + ", " + lname + endl;
-                code += space + "sub\tr" + res + ", r" + res + ", " + rname + endl;
-            }
-            else
-                code += space + "sub\tr" + res + ", " + lname + ", " + rname + endl;
-        }
-        else if (bInst->getKind() == Instruction::kMul)
-        {
-            if (lconst && rconst)
-            {
-                int val = dynamic_cast<ConstantValue *>(lhs)->getInt() * dynamic_cast<ConstantValue *>(rhs)->getInt();
-                if (val >= 0)
-                    code += space + "mov\tr" + res + ", #" + to_string(val) + endl;
-                else
-                {
-                    code += space + "mov\tr" + res + ", #" + to_string(-val) + endl;
-                    code += space + "mvn\tr" + res + ", #1" + endl;
-                }
-            }
-            else if (lconst)
-            {
-                code += space + "mov\tr" + res + ", " + lname + endl;
-                code += space + "mul\tr" + res + ", r" + res + ", " + rname + endl;
+                float val_l = dynamic_cast<ConstantValue *>(lhs)->getFloat();
+                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
+                std::string dname = to_string(16 + std::stoi(rhs->getName()));
+                std::string immname = to_string(16 + std::stoi(bInst->getName()));
+                code += space + "vcvt.f64.f32\td" + dname + ", " + rname + endl;
+                // code += space + "vmov.f64\td" + immname + ", " + lname + endl;
+                code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
+                imm_offset += 8;
+
+                imms.push_back(val_l);
+                code += space + "vsub.f64\td" + immname + ", d" + immname + ", d" + dname + endl;
+                code += space + "vcvt.f32.f64\ts" + to_string(15 - std::stoi(bInst->getName())) + ", d" + immname + endl;
             }
             else if (rconst)
             {
-                code += space + "mov\tr" + res + ", " + rname + endl;
-                code += space + "mul\tr" + res + ", " + lname + ", r" + res + endl;
+                float val_r = dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
+                std::string dname = to_string(16 + std::stoi(lhs->getName()));
+                std::string immname = to_string(16 + std::stoi(bInst->getName()));
+                code += space + "vcvt.f64.f32\td" + dname + ", " + lname + endl;
+                code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
+                imm_offset += 8;
+                imms.push_back(val_r);
+                code += space + "vsub.f64\td" + dname + ", d" + dname + ", d" + immname + endl;
+                code += space + "vcvt.f32.f64\ts" + to_string(15 - std::stoi(bInst->getName())) + ", d" + dname + endl;
             }
             else
-                code += space + "mul\tr" + res + ", " + lname + ", " + rname + endl;
+                code += space + "vsub.f32\ts" + res + ", " + lname + ", " + rname + endl;
         }
-        else if (bInst->getKind() == Instruction::kDiv)
-            code += space + "div\tr" + res + ", " + lname + ", " + rname + endl;
+        else if (bInst->getKind() == Instruction::kFMul)
+        {
+            if (lconst && rconst)
+            {
+                float val = dynamic_cast<ConstantValue *>(lhs)->getFloat() * dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                unsigned num;
+                memcpy(&num, &val, sizeof(val));
+                code += space + "vmov.f32\ts" + res + "#" + to_string(num) + endl;
+            }
+            else if (lconst)
+            {
+                float val_l = dynamic_cast<ConstantValue *>(lhs)->getFloat();
+                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
+                std::string dname = to_string(16 + std::stoi(rhs->getName()));
+                std::string immname = to_string(16 + std::stoi(bInst->getName()));
+                code += space + "vcvt.f64.f32\td" + dname + ", " + rname + endl;
+                // code += space + "vmov.f64\td" + immname + ", " + lname + endl;
+                code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
+                imm_offset += 8;
+                imms.push_back(val_l);
+                code += space + "vmul.f64\td" + immname + ", d" + immname + ", d" + dname + endl;
+                code += space + "vcvt.f32.f64\ts" + to_string(15 - std::stoi(bInst->getName())) + ", d" + immname + endl;
+            }
+            else if (rconst)
+            {
+                float val_r = dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
+                std::string dname = to_string(16 + std::stoi(lhs->getName()));
+                std::string immname = to_string(16 + std::stoi(bInst->getName()));
+                code += space + "vcvt.f64.f32\td" + dname + ", " + lname + endl;
+                code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
+                imm_offset += 8;
+                imms.push_back(val_r);
+                code += space + "vmul.f64\td" + immname + ", d" + immname + ", d" + dname + endl;
+                code += space + "vcvt.f32.f64\ts" + to_string(15 - std::stoi(bInst->getName())) + ", d" + immname + endl;
+            }
+            else
+                code += space + "vmul.f32\ts" + res + ", " + lname + ", " + rname + endl;
+        }
+        else if (bInst->getKind() == Instruction::kFDiv)
+        {
+            if (lconst && rconst)
+            {
+                float val = dynamic_cast<ConstantValue *>(lhs)->getFloat() - dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                unsigned num;
+                memcpy(&num, &val, sizeof(val));
+                code += space + "vmov.f32\ts" + res + "#" + to_string(num) + endl;
+            }
+            else if (lconst)
+            {
+                float val_l = dynamic_cast<ConstantValue *>(lhs)->getFloat();
+                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
+                std::string dname = to_string(16 + std::stoi(rhs->getName()));
+                std::string immname = to_string(16 + std::stoi(bInst->getName()));
+                code += space + "vcvt.f64.f32\td" + dname + ", " + rname + endl;
+                // code += space + "vmov.f64\td" + immname + ", " + lname + endl;
+                code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
+                imm_offset += 8;
+                imms.push_back(val_l);
+                code += space + "vdiv.f64\td" + immname + ", d" + immname + ", d" + dname + endl;
+                code += space + "vcvt.f32.f64\ts" + to_string(15 - std::stoi(bInst->getName())) + ", d" + immname + endl;
+            }
+            else if (rconst)
+            {
+                float val_r = dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
+                std::string dname = to_string(16 + std::stoi(lhs->getName()));
+                std::string immname = to_string(16 + std::stoi(bInst->getName()));
+                code += space + "vcvt.f64.f32\td" + dname + ", " + lname + endl;
+                code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
+                imm_offset += 8;
+                imms.push_back(val_r);
+                code += space + "vdiv.f64\td" + immname + ", d" + dname + ", d" + immname + endl;
+                code += space + "vcvt.f32.f64\ts" + to_string(15 - std::stoi(bInst->getName())) + ", d" + immname + endl;
+            }
+            else
+                code += space + "vdiv.f32\ts" + res + ", " + lname + ", " + rname + endl;
+        }
         else if (lconst && rconst)
             return {dstRegId, code};
         else if (bInst->getKind() == Instruction::kICmpEQ)

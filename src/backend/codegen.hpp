@@ -186,6 +186,8 @@ namespace backend
         int top_offset = 0;
         int above_offset = 4;
         int max_param = 0;
+        int imm_offset = 0;
+        vector<float> imms;
         // record arguments need to be backpatched
         vector<Argument *> backpatch;
         set<string> libfunc = {"getint", "putint"};
