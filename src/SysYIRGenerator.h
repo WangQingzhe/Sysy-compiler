@@ -92,6 +92,9 @@ namespace sysy
     std::unique_ptr<Module> module;
     IRBuilder builder;
     SymbolTable symbols;
+    int d = 0, n = 0;
+    vector<int> path;
+    AllocaInst *current_alloca;
 
   public:
     SysYIRGenerator() = default;

@@ -307,6 +307,7 @@ namespace sysy
     {
       int iScalar;
       float fScalar;
+      double dScalar;
     };
 
   protected:
@@ -314,10 +315,13 @@ namespace sysy
         : Value(kConstant, Type::getIntType(), ""), iScalar(value) {}
     ConstantValue(float value)
         : Value(kConstant, Type::getFloatType(), ""), fScalar(value) {}
+    ConstantValue(double value)
+        : Value(kConstant, Type::getFloatType(), ""), dScalar(value) {}
 
   public:
     static ConstantValue *get(int value);
     static ConstantValue *get(float value);
+    static ConstantValue *get(double value);
 
   public:
     static bool classof(const Value *value)
@@ -335,6 +339,11 @@ namespace sysy
     {
       assert(isFloat());
       return fScalar;
+    }
+    double getDouble() const
+    {
+      assert(isFloat());
+      return dScalar;
     }
 
   public:
@@ -822,6 +831,7 @@ namespace sysy
     bool isConst;
     int int_value;
     float float_value;
+    double double_value;
     bool Int = false;
 
   public:
@@ -835,8 +845,10 @@ namespace sysy
       Int = true;
     }
     void setFloat(float value) { float_value = value; }
+    void setDouble(double value) { double_value = value; }
     int getInt() { return int_value; }
     float getFloat() { return float_value; }
+    double getDouble() { return double_value; }
     bool isInt() { return Int; }
 
   public:

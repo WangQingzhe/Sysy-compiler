@@ -221,12 +221,24 @@ namespace sysy
     return result.first->second.get();
   }
 
+  ConstantValue *ConstantValue::get(double value)
+  {
+    static std::map<float, std::unique_ptr<ConstantValue>> floatConstants;
+    auto iter = floatConstants.find(value);
+    if (iter != floatConstants.end())
+      return iter->second.get();
+    auto constant = new ConstantValue(value);
+    assert(constant);
+    auto result = floatConstants.emplace(value, constant);
+    return result.first->second.get();
+  }
+
   void ConstantValue::print(ostream &os) const
   {
     if (isInt())
       os << getInt();
     else
-      os << getFloat();
+      os << getDouble();
   }
 
   Argument::Argument(Type *type, BasicBlock *block, int index,

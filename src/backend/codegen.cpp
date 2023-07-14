@@ -382,7 +382,8 @@ namespace backend
         bool lconst = false, rconst = false;
         if (isa<ConstantValue>(lhs))
         {
-            float val = dynamic_cast<ConstantValue *>(lhs)->getFloat();
+            // float val = dynamic_cast<ConstantValue *>(lhs)->getFloat();
+            float val = dynamic_cast<ConstantValue *>(lhs)->getDouble();
             unsigned int num;
             memcpy(&num, &val, sizeof(val));
             lname = "#" + to_string(num);
@@ -396,7 +397,8 @@ namespace backend
             lname = "s" + to_string(15 - std::stoi(lhs->getName()));
         if (isa<ConstantValue>(rhs))
         {
-            float val = dynamic_cast<ConstantValue *>(rhs)->getFloat();
+            // float val = dynamic_cast<ConstantValue *>(rhs)->getFloat();
+            float val = dynamic_cast<ConstantValue *>(rhs)->getDouble();
             unsigned int num;
             memcpy(&num, &val, sizeof(val));
             rname = "#" + to_string(num);
@@ -412,14 +414,15 @@ namespace backend
         {
             if (lconst && rconst)
             {
-                float val = dynamic_cast<ConstantValue *>(lhs)->getFloat() + dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                // float val = dynamic_cast<ConstantValue *>(lhs)->getFloat() + dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                double val = dynamic_cast<ConstantValue *>(lhs)->getDouble() + dynamic_cast<ConstantValue *>(rhs)->getDouble();
                 unsigned num;
                 memcpy(&num, &val, sizeof(val));
                 code += space + "vmov.f32\ts" + res + "#" + to_string(num) + endl;
             }
             else if (lconst)
             {
-                float val_l = dynamic_cast<ConstantValue *>(lhs)->getFloat();
+                double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
                 // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
                 std::string dname = to_string(16 + std::stoi(rhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
@@ -433,7 +436,7 @@ namespace backend
             }
             else if (rconst)
             {
-                float val_r = dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
                 // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
                 std::string dname = to_string(16 + std::stoi(lhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
@@ -451,14 +454,15 @@ namespace backend
         {
             if (lconst && rconst)
             {
-                float val = dynamic_cast<ConstantValue *>(lhs)->getFloat() - dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                double val = dynamic_cast<ConstantValue *>(lhs)->getDouble() - dynamic_cast<ConstantValue *>(rhs)->getDouble();
                 unsigned num;
                 memcpy(&num, &val, sizeof(val));
                 code += space + "vmov.f32\ts" + res + "#" + to_string(num) + endl;
             }
             else if (lconst)
             {
-                float val_l = dynamic_cast<ConstantValue *>(lhs)->getFloat();
+                // float val_l = dynamic_cast<ConstantValue *>(lhs)->getFloat();
+                double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
                 // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
                 std::string dname = to_string(16 + std::stoi(rhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
@@ -473,7 +477,8 @@ namespace backend
             }
             else if (rconst)
             {
-                float val_r = dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                // float val_r = dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
                 // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
                 std::string dname = to_string(16 + std::stoi(lhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
@@ -491,14 +496,15 @@ namespace backend
         {
             if (lconst && rconst)
             {
-                float val = dynamic_cast<ConstantValue *>(lhs)->getFloat() * dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                // float val = dynamic_cast<ConstantValue *>(lhs)->getFloat() * dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                double val = dynamic_cast<ConstantValue *>(lhs)->getDouble() * dynamic_cast<ConstantValue *>(rhs)->getDouble();
                 unsigned num;
                 memcpy(&num, &val, sizeof(val));
                 code += space + "vmov.f32\ts" + res + "#" + to_string(num) + endl;
             }
             else if (lconst)
             {
-                float val_l = dynamic_cast<ConstantValue *>(lhs)->getFloat();
+                double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
                 // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
                 std::string dname = to_string(16 + std::stoi(rhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
@@ -512,7 +518,7 @@ namespace backend
             }
             else if (rconst)
             {
-                float val_r = dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
                 // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
                 std::string dname = to_string(16 + std::stoi(lhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
@@ -530,14 +536,14 @@ namespace backend
         {
             if (lconst && rconst)
             {
-                float val = dynamic_cast<ConstantValue *>(lhs)->getFloat() - dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                double val = dynamic_cast<ConstantValue *>(lhs)->getDouble() - dynamic_cast<ConstantValue *>(rhs)->getDouble();
                 unsigned num;
                 memcpy(&num, &val, sizeof(val));
                 code += space + "vmov.f32\ts" + res + "#" + to_string(num) + endl;
             }
             else if (lconst)
             {
-                float val_l = dynamic_cast<ConstantValue *>(lhs)->getFloat();
+                double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
                 // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
                 std::string dname = to_string(16 + std::stoi(rhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
@@ -551,7 +557,7 @@ namespace backend
             }
             else if (rconst)
             {
-                float val_r = dynamic_cast<ConstantValue *>(rhs)->getFloat();
+                double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
                 // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
                 std::string dname = to_string(16 + std::stoi(lhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
@@ -651,7 +657,7 @@ namespace backend
                 }
                 else if (value->isFloat())
                 {
-                    float constant_value = dynamic_cast<ConstantValue *>(value)->getFloat();
+                    double constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
                     unsigned dec;
                     std::memcpy(&dec, &constant_value, sizeof(dec));
                     code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
@@ -690,7 +696,8 @@ namespace backend
             }
             else if (value->isFloat())
             {
-                float constant_value = dynamic_cast<ConstantValue *>(value)->getFloat();
+                float constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
+
                 unsigned dec;
                 std::memcpy(&dec, &constant_value, sizeof(dec));
                 code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
@@ -768,8 +775,8 @@ namespace backend
             else if (retval->getType()->isFloat())
             {
                 unsigned num1;
-                float val1;
-                val1 = dynamic_cast<ConstantValue *>(retval)->getFloat();
+                double val1;
+                val1 = dynamic_cast<ConstantValue *>(retval)->getDouble();
                 memcpy(&num1, &val1, sizeof(val1));
                 code += space + "movw\tr3, #" + to_string(num1 & 0x0000FFFF) + endl;
                 code += space + "movt\tr3, #" + to_string(num1 >> 16) + endl;
@@ -1114,7 +1121,7 @@ namespace backend
                 val = to_string(value->getInt());
             else if (type->isFloat())
             {
-                float constant_value = value->getFloat();
+                double constant_value = value->getDouble();
                 int dec;
                 std::memcpy(&dec, &constant_value, sizeof(dec));
                 val = to_string(dec);
