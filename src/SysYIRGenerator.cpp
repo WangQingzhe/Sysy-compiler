@@ -135,7 +135,8 @@ namespace sysy
           path.empty();
           path = vector<int>(alloca->getNumDims(), 0);
           current_alloca = alloca;
-          visitInitValue(varDef->initValue());
+          for (auto init : varDef->initValue()->initValue())
+            visitInitValue(init);
         }
       }
       // collect the created variable (pointer)
@@ -148,11 +149,29 @@ namespace sysy
     if (ctx->exp())
     {
       auto value = any_cast<Value *>(ctx->exp()->accept(this));
+      if (isa<ConstantValue>(value))
+      {
+        // if var is int, convert the constant into int type
+        if (current_alloca->getType()->as<PointerType>()->getBaseType()->isInt() && value->getType()->isFloat())
+        {
+          // if (dynamic_cast<ConstantValue *>(value)->isFloat())
+          value = ConstantValue::get((int)dynamic_cast<ConstantValue *>(value)->getDouble());
+        }
+        else if (current_alloca->getType()->as<PointerType>()->getBaseType()->isFloat() && value->getType()->isInt())
+        {
+          // if (dynamic_cast<ConstantValue *>(value)->isInt())
+          value = ConstantValue::get((double)dynamic_cast<ConstantValue *>(value)->getInt());
+        }
+      }
+      else if (current_alloca->getType()->as<PointerType>()->getBaseType()->isInt() && value->getType()->isFloat())
+        value = builder.createFtoIInst(value);
+      else if (current_alloca->getType()->as<PointerType>()->getBaseType()->isFloat() && value->getType()->isInt())
+        value = builder.createIToFInst(value);
       // goto the last dimension
       while (d < current_alloca->getNumDims() - 1)
       {
-        path[d] = n;
-        d++;
+        path[d++] = n;
+        // d++;
         n = 0;
       }
       vector<Value *> indices;
@@ -161,7 +180,25 @@ namespace sysy
       indices.push_back(ConstantValue::get(n));
       // store exp into alloca
       auto store = builder.createStoreInst(value, current_alloca, indices);
+      builder.getBasicBlock()->getParent()->resetVariableID();
       // goto next element
+      n++;
+      while (d >= 0 && n >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
+      {
+        // d--;
+        n = path[--d] + 1;
+      }
+      return store;
+    }
+    else
+    {
+      int cur_d = d;
+      int cur_n = n;
+      Value *value;
+      for (auto init : ctx->initValue())
+        visitInitValue(init);
+      d = cur_d;
+      n = cur_n;
       n++;
       if (n >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
         while (d >= 0 && (n + 1) >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
@@ -169,12 +206,7 @@ namespace sysy
           d--;
           n = path[d] + 1;
         }
-    }
-    else
-    {
-      for (auto init : ctx->initValue())
-      {
-      }
+      return value;
     }
   }
 

@@ -512,10 +512,14 @@ namespace sysy
 
   void StoreInst::print(std::ostream &os) const
   {
-    if (getNumIndices())
-      cerr << "not implemented yet\n";
+    // if (getNumIndices())
+    //   cerr << "not implemented yet\n";
     os << "store ";
     printOperand(os, getValue()) << ", ";
+    for (auto iter = getIndices().begin(); iter != getIndices().end(); iter++)
+    {
+      os << "[" << static_cast<const ConstantValue *>(*iter)->getInt() << "]";
+    }
     printOperand(os, getPointer()) << " : " << *getValue()->getType();
   }
 
