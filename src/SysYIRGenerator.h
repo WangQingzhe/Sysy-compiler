@@ -114,10 +114,7 @@ namespace sysy
       return visitChildren(ctx);
     }
 
-    virtual std::any visitInitValue(SysYParser::InitValueContext *ctx) override
-    {
-      return visitChildren(ctx);
-    }
+    virtual std::any visitInitValue(SysYParser::InitValueContext *ctx) override;
 
     virtual std::any visitFunc(SysYParser::FuncContext *ctx) override;
 

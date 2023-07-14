@@ -143,42 +143,40 @@ namespace sysy
     }
     return values;
   }
-  // any SysYIRGenerator::visitInitValue(SysYParser::InitValueContext *ctx)
-  // {
-  //   if (ctx->exp())
-  //   {
-  //     auto value = any_cast<Value *>(ctx->exp()->accept(this));
-  //     // goto the last dimension
-  //     while (d < current_alloca->getNumDims() - 1)
-  //     {
-  //       path[d] = n;
-  //       d++;
-  //       n = 0;
-  //     }
-  //     vector<Value *> indices;
-  //     for (int i = 0; i < current_alloca->getNumDims() - 1; i++)
-  //       indices.push_back(ConstantValue::get(path[i]));
-  //     indices.push_back(ConstantValue::get(n));
-  //     // store exp into alloca
-  //     auto store = builder.createStoreInst(value, current_alloca, indices);
-  //     // goto next element
-  //     n++;
-  //     if (n >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
-  //       while (d >= 0 && (n + 1) >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
-  //       {
-  //         d--;
-  //         n = path[d] + 1;
-  //       }
-  //     if (d < 0)
-  //       return;
-  //   }
-  //   else
-  //   {
-  //     for (auto init : ctx->initValue())
-  //     {
-  //     }
-  //   }
-  // }
+  any SysYIRGenerator::visitInitValue(SysYParser::InitValueContext *ctx)
+  {
+    if (ctx->exp())
+    {
+      auto value = any_cast<Value *>(ctx->exp()->accept(this));
+      // goto the last dimension
+      while (d < current_alloca->getNumDims() - 1)
+      {
+        path[d] = n;
+        d++;
+        n = 0;
+      }
+      vector<Value *> indices;
+      for (int i = 0; i < current_alloca->getNumDims() - 1; i++)
+        indices.push_back(ConstantValue::get(path[i]));
+      indices.push_back(ConstantValue::get(n));
+      // store exp into alloca
+      auto store = builder.createStoreInst(value, current_alloca, indices);
+      // goto next element
+      n++;
+      if (n >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
+        while (d >= 0 && (n + 1) >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
+        {
+          d--;
+          n = path[d] + 1;
+        }
+    }
+    else
+    {
+      for (auto init : ctx->initValue())
+      {
+      }
+    }
+  }
 
   any SysYIRGenerator::visitFunc(SysYParser::FuncContext *ctx)
   {
@@ -267,7 +265,7 @@ namespace sysy
       else if (pointer->getType()->as<PointerType>()->getBaseType()->isFloat())
       {
         if (dynamic_cast<ConstantValue *>(rhs)->isInt())
-          rhs = ConstantValue::get((float)dynamic_cast<ConstantValue *>(rhs)->getInt());
+          rhs = ConstantValue::get((double)dynamic_cast<ConstantValue *>(rhs)->getInt());
       }
     }
     else if (pointer->getType()->as<PointerType>()->getBaseType()->isInt() && rhs->getType()->isFloat())
