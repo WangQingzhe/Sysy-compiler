@@ -384,9 +384,9 @@ namespace backend
         {
             // float val = dynamic_cast<ConstantValue *>(lhs)->getFloat();
             float val = dynamic_cast<ConstantValue *>(lhs)->getDouble();
-            unsigned int num;
-            memcpy(&num, &val, sizeof(val));
-            lname = "#" + to_string(num);
+            // unsigned int num;
+            // memcpy(&num, &val, sizeof(val));
+            lname = "#" + to_string(val);
             lconst = true;
         }
         else if (isa<CallInst>(lhs))
@@ -394,14 +394,16 @@ namespace backend
             lname = 's' + to_string(16 - stoi(lhs->getName()));
         }
         else
-            lname = "s" + to_string(15 - std::stoi(lhs->getName()));
+            lname = "s" + to_string(15 - stoi(lhs->getName()));
         if (isa<ConstantValue>(rhs))
         {
             // float val = dynamic_cast<ConstantValue *>(rhs)->getFloat();
             float val = dynamic_cast<ConstantValue *>(rhs)->getDouble();
-            unsigned int num;
-            memcpy(&num, &val, sizeof(val));
-            rname = "#" + to_string(num);
+            // unsigned int num;
+            // memcpy(&num, &val, sizeof(val));
+            char s[200];
+            sprintf(s, "%3.1e", val);
+            rname = "#" + string(s);
             rconst = true;
         }
         else if (isa<CallInst>(rhs))
@@ -414,7 +416,6 @@ namespace backend
         {
             if (lconst && rconst)
             {
-                // float val = dynamic_cast<ConstantValue *>(lhs)->getFloat() + dynamic_cast<ConstantValue *>(rhs)->getFloat();
                 double val = dynamic_cast<ConstantValue *>(lhs)->getDouble() + dynamic_cast<ConstantValue *>(rhs)->getDouble();
                 unsigned num;
                 memcpy(&num, &val, sizeof(val));
@@ -427,7 +428,6 @@ namespace backend
                 std::string dname = to_string(16 + std::stoi(rhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
                 code += space + "vcvt.f64.f32\td" + dname + ", " + rname + endl;
-                // code += space + "vmov.f64\td" + immname + ", " + lname + endl;
                 code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_l);
@@ -437,7 +437,6 @@ namespace backend
             else if (rconst)
             {
                 double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
-                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
                 std::string dname = to_string(16 + std::stoi(lhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
                 code += space + "vcvt.f64.f32\td" + dname + ", " + lname + endl;
@@ -461,13 +460,10 @@ namespace backend
             }
             else if (lconst)
             {
-                // float val_l = dynamic_cast<ConstantValue *>(lhs)->getFloat();
                 double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
-                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
                 std::string dname = to_string(16 + std::stoi(rhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
                 code += space + "vcvt.f64.f32\td" + dname + ", " + rname + endl;
-                // code += space + "vmov.f64\td" + immname + ", " + lname + endl;
                 code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
 
@@ -477,9 +473,7 @@ namespace backend
             }
             else if (rconst)
             {
-                // float val_r = dynamic_cast<ConstantValue *>(rhs)->getFloat();
                 double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
-                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
                 std::string dname = to_string(16 + std::stoi(lhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
                 code += space + "vcvt.f64.f32\td" + dname + ", " + lname + endl;
@@ -496,7 +490,6 @@ namespace backend
         {
             if (lconst && rconst)
             {
-                // float val = dynamic_cast<ConstantValue *>(lhs)->getFloat() * dynamic_cast<ConstantValue *>(rhs)->getFloat();
                 double val = dynamic_cast<ConstantValue *>(lhs)->getDouble() * dynamic_cast<ConstantValue *>(rhs)->getDouble();
                 unsigned num;
                 memcpy(&num, &val, sizeof(val));
@@ -505,11 +498,9 @@ namespace backend
             else if (lconst)
             {
                 double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
-                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
                 std::string dname = to_string(16 + std::stoi(rhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
                 code += space + "vcvt.f64.f32\td" + dname + ", " + rname + endl;
-                // code += space + "vmov.f64\td" + immname + ", " + lname + endl;
                 code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_l);
@@ -519,7 +510,6 @@ namespace backend
             else if (rconst)
             {
                 double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
-                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
                 std::string dname = to_string(16 + std::stoi(lhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
                 code += space + "vcvt.f64.f32\td" + dname + ", " + lname + endl;
@@ -544,11 +534,9 @@ namespace backend
             else if (lconst)
             {
                 double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
-                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
                 std::string dname = to_string(16 + std::stoi(rhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
                 code += space + "vcvt.f64.f32\td" + dname + ", " + rname + endl;
-                // code += space + "vmov.f64\td" + immname + ", " + lname + endl;
                 code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_l);
@@ -558,7 +546,6 @@ namespace backend
             else if (rconst)
             {
                 double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
-                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
                 std::string dname = to_string(16 + std::stoi(lhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
                 code += space + "vcvt.f64.f32\td" + dname + ", " + lname + endl;
@@ -573,18 +560,78 @@ namespace backend
         }
         else if (lconst && rconst)
             return {dstRegId, code};
-        else if (bInst->getKind() == Instruction::kICmpEQ)
-            code += space + "cmp\t" + lname + ", " + rname + endl;
-        else if (bInst->getKind() == Instruction::kICmpGE)
-            code += space + "cmp\t" + lname + ", " + rname + endl;
-        else if (bInst->getKind() == Instruction::kICmpGT)
-            code += space + "cmp\t" + lname + ", " + rname + endl;
-        else if (bInst->getKind() == Instruction::kICmpLE)
-            code += space + "cmp\t" + lname + ", " + rname + endl;
-        else if (bInst->getKind() == Instruction::kICmpLT)
-            code += space + "cmp\t" + lname + ", " + rname + endl;
-        else if (bInst->getKind() == Instruction::kICmpNE)
-            code += space + "cmp\t" + lname + ", " + rname + endl;
+        else if (bInst->getKind() == Instruction::kFCmpEQ)
+        {
+            if (rconst)
+            {
+                string immname = to_string(15 - std::stoi(bInst->getName()));
+                code += space + "vmov.f32\ts" + immname + ", " + rname + endl;
+                code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
+            }
+            else
+                code += space + "vcmpe.f32\t" + lname + ", " + rname + endl;
+            code += space + "vmrs\tAPSR_nzcv, FPSCR" + endl;
+        }
+        else if (bInst->getKind() == Instruction::kFCmpGE)
+        {
+            if (rconst)
+            {
+                string immname = to_string(15 - std::stoi(bInst->getName()));
+                code += space + "vmov.f32\ts" + immname + ", " + rname + endl;
+                code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
+            }
+            else
+                code += space + "vcmpe.f32\t" + lname + ", " + rname + endl;
+            code += space + "vmrs\tAPSR_nzcv, FPSCR" + endl;
+        }
+        else if (bInst->getKind() == Instruction::kFCmpGT)
+        {
+            if (rconst)
+            {
+                string immname = to_string(15 - std::stoi(bInst->getName()));
+                code += space + "vmov.f32\ts" + immname + ", " + rname + endl;
+                code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
+            }
+            else
+                code += space + "vcmpe.f32\t" + lname + ", " + rname + endl;
+            code += space + "vmrs\tAPSR_nzcv, FPSCR" + endl;
+        }
+        else if (bInst->getKind() == Instruction::kFCmpLE)
+        {
+            if (rconst)
+            {
+                string immname = to_string(15 - std::stoi(bInst->getName()));
+                code += space + "vmov.f32\ts" + immname + ", " + rname + endl;
+                code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
+            }
+            else
+                code += space + "vcmpe.f32\t" + lname + ", " + rname + endl;
+            code += space + "vmrs\tAPSR_nzcv, FPSCR" + endl;
+        }
+        else if (bInst->getKind() == Instruction::kFCmpLT)
+        {
+            if (rconst)
+            {
+                string immname = to_string(15 - std::stoi(bInst->getName()));
+                code += space + "vmov.f32\ts" + immname + ", " + rname + endl;
+                code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
+            }
+            else
+                code += space + "vcmpe.f32\t" + lname + ", " + rname + endl;
+            code += space + "vmrs\tAPSR_nzcv, FPSCR" + endl;
+        }
+        else if (bInst->getKind() == Instruction::kFCmpNE)
+        {
+            if (rconst)
+            {
+                string immname = to_string(15 - std::stoi(bInst->getName()));
+                code += space + "vmov.f32\ts" + immname + ", " + rname + endl;
+                code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
+            }
+            else
+                code += space + "vcmpe.f32\t" + lname + ", " + rname + endl;
+            code += space + "vmrs\tAPSR_nzcv, FPSCR" + endl;
+        }
 
         return {dstRegId, code};
     }
@@ -823,34 +870,47 @@ namespace backend
             auto rhs = bInst->getRhs();
             if (isa<ConstantValue>(lhs) && isa<ConstantValue>(rhs))
             {
-                int lvalue = dynamic_cast<ConstantValue *>(lhs)->getInt();
-                int rvalue = dynamic_cast<ConstantValue *>(rhs)->getInt();
-                if (bInst->getKind() == Instruction::kICmpEQ)
+                float lvalue, rvalue;
+                if (lhs->getType()->isInt())
+                    lvalue = dynamic_cast<ConstantValue *>(lhs)->getInt();
+                else if (lhs->getType()->isFloat())
+                    lvalue = dynamic_cast<ConstantValue *>(lhs)->getDouble();
+                if (rhs->getType()->isInt())
+                    rvalue = dynamic_cast<ConstantValue *>(rhs)->getInt();
+                else if (rhs->getType()->isFloat())
+                    rvalue = dynamic_cast<ConstantValue *>(rhs)->getDouble();
+                if (bInst->getKind() == Instruction::kICmpEQ ||
+                    bInst->getKind() == Instruction::kFCmpEQ)
                     if (lvalue == rvalue)
                         code += space + "b\t" + then_block->getName() + endl;
                     else
                         code += space + "b\t" + else_block->getName() + endl;
-                else if (bInst->getKind() == Instruction::kICmpGE)
+                else if (bInst->getKind() == Instruction::kICmpGE ||
+                         bInst->getKind() == Instruction::kFCmpGE)
                     if (lvalue >= rvalue)
                         code += space + "b\t" + then_block->getName() + endl;
                     else
                         code += space + "b\t" + else_block->getName() + endl;
-                else if (bInst->getKind() == Instruction::kICmpGT)
+                else if (bInst->getKind() == Instruction::kICmpGT ||
+                         bInst->getKind() == Instruction::kFCmpGT)
                     if (lvalue > rvalue)
                         code += space + "b\t" + then_block->getName() + endl;
                     else
                         code += space + "b\t" + else_block->getName() + endl;
-                else if (bInst->getKind() == Instruction::kICmpLE)
+                else if (bInst->getKind() == Instruction::kICmpLE ||
+                         bInst->getKind() == Instruction::kFCmpLE)
                     if (lvalue <= rvalue)
                         code += space + "b\t" + then_block->getName() + endl;
                     else
                         code += space + "b\t" + else_block->getName() + endl;
-                else if (bInst->getKind() == Instruction::kICmpLT)
+                else if (bInst->getKind() == Instruction::kICmpLT ||
+                         bInst->getKind() == Instruction::kFCmpLT)
                     if (lvalue < rvalue)
                         code += space + "b\t" + then_block->getName() + endl;
                     else
                         code += space + "b\t" + else_block->getName() + endl;
-                else if (bInst->getKind() == Instruction::kICmpNE)
+                else if (bInst->getKind() == Instruction::kICmpNE ||
+                         bInst->getKind() == Instruction::kFCmpNE)
                     if (lvalue != rvalue)
                         code += space + "b\t" + then_block->getName() + endl;
                     else
@@ -862,37 +922,37 @@ namespace backend
                     code += space + "b\t" + else_block->getName() + endl;
                 }
             }
-            else if (bInst->getKind() == Instruction::kICmpEQ)
+            else if (bInst->getKind() == Instruction::kICmpEQ || bInst->getKind() == Instruction::kFCmpEQ)
             {
                 // code += binaryInst_gen(bInst, RegManager::RANY).second;
                 code += space + "beq\t" + then_block->getName() + endl;
                 code += space + "b\t" + else_block->getName() + endl;
             }
-            else if (bInst->getKind() == Instruction::kICmpGE)
+            else if (bInst->getKind() == Instruction::kICmpGE || bInst->getKind() == Instruction::kFCmpGE)
             {
                 // code += binaryInst_gen(bInst, RegManager::RANY).second;
                 code += space + "bge\t" + then_block->getName() + endl;
                 code += space + "b\t" + else_block->getName() + endl;
             }
-            else if (bInst->getKind() == Instruction::kICmpGT)
+            else if (bInst->getKind() == Instruction::kICmpGT || bInst->getKind() == Instruction::kFCmpGT)
             {
                 // code += binaryInst_gen(bInst, RegManager::RANY).second;
                 code += space + "bgt\t" + then_block->getName() + endl;
                 code += space + "b\t" + else_block->getName() + endl;
             }
-            else if (bInst->getKind() == Instruction::kICmpLE)
+            else if (bInst->getKind() == Instruction::kICmpLE || bInst->getKind() == Instruction::kFCmpLE)
             {
                 // code += binaryInst_gen(bInst, RegManager::RANY).second;
                 code += space + "ble\t" + then_block->getName() + endl;
                 code += space + "b\t" + else_block->getName() + endl;
             }
-            else if (bInst->getKind() == Instruction::kICmpLT)
+            else if (bInst->getKind() == Instruction::kICmpLT || bInst->getKind() == Instruction::kFCmpLT)
             {
                 // code += binaryInst_gen(bInst, RegManager::RANY).second;
                 code += space + "blt\t" + then_block->getName() + endl;
                 code += space + "b\t" + else_block->getName() + endl;
             }
-            else if (bInst->getKind() == Instruction::kICmpNE)
+            else if (bInst->getKind() == Instruction::kICmpNE || bInst->getKind() == Instruction::kFCmpNE)
             {
                 // code += binaryInst_gen(bInst, RegManager::RANY).second;
                 code += space + "bne\t" + then_block->getName() + endl;
