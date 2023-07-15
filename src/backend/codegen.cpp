@@ -101,7 +101,6 @@ namespace backend
     {
         string code;
         // if there is callinst in function
-        bool haveCall = false;
         auto bbs = func->getBasicBlocks();
         for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
         {
@@ -166,22 +165,6 @@ namespace backend
     string CodeGen::epilogueCode_gen(Function *func)
     {
         string code;
-        // if there is callinst in function
-        bool haveCall = false;
-        auto bbs = func->getBasicBlocks();
-        for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
-        {
-            auto bb = iter->get();
-            for (auto &instr : bb->getInstructions())
-            {
-                auto instrType = instr->getKind();
-                if (instrType == Value::Kind::kCall)
-                {
-                    haveCall = true;
-                    break;
-                }
-            }
-        }
         if (haveCall)
         {
             code += space + "sub\tsp, fp, #4" + endl;
@@ -201,6 +184,7 @@ namespace backend
     {
         string code;
         curFunc = func;
+        haveCall = false;
         clearFunctionRecord(func);
         string bbCode;
         auto bbs = func->getBasicBlocks();
@@ -663,15 +647,38 @@ namespace backend
         if (NumDims)
         {
             code += space + "sub\tr3, fp, #" + to_string(-top_offset - 4) + endl;
-            code += space + "mov\tr2, #" + to_string(top_offset_old - top_offset) + endl;
-            code += space + "mov\tr1, #0" + endl;
-            code += space + "mov\tr0, r3" + endl;
-            code += space + "bl\tmemset" + endl;
+            if (num >= 18)
+            {
+                code += space + "mov\tr2, #" + to_string(top_offset_old - top_offset) + endl;
+                code += space + "mov\tr1, #0" + endl;
+                code += space + "mov\tr0, r3" + endl;
+                code += space + "bl\tmemset" + endl;
+                haveCall = true;
+            }
+            else if (num % 4 == 0)
+            {
+                code += space + "vmov.i32\tq8, #0\t@ v16qi" + endl;
+                code += space + "vst1.8\t{q8}, [r3:64]" + endl;
+                num -= 4;
+                while (num != 0)
+                {
+                    num -= 4;
+                    code += space + "add\tr3, #16" + endl;
+                    code += space + "vst1.8\t{q8}, [r3:64]" + endl;
+                }
+            }
+            else if (num % 2 == 0)
+            {
+                code += space + "vmov\td18, d16\t@ v8qi" + endl;
+                for (int i = 0; i < num / 2; i++)
+                {
+                    code += space + "vstr\td18, [r3, #" + to_string(i * 8) + "]" + endl;
+                }
+            }
         }
         dstRegId = RegManager::RNONE;
         return {dstRegId, code};
     }
-
     string CodeGen::storeInst_gen(StoreInst *stInst)
     {
 
@@ -681,29 +688,29 @@ namespace backend
         int NumIndices = stInst->getNumIndices(); // numindices denotes dimensions of pointer
 
         auto dims_len = dynamic_cast<AllocaInst *>(pointer)->getDims();
-        // code += to_string(dynamic_cast<ConstantValue *>(dynamic_cast<AllocaInst *>(pointer)->getDim(0))->getInt());
         int offset_array = 0;
-        int dim = 0;
-        int full_num = 1;
+        int dim = NumIndices - 1;
+        // int full_num = 1;
         vector<int> dim_len;
-        for (auto iter = dims_len.end(); iter != dims_len.begin(); iter--)
-        {
-            // dim_len.push_back(dynamic_cast<ConstantValue *>(*iter)->getInt());
-            // code += to_string(static_cast<const ConstantValue *>(*iter)->getInt()) + endl;
-        }
+        vector<int> full_num;
         for (int i = 0; i < NumIndices; i++)
         {
             dim_len.push_back(dynamic_cast<ConstantValue *>(dynamic_cast<AllocaInst *>(pointer)->getDim(i))->getInt());
         }
-        for (auto iter = stInst->getIndices().end(); iter != stInst->getIndices().begin(); iter--)
+        reverse(dim_len.begin(), dim_len.end());
+        full_num.push_back(1);
+        for (int i = 0; i < NumIndices; i++)
+        {
+            full_num.push_back(dim_len[i] * full_num[i]);
+        }
+        for (auto iter = stInst->getIndices().begin(); iter != stInst->getIndices().end(); iter++)
         {
             // num 是数组下标
             int num = dynamic_cast<ConstantValue *>(*iter)->getInt();
-            offset_array += num * full_num;
-            full_num = full_num * 1; // dim_len[dim];
-            dim += 1;
+            offset_array += num * full_num[dim];
+            // code += to_string(offset_array) + endl;
+            dim -= 1;
         }
-
         if (NumIndices == 0)
         {
             if (globalval.find(dynamic_cast<GlobalValue *>(pointer)) != globalval.end())
@@ -744,7 +751,7 @@ namespace backend
                 }
                 return code;
             }
-            int offset = 0;
+            int offset;
             if (localVarStOffset.find(dynamic_cast<Instruction *>(pointer)) != localVarStOffset.end())
                 offset = localVarStOffset[dynamic_cast<Instruction *>(pointer)];
             else if (paramsStOffset.find(dynamic_cast<Argument *>(pointer)) != paramsStOffset.end())
@@ -786,10 +793,10 @@ namespace backend
         else // 如果store的是数组
              // 数组是全局变量还没实现
         {
-            int offset = 0;
+            int offset;
             if (localVarStOffset.find(dynamic_cast<Instruction *>(pointer)) != localVarStOffset.end())
                 // offset = localVarStOffset[dynamic_cast<Instruction *>(pointer)];
-                offset = top_offset + 4;
+                offset = top_offset + (offset_array + 1) * 4;
             else if (paramsStOffset.find(dynamic_cast<Argument *>(pointer)) != paramsStOffset.end())
                 offset = paramsStOffset[dynamic_cast<Argument *>(pointer)];
             if (isa<ConstantValue>(value))

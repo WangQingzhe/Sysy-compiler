@@ -188,6 +188,7 @@ namespace backend
         int max_param = 0;
         int imm_offset = 0;
         vector<double> imms;
+        bool haveCall = false;
         // record arguments need to be backpatched
         vector<Argument *> backpatch;
         set<string> libfunc = {"getint", "putint"};
