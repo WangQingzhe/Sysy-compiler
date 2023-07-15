@@ -54,14 +54,39 @@ namespace sysy
       vector<Value *> dims;
       for (auto exp : varDef->lValue()->exp())
         dims.push_back(any_cast<Value *>(exp->accept(this)));
-      auto init = varDef->ASSIGN()
-                      ? any_cast<Value *>((varDef->initValue()->exp()->accept(this)))
-                      : nullptr;
-      //******************Revised by lyq BEGIN***************************************
-      auto global_value = module->createGlobalValue(name, type, dims, init, isConst);
-      //******************Revised by lyq END*****************************************
-      symbols.insert(name, global_value);
-      values.push_back(global_value);
+      // if is a scalar
+      if (dims.size() == 0)
+      {
+        auto init = varDef->ASSIGN()
+                        ? any_cast<Value *>((varDef->initValue()->exp()->accept(this)))
+                        : nullptr;
+        //******************Revised by lyq BEGIN***************************************
+        auto global_value = module->createGlobalValue(name, type, dims, init, isConst);
+        //******************Revised by lyq END*****************************************
+        symbols.insert(name, global_value);
+        values.push_back(global_value);
+      }
+      // if is an array
+      else
+      {
+        auto global_value = module->createGlobalValue(name, type, dims, nullptr, isConst);
+        // if initialize
+        if (varDef->ASSIGN())
+        {
+          d = 0;
+          n = 0;
+          path.empty();
+          path = vector<int>(dims.size(), 0);
+          isalloca = false;
+          current_type = global_value->getType()->as<PointerType>()->getBaseType();
+          current_global = global_value;
+          numdims = global_value->getNumDims();
+          for (auto init : varDef->initValue()->initValue())
+            visitInitValue(init);
+        }
+        symbols.insert(name, global_value);
+        values.push_back(global_value);
+      }
     }
     // FIXME const
     return values;
@@ -83,9 +108,7 @@ namespace sysy
       // if var is an array, get its dimensions
       vector<Value *> dims;
       for (auto dim : varDef->lValue()->exp())
-      {
         dims.push_back(any_cast<Value *>(dim->accept(this)));
-      }
       // if var is a constant
       auto alloca = builder.createAllocaInst(type, dims, name, isConst);
       // update the symbol table
@@ -99,16 +122,10 @@ namespace sysy
           if (isa<ConstantValue>(value))
           {
             // if var is int, convert the constant into int type
-            if (ctx->btype()->INT())
-            {
-              if (dynamic_cast<ConstantValue *>(value)->isFloat())
-                value = ConstantValue::get((int)dynamic_cast<ConstantValue *>(value)->getDouble());
-            }
-            else if (ctx->btype()->FLOAT())
-            {
-              if (dynamic_cast<ConstantValue *>(value)->isInt())
-                value = ConstantValue::get((double)dynamic_cast<ConstantValue *>(value)->getInt());
-            }
+            if (ctx->btype()->INT() && dynamic_cast<ConstantValue *>(value)->isFloat())
+              value = ConstantValue::get((int)dynamic_cast<ConstantValue *>(value)->getDouble());
+            else if (ctx->btype()->FLOAT() && dynamic_cast<ConstantValue *>(value)->isInt())
+              value = ConstantValue::get((double)dynamic_cast<ConstantValue *>(value)->getInt());
           }
           else if (alloca->getType()->as<PointerType>()->getBaseType()->isInt() && value->getType()->isFloat())
             value = builder.createFtoIInst(value);
@@ -117,7 +134,7 @@ namespace sysy
           auto store = builder.createStoreInst(value, alloca);
           builder.getBasicBlock()->getParent()->resetVariableID();
           // if var is a constant scalar, store its value to alloca inst
-          if (isConst && alloca->getNumDims() == 0)
+          if (isConst)
           {
             auto constant_var = dynamic_cast<ConstantValue *>(value);
             if (constant_var->isInt())
@@ -133,7 +150,10 @@ namespace sysy
           n = 0;
           path.empty();
           path = vector<int>(alloca->getNumDims(), 0);
+          isalloca = true;
           current_alloca = alloca;
+          current_type = alloca->getType()->as<PointerType>()->getBaseType();
+          numdims = alloca->getNumDims();
           for (auto init : varDef->initValue()->initValue())
             visitInitValue(init);
         }
@@ -148,55 +168,60 @@ namespace sysy
     if (ctx->exp())
     {
       auto value = any_cast<Value *>(ctx->exp()->accept(this));
+      // convert the constant into type of the lvalue
       if (isa<ConstantValue>(value))
       {
-        // if var is int, convert the constant into int type
-        if (current_alloca->getType()->as<PointerType>()->getBaseType()->isInt() && value->getType()->isFloat())
-        {
-          // if (dynamic_cast<ConstantValue *>(value)->isFloat())
+        if (current_type->isInt() && value->getType()->isFloat())
           value = ConstantValue::get((int)dynamic_cast<ConstantValue *>(value)->getDouble());
-        }
-        else if (current_alloca->getType()->as<PointerType>()->getBaseType()->isFloat() && value->getType()->isInt())
-        {
-          // if (dynamic_cast<ConstantValue *>(value)->isInt())
+        else if (current_type->isFloat() && value->getType()->isInt())
           value = ConstantValue::get((double)dynamic_cast<ConstantValue *>(value)->getInt());
-        }
       }
-      else if (current_alloca->getType()->as<PointerType>()->getBaseType()->isInt() && value->getType()->isFloat())
+      else if (current_type->isInt() && value->getType()->isFloat())
         value = builder.createFtoIInst(value);
-      else if (current_alloca->getType()->as<PointerType>()->getBaseType()->isFloat() && value->getType()->isInt())
+      else if (current_type->isFloat() && value->getType()->isInt())
         value = builder.createIToFInst(value);
       // goto the last dimension
-      while (d < current_alloca->getNumDims() - 1)
+      while (d < numdims - 1)
       {
         path[d++] = n;
-        // d++;
         n = 0;
       }
       vector<Value *> indices;
-      for (int i = 0; i < current_alloca->getNumDims() - 1; i++)
+      for (int i = 0; i < numdims - 1; i++)
         indices.push_back(ConstantValue::get(path[i]));
       indices.push_back(ConstantValue::get(n));
-      // store exp into alloca
-      auto store = builder.createStoreInst(value, current_alloca, indices);
-      builder.getBasicBlock()->getParent()->resetVariableID();
-      // if array is const store value into alloca
-      if (current_alloca->Const())
+      if (isalloca)
+      {
+        // store exp into alloca
+        auto store = builder.createStoreInst(value, current_alloca, indices);
+        builder.getBasicBlock()->getParent()->resetVariableID();
+        // if array is const store value into alloca
+        if (current_alloca->Const())
+        {
+          auto constant_var = dynamic_cast<ConstantValue *>(value);
+          if (constant_var->isInt())
+            current_alloca->setInt(constant_var->getInt(), indices);
+          else if (constant_var->isFloat())
+            current_alloca->setDouble(constant_var->getDouble(), indices);
+        }
+        // goto next element
+        n++;
+        while (d >= 0 && n >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
+          n = path[--d] + 1;
+      }
+      else
       {
         auto constant_var = dynamic_cast<ConstantValue *>(value);
         if (constant_var->isInt())
-          current_alloca->setInt(constant_var->getInt(), indices);
+          current_global->setInt(constant_var->getInt(), indices);
         else if (constant_var->isFloat())
-          current_alloca->setDouble(constant_var->getDouble(), indices);
+          current_global->setDouble(constant_var->getDouble(), indices);
+        // goto next element
+        n++;
+        while (d >= 0 && n >= dynamic_cast<ConstantValue *>(current_global->getDim(d))->getInt())
+          n = path[--d] + 1;
       }
-      // goto next element
-      n++;
-      while (d >= 0 && n >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
-      {
-        // d--;
-        n = path[--d] + 1;
-      }
-      return store;
+      return value;
     }
     else
     {
@@ -208,11 +233,12 @@ namespace sysy
       d = cur_d;
       n = cur_n;
       n++;
-      while (d >= 0 && n >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
-      {
-        d--;
-        n = path[d] + 1;
-      }
+      if (isalloca)
+        while (d >= 0 && n >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
+          n = path[--d] + 1;
+      else
+        while (d >= 0 && n >= dynamic_cast<ConstantValue *>(current_global->getDim(d))->getInt())
+          n = path[--d] + 1;
       return value;
     }
   }
@@ -352,18 +378,21 @@ namespace sysy
       error(ctx, "undefined variable");
     vector<Value *> indices;
     for (auto exp : ctx->lValue()->exp())
-    {
       indices.push_back(any_cast<Value *>(exp->accept(this)));
-    }
     if (isa<GlobalValue>(value))
     {
       auto global_val = dynamic_cast<GlobalValue *>(value);
-      if (global_val->isconst() && global_val->getNumDims() == 0)
+      if (global_val->isconst())
       {
-        value = global_val->init();
+        if (global_val->getNumDims() == 0)
+          value = global_val->init();
+        else if (global_val->isInt())
+          value = ConstantValue::get(global_val->getInt(indices));
+        else
+          value = ConstantValue::get(global_val->getDouble(indices));
       }
       else
-        value = builder.createLoadInst(value);
+        value = builder.createLoadInst(value, indices);
     }
     else if (isa<AllocaInst>(value))
     {
@@ -376,9 +405,7 @@ namespace sysy
           value = ConstantValue::get(alloca_inst->getDouble(indices));
       }
       else
-      {
         value = builder.createLoadInst(value, indices);
-      }
     }
     else if (isa<Argument>(value))
     {

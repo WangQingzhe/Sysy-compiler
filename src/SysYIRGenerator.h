@@ -94,7 +94,11 @@ namespace sysy
     SymbolTable symbols;
     int d = 0, n = 0;
     vector<int> path;
+    bool isalloca;
     AllocaInst *current_alloca;
+    GlobalValue *current_global;
+    Type *current_type;
+    int numdims = 0;
 
   public:
     SysYIRGenerator() = default;

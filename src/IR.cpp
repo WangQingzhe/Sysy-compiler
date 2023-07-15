@@ -510,7 +510,13 @@ namespace sysy
     printOperand(os, getPointer());
     for (auto iter = getIndices().begin(); iter != getIndices().end(); iter++)
     {
-      os << "[" << static_cast<const ConstantValue *>(*iter)->getInt() << "]";
+      if (isa<ConstantValue>(*iter))
+        os << "[" << static_cast<const ConstantValue *>(*iter)->getInt() << "]";
+      else
+      {
+        os << "[";
+        printVarName(os, *iter) << "]";
+      }
     }
     os << " : " << *getType();
   }
@@ -524,7 +530,13 @@ namespace sysy
     printOperand(os, getPointer());
     for (auto iter = getIndices().begin(); iter != getIndices().end(); iter++)
     {
-      os << "[" << static_cast<const ConstantValue *>(*iter)->getInt() << "]";
+      if (isa<ConstantValue>(*iter))
+        os << "[" << static_cast<const ConstantValue *>(*iter)->getInt() << "]";
+      else
+      {
+        os << "[";
+        printVarName(os, *iter) << "]";
+      }
     }
     os << " : " << *getValue()->getType();
   }

@@ -825,13 +825,9 @@ namespace sysy
         for (int i = 0; i < dims.size(); i++)
           size *= dynamic_cast<ConstantValue *>(dims[i])->getInt();
         if (static_cast<const PointerType *>(getType())->getBaseType()->isInt())
-        {
           int_array = new int[size];
-        }
         else if (static_cast<const PointerType *>(getType())->getBaseType()->isFloat())
-        {
           double_array = new double[size];
-        }
       }
     }
 
@@ -1083,6 +1079,9 @@ namespace sysy
     Module *parent;
     bool hasInit;
     bool isConst;
+    bool Int = false;
+    int *int_array;
+    double *double_array;
 
   protected:
     //******************Revised by lyq BEGIN***************************************
@@ -1095,6 +1094,16 @@ namespace sysy
       addOperands(dims);
       if (init)
         addOperand(init);
+      if (dims.size() > 0)
+      {
+        int size = 1;
+        for (int i = 0; i < dims.size(); i++)
+          size *= dynamic_cast<ConstantValue *>(dims[i])->getInt();
+        if (static_cast<const PointerType *>(getType())->getBaseType()->isInt())
+          int_array = new int[size];
+        else if (static_cast<const PointerType *>(getType())->getBaseType()->isFloat())
+          double_array = new double[size];
+      }
     }
 
   public:
@@ -1110,6 +1119,53 @@ namespace sysy
     //******************Revised by lyq BEGIN***************************************
     bool isconst() { return isConst; }
     //******************Revised by lyq END*****************************************
+    void setInt(int value, const std::vector<Value *> &indices = {})
+    {
+      Int = true;
+      int factor = 1;
+      int offset = 0;
+      for (int i = indices.size() - 1; i >= 0; i--)
+      {
+        offset += factor * dynamic_cast<ConstantValue *>(indices[i])->getInt();
+        factor *= dynamic_cast<ConstantValue *>(getDim(i))->getInt();
+      }
+      int_array[offset] = value;
+    }
+    void setDouble(double value, const std::vector<Value *> &indices = {})
+    {
+      int factor = 1;
+      int offset = 0;
+      for (int i = indices.size() - 1; i >= 0; i--)
+      {
+        offset += factor * dynamic_cast<ConstantValue *>(indices[i])->getInt();
+        factor *= dynamic_cast<ConstantValue *>(getDim(i))->getInt();
+      }
+      double_array[offset] = value;
+    }
+    int getInt(const std::vector<Value *> &indices = {})
+    {
+      int factor = 1;
+      int offset = 0;
+      for (int i = indices.size() - 1; i >= 0; i--)
+      {
+        offset += factor * dynamic_cast<ConstantValue *>(indices[i])->getInt();
+        factor *= dynamic_cast<ConstantValue *>(getDim(i))->getInt();
+      }
+      return int_array[offset];
+    }
+    double getDouble(const std::vector<Value *> &indices = {})
+    {
+      int factor = 1;
+      int offset = 0;
+      for (int i = indices.size() - 1; i >= 0; i--)
+      {
+        offset += factor * dynamic_cast<ConstantValue *>(indices[i])->getInt();
+        factor *= dynamic_cast<ConstantValue *>(getDim(i))->getInt();
+      }
+      return double_array[offset];
+    }
+    bool isInt() { return Int; }
+
   public:
     void print(std::ostream &os) const override;
   }; // class GlobalValue
