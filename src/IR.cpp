@@ -503,11 +503,16 @@ namespace sysy
 
   void LoadInst::print(std::ostream &os) const
   {
-    if (getNumIndices())
-      cerr << "not implemented yet\n";
+    // if (getNumIndices())
+    //   cerr << "not implemented yet\n";
     printVarName(os, this) << " = ";
     os << "load ";
-    printOperand(os, getPointer()) << " : " << *getType();
+    printOperand(os, getPointer());
+    for (auto iter = getIndices().begin(); iter != getIndices().end(); iter++)
+    {
+      os << "[" << static_cast<const ConstantValue *>(*iter)->getInt() << "]";
+    }
+    os << " : " << *getType();
   }
 
   void StoreInst::print(std::ostream &os) const
@@ -516,11 +521,12 @@ namespace sysy
     //   cerr << "not implemented yet\n";
     os << "store ";
     printOperand(os, getValue()) << ", ";
+    printOperand(os, getPointer());
     for (auto iter = getIndices().begin(); iter != getIndices().end(); iter++)
     {
       os << "[" << static_cast<const ConstantValue *>(*iter)->getInt() << "]";
     }
-    printOperand(os, getPointer()) << " : " << *getValue()->getType();
+    os << " : " << *getValue()->getType();
   }
 
   void GlobalValue::print(std::ostream &os) const

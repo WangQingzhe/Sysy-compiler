@@ -90,7 +90,6 @@ namespace sysy
       auto alloca = builder.createAllocaInst(type, dims, name, isConst);
       // update the symbol table
       symbols.insert(name, alloca);
-      // if an initial value is given, create a store instruction
       if (varDef->ASSIGN())
       {
         // if alloca is scalar,only one store inst
@@ -200,12 +199,11 @@ namespace sysy
       d = cur_d;
       n = cur_n;
       n++;
-      if (n >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
-        while (d >= 0 && (n + 1) >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
-        {
-          d--;
-          n = path[d] + 1;
-        }
+      while (d >= 0 && n >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
+      {
+        d--;
+        n = path[d] + 1;
+      }
       return value;
     }
   }
@@ -305,7 +303,10 @@ namespace sysy
     else if (pointer->getType()->as<PointerType>()->getBaseType()->isFloat() && rhs->getType()->isInt())
       rhs = builder.createIToFInst(rhs);
     // update the variable
-    Value *store = builder.createStoreInst(rhs, pointer);
+    vector<Value *> indices;
+    for (auto exp : ctx->lValue()->exp())
+      indices.push_back(any_cast<Value *>(exp->accept(this)));
+    Value *store = builder.createStoreInst(rhs, pointer, indices);
     return store;
   }
 
@@ -361,7 +362,14 @@ namespace sysy
           value = ConstantValue::get(alloca_inst->getDouble());
       }
       else
-        value = builder.createLoadInst(value);
+      {
+        vector<Value *> indices;
+        for (auto exp : ctx->lValue()->exp())
+        {
+          indices.push_back(any_cast<Value *>(exp->accept(this)));
+        }
+        value = builder.createLoadInst(value, indices);
+      }
     }
     else if (isa<Argument>(value))
     {
