@@ -180,6 +180,15 @@ namespace sysy
       // store exp into alloca
       auto store = builder.createStoreInst(value, current_alloca, indices);
       builder.getBasicBlock()->getParent()->resetVariableID();
+      // if array is const store value into alloca
+      if (current_alloca->Const())
+      {
+        auto constant_var = dynamic_cast<ConstantValue *>(value);
+        if (constant_var->isInt())
+          current_alloca->setInt(constant_var->getInt(), indices);
+        else if (constant_var->isFloat())
+          current_alloca->setDouble(constant_var->getDouble(), indices);
+      }
       // goto next element
       n++;
       while (d >= 0 && n >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
@@ -341,6 +350,11 @@ namespace sysy
     Value *value = symbols.lookup(name);
     if (not value)
       error(ctx, "undefined variable");
+    vector<Value *> indices;
+    for (auto exp : ctx->lValue()->exp())
+    {
+      indices.push_back(any_cast<Value *>(exp->accept(this)));
+    }
     if (isa<GlobalValue>(value))
     {
       auto global_val = dynamic_cast<GlobalValue *>(value);
@@ -354,20 +368,15 @@ namespace sysy
     else if (isa<AllocaInst>(value))
     {
       auto alloca_inst = dynamic_cast<AllocaInst *>(value);
-      if (alloca_inst->Const() && alloca_inst->getNumDims() == 0)
+      if (alloca_inst->Const())
       {
         if (alloca_inst->isInt())
-          value = ConstantValue::get(alloca_inst->getInt());
+          value = ConstantValue::get(alloca_inst->getInt(indices));
         else
-          value = ConstantValue::get(alloca_inst->getDouble());
+          value = ConstantValue::get(alloca_inst->getDouble(indices));
       }
       else
       {
-        vector<Value *> indices;
-        for (auto exp : ctx->lValue()->exp())
-        {
-          indices.push_back(any_cast<Value *>(exp->accept(this)));
-        }
         value = builder.createLoadInst(value, indices);
       }
     }
@@ -400,18 +409,18 @@ namespace sysy
         // lfloat = dynamic_cast<ConstantValue *>(lhs)->getFloat();
         ldouble = dynamic_cast<ConstantValue *>(lhs)->getDouble();
     }
-    else if (isa<AllocaInst>(lhs) && dynamic_cast<AllocaInst *>(lhs)->Const())
-    {
-      lconst = true;
-      if (dynamic_cast<AllocaInst *>(lhs)->isInt())
-      {
-        lint = dynamic_cast<AllocaInst *>(lhs)->getInt();
-        ldouble = dynamic_cast<AllocaInst *>(lhs)->getInt();
-      }
-      else
-        // lfloat = dynamic_cast<AllocaInst *>(lhs)->getFloat();
-        ldouble = dynamic_cast<AllocaInst *>(lhs)->getDouble();
-    }
+    // else if (isa<AllocaInst>(lhs) && dynamic_cast<AllocaInst *>(lhs)->Const())
+    // {
+    //   lconst = true;
+    //   if (dynamic_cast<AllocaInst *>(lhs)->isInt())
+    //   {
+    //     lint = dynamic_cast<AllocaInst *>(lhs)->getInt();
+    //     ldouble = dynamic_cast<AllocaInst *>(lhs)->getInt();
+    //   }
+    //   else
+    //     // lfloat = dynamic_cast<AllocaInst *>(lhs)->getFloat();
+    //     ldouble = dynamic_cast<AllocaInst *>(lhs)->getDouble();
+    // }
     // judge if rhs is a constant
     bool rconst = false;
     int rint = 0;
@@ -429,18 +438,18 @@ namespace sysy
         // rfloat = dynamic_cast<ConstantValue *>(rhs)->getFloat();
         rdouble = dynamic_cast<ConstantValue *>(rhs)->getDouble();
     }
-    else if (isa<AllocaInst>(rhs) && dynamic_cast<AllocaInst *>(rhs)->Const())
-    {
-      rconst = true;
-      if (dynamic_cast<AllocaInst *>(rhs)->isInt())
-      {
-        rint = dynamic_cast<AllocaInst *>(rhs)->getInt();
-        rdouble = dynamic_cast<AllocaInst *>(rhs)->getInt();
-      }
-      else
-        // rfloat = dynamic_cast<AllocaInst *>(rhs)->getFloat();
-        rdouble = dynamic_cast<AllocaInst *>(rhs)->getDouble();
-    }
+    // else if (isa<AllocaInst>(rhs) && dynamic_cast<AllocaInst *>(rhs)->Const())
+    // {
+    //   rconst = true;
+    //   if (dynamic_cast<AllocaInst *>(rhs)->isInt())
+    //   {
+    //     rint = dynamic_cast<AllocaInst *>(rhs)->getInt();
+    //     rdouble = dynamic_cast<AllocaInst *>(rhs)->getInt();
+    //   }
+    //   else
+    //     // rfloat = dynamic_cast<AllocaInst *>(rhs)->getFloat();
+    //     rdouble = dynamic_cast<AllocaInst *>(rhs)->getDouble();
+    // }
     // create convert instruction if needed
     auto lhsTy = lhs->getType();
     auto rhsTy = rhs->getType();
@@ -498,18 +507,18 @@ namespace sysy
         // lfloat = dynamic_cast<ConstantValue *>(lhs)->getFloat();
         ldouble = dynamic_cast<ConstantValue *>(lhs)->getDouble();
     }
-    else if (isa<AllocaInst>(lhs) && dynamic_cast<AllocaInst *>(lhs)->Const())
-    {
-      lconst = true;
-      if (dynamic_cast<AllocaInst *>(lhs)->isInt())
-      {
-        lint = dynamic_cast<AllocaInst *>(lhs)->getInt();
-        ldouble = dynamic_cast<AllocaInst *>(lhs)->getInt();
-      }
-      else
-        // lfloat = dynamic_cast<AllocaInst *>(lhs)->getFloat();
-        ldouble = dynamic_cast<AllocaInst *>(lhs)->getDouble();
-    }
+    // else if (isa<AllocaInst>(lhs) && dynamic_cast<AllocaInst *>(lhs)->Const())
+    // {
+    //   lconst = true;
+    //   if (dynamic_cast<AllocaInst *>(lhs)->isInt())
+    //   {
+    //     lint = dynamic_cast<AllocaInst *>(lhs)->getInt();
+    //     ldouble = dynamic_cast<AllocaInst *>(lhs)->getInt();
+    //   }
+    //   else
+    //     // lfloat = dynamic_cast<AllocaInst *>(lhs)->getFloat();
+    //     ldouble = dynamic_cast<AllocaInst *>(lhs)->getDouble();
+    // }
     // judge if rhs is a constant
     bool rconst = false;
     int rint = 0;
@@ -527,18 +536,18 @@ namespace sysy
         // rfloat = dynamic_cast<ConstantValue *>(rhs)->getFloat();
         rdouble = dynamic_cast<ConstantValue *>(rhs)->getDouble();
     }
-    else if (isa<AllocaInst>(rhs) && dynamic_cast<AllocaInst *>(rhs)->Const())
-    {
-      rconst = true;
-      if (dynamic_cast<AllocaInst *>(rhs)->isInt())
-      {
-        rint = dynamic_cast<AllocaInst *>(rhs)->getInt();
-        rdouble = dynamic_cast<AllocaInst *>(rhs)->getInt();
-      }
-      else
-        // rfloat = dynamic_cast<AllocaInst *>(rhs)->getFloat();
-        rdouble = dynamic_cast<AllocaInst *>(rhs)->getDouble();
-    }
+    // else if (isa<AllocaInst>(rhs) && dynamic_cast<AllocaInst *>(rhs)->Const())
+    // {
+    //   rconst = true;
+    //   if (dynamic_cast<AllocaInst *>(rhs)->isInt())
+    //   {
+    //     rint = dynamic_cast<AllocaInst *>(rhs)->getInt();
+    //     rdouble = dynamic_cast<AllocaInst *>(rhs)->getInt();
+    //   }
+    //   else
+    //     // rfloat = dynamic_cast<AllocaInst *>(rhs)->getFloat();
+    //     rdouble = dynamic_cast<AllocaInst *>(rhs)->getDouble();
+    // }
     // create convert instruction if needed
     auto lhsTy = lhs->getType();
     auto rhsTy = rhs->getType();

@@ -819,6 +819,20 @@ namespace sysy
         : Instruction(kAlloca, type, parent, name), isConst(isConst)
     {
       addOperands(dims);
+      if (isConst && dims.size() > 0)
+      {
+        int size = 1;
+        for (int i = 0; i < dims.size(); i++)
+          size *= dynamic_cast<ConstantValue *>(dims[i])->getInt();
+        if (static_cast<const PointerType *>(getType())->getBaseType()->isInt())
+        {
+          int_array = new int[size];
+        }
+        else if (static_cast<const PointerType *>(getType())->getBaseType()->isFloat())
+        {
+          double_array = new double[size];
+        }
+      }
     }
 
   public:
@@ -833,22 +847,75 @@ namespace sysy
     float float_value;
     double double_value;
     bool Int = false;
+    int *int_array;
+    double *double_array;
 
   public:
     int getNumDims() const { return getNumOperands(); }
     auto getDims() const { return getOperands(); }
     Value *getDim(int index) { return getOperand(index); }
     bool Const() const { return isConst; }
-    void setInt(int value)
+    void setInt(int value, const std::vector<Value *> &indices = {})
     {
-      int_value = value;
       Int = true;
+      if (indices.size() == 0)
+        int_value = value;
+      else
+      {
+        int factor = 1;
+        int offset = 0;
+        for (int i = indices.size() - 1; i >= 0; i--)
+        {
+          offset += factor * dynamic_cast<ConstantValue *>(indices[i])->getInt();
+          factor *= dynamic_cast<ConstantValue *>(getDim(i))->getInt();
+        }
+        int_array[offset] = value;
+      }
     }
     void setFloat(float value) { float_value = value; }
-    void setDouble(double value) { double_value = value; }
-    int getInt() { return int_value; }
+    void setDouble(double value, const std::vector<Value *> &indices = {})
+    {
+      if (indices.size() == 0)
+        double_value = value;
+      else
+      {
+        int factor = 1;
+        int offset = 0;
+        for (int i = indices.size() - 1; i >= 0; i--)
+        {
+          offset += factor * dynamic_cast<ConstantValue *>(indices[i])->getInt();
+          factor *= dynamic_cast<ConstantValue *>(getDim(i))->getInt();
+        }
+        double_array[offset] = value;
+      }
+    }
+    int getInt(const std::vector<Value *> &indices = {})
+    {
+      if (indices.size() == 0)
+        return int_value;
+      int factor = 1;
+      int offset = 0;
+      for (int i = indices.size() - 1; i >= 0; i--)
+      {
+        offset += factor * dynamic_cast<ConstantValue *>(indices[i])->getInt();
+        factor *= dynamic_cast<ConstantValue *>(getDim(i))->getInt();
+      }
+      return int_array[offset];
+    }
     float getFloat() { return float_value; }
-    double getDouble() { return double_value; }
+    double getDouble(const std::vector<Value *> &indices = {})
+    {
+      if (indices.size() == 0)
+        return double_value;
+      int factor = 1;
+      int offset = 0;
+      for (int i = indices.size() - 1; i >= 0; i--)
+      {
+        offset += factor * dynamic_cast<ConstantValue *>(indices[i])->getInt();
+        factor *= dynamic_cast<ConstantValue *>(getDim(i))->getInt();
+      }
+      return double_array[offset];
+    }
     bool isInt() { return Int; }
 
   public:
