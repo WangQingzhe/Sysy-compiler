@@ -679,95 +679,180 @@ namespace backend
     CodeGen::allocaInst_gen(AllocaInst *aInst, RegManager::RegId dstRegId)
     {
         string code;
+        int NumDims = aInst->getNumDims();
+        auto Dims = aInst->getDims();
+        int num = 1;
+        for (auto iter = Dims.begin(); iter != Dims.end(); iter++)
+        {
+            num *= static_cast<const ConstantValue *>(*iter)->getInt();
+        }
         localVarStOffset.emplace(aInst, top_offset);
-        top_offset -= 4;
+        int top_offset_old = top_offset;
+        top_offset -= 4 * num;
+        if (NumDims)
+        {
+            code += space + "sub\tr3, fp, #" + to_string(-top_offset - 4) + endl;
+            code += space + "mov\tr2, #" + to_string(top_offset_old - top_offset) + endl;
+            code += space + "mov\tr1, #0" + endl;
+            code += space + "mov\tr0, r3" + endl;
+            code += space + "bl\tmemset" + endl;
+        }
         dstRegId = RegManager::RNONE;
         return {dstRegId, code};
     }
 
     string CodeGen::storeInst_gen(StoreInst *stInst)
     {
+
         string code;
         auto value = stInst->getValue();
         auto pointer = stInst->getPointer();
-        if (globalval.find(dynamic_cast<GlobalValue *>(pointer)) != globalval.end())
+        int NumIndices = stInst->getNumIndices(); // numindices denotes dimensions of pointer
+
+        auto dims_len = dynamic_cast<AllocaInst *>(pointer)->getDims();
+        int offset_array = 0;
+        int dim = 0;
+        int full_num = 1;
+        vector<int> dim_len;
+        for (auto iter = dims_len.end(); iter != dims_len.begin(); iter--)
         {
-            code += space + "movw\tr10, #:lower16:" + pointer->getName() + endl;
-            code += space + "movt\tr10, #:upper16:" + pointer->getName() + endl;
+            // dim_len.push_back(dynamic_cast<ConstantValue *>(*iter)->getInt());
+            // code += to_string(static_cast<const ConstantValue *>(*iter)->getInt()) + endl;
+        }
+        for (auto iter = stInst->getIndices().end(); iter != stInst->getIndices().begin(); iter--)
+        {
+            // num 是数组下标
+            int num = dynamic_cast<ConstantValue *>(*iter)->getInt();
+            offset_array += num * full_num;
+            full_num = full_num * 1; // dim_len[dim];
+            dim += 1;
+        }
+
+        if (NumIndices == 0)
+        {
+            if (globalval.find(dynamic_cast<GlobalValue *>(pointer)) != globalval.end())
+            {
+                code += space + "movw\tr10, #:lower16:" + pointer->getName() + endl;
+                code += space + "movt\tr10, #:upper16:" + pointer->getName() + endl;
+                if (isa<ConstantValue>(value))
+                {
+                    if (value->isInt())
+                    {
+                        int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
+                        code += space + "mov\tr3, #" + to_string(constant_value) + endl;
+                        code += space + "str\tr3, [r10]" + endl;
+                    }
+                    else if (value->isFloat())
+                    {
+                        double constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
+                        unsigned dec;
+                        std::memcpy(&dec, &constant_value, sizeof(dec));
+                        code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
+                        code += space + "movt\tr3, #" + to_string(dec >> 16) + endl;
+                        code += space + "str\tr3, [r10]\t@ float" + endl;
+                    }
+                }
+                else if (isa<CallInst>(value))
+                {
+                    if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
+                        code += space + "str\tr0, [r10]" + endl;
+                    else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
+                        code += space + "vstr.32\tr0, [r10]" + endl;
+                }
+                else
+                {
+                    if (value->getType()->isInt())
+                        code += space + "str\tr" + value->getName() + ", [r10]" + endl;
+                    else if (value->getType()->isFloat())
+                        code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r10]" + endl;
+                }
+                return code;
+            }
+            int offset;
+            if (localVarStOffset.find(dynamic_cast<Instruction *>(pointer)) != localVarStOffset.end())
+                offset = localVarStOffset[dynamic_cast<Instruction *>(pointer)];
+            else if (paramsStOffset.find(dynamic_cast<Argument *>(pointer)) != paramsStOffset.end())
+                offset = paramsStOffset[dynamic_cast<Argument *>(pointer)];
             if (isa<ConstantValue>(value))
             {
                 if (value->isInt())
                 {
                     int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
                     code += space + "mov\tr3, #" + to_string(constant_value) + endl;
-                    code += space + "str\tr3, [r10]" + endl;
+                    code += space + "str\tr3, [fp, #" + to_string(offset) + "]" + endl;
                 }
                 else if (value->isFloat())
                 {
-                    double constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
+                    float constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
+
                     unsigned dec;
                     std::memcpy(&dec, &constant_value, sizeof(dec));
                     code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
                     code += space + "movt\tr3, #" + to_string(dec >> 16) + endl;
-                    code += space + "str\tr3, [r10]\t@ float" + endl;
+                    code += space + "str\tr3, [fp, #" + to_string(offset) + "]\t@ float" + endl;
                 }
             }
             else if (isa<CallInst>(value))
             {
                 if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
-                    code += space + "str\tr0, [r10]" + endl;
+                    code += space + "str\tr0, [fp, #" + to_string(offset) + "]" + endl;
                 else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
-                    code += space + "vstr.32\tr0, [r10]" + endl;
+                    code += space + "vstr.32\ts0, [fp, #" + to_string(offset) + "]" + endl;
             }
             else
             {
                 if (value->getType()->isInt())
-                    code += space + "str\tr" + value->getName() + ", [r10]" + endl;
+                    code += space + "str\tr" + value->getName() + ", [fp, #" + to_string(offset) + "]" + endl;
                 else if (value->getType()->isFloat())
-                    code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r10]" + endl;
+                    code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [fp, #" + to_string(offset) + "]" + endl;
             }
-            return code;
         }
-        int offset;
-        if (localVarStOffset.find(dynamic_cast<Instruction *>(pointer)) != localVarStOffset.end())
-            offset = localVarStOffset[dynamic_cast<Instruction *>(pointer)];
-        else if (paramsStOffset.find(dynamic_cast<Argument *>(pointer)) != paramsStOffset.end())
-            offset = paramsStOffset[dynamic_cast<Argument *>(pointer)];
-        if (isa<ConstantValue>(value))
+        else // 如果store的是数组
+             // 数组是全局变量还没实现
         {
-            if (value->isInt())
+            int offset;
+            if (localVarStOffset.find(dynamic_cast<Instruction *>(pointer)) != localVarStOffset.end())
+                // offset = localVarStOffset[dynamic_cast<Instruction *>(pointer)];
+                offset = top_offset + 4;
+            else if (paramsStOffset.find(dynamic_cast<Argument *>(pointer)) != paramsStOffset.end())
+                offset = paramsStOffset[dynamic_cast<Argument *>(pointer)];
+            if (isa<ConstantValue>(value))
             {
-                int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                code += space + "mov\tr3, #" + to_string(constant_value) + endl;
-                code += space + "str\tr3, [fp, #" + to_string(offset) + "]" + endl;
-            }
-            else if (value->isFloat())
-            {
-                float constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
+                if (value->isInt())
+                {
+                    int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
+                    code += space + "mov\tr3, #" + to_string(constant_value) + endl;
+                    code += space + "str\tr3, [fp, #" + to_string(offset) + "]" + endl;
+                }
+                else if (value->isFloat())
+                {
+                    float constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
 
-                unsigned dec;
-                std::memcpy(&dec, &constant_value, sizeof(dec));
-                code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
-                code += space + "movt\tr3, #" + to_string(dec >> 16) + endl;
-                code += space + "str\tr3, [fp, #" + to_string(offset) + "]\t@ float" + endl;
+                    unsigned dec;
+                    std::memcpy(&dec, &constant_value, sizeof(dec));
+                    code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
+                    code += space + "movt\tr3, #" + to_string(dec >> 16) + endl;
+                    code += space + "str\tr3, [fp, #" + to_string(offset) + "]\t@ float" + endl;
+                }
             }
-        }
-        else if (isa<CallInst>(value))
-        {
-            if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
-                code += space + "str\tr0, [fp, #" + to_string(offset) + "]" + endl;
-            else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
-                code += space + "vstr.32\ts0, [fp, #" + to_string(offset) + "]" + endl;
-        }
-        else
-        {
-            if (value->getType()->isInt())
-                code += space + "str\tr" + value->getName() + ", [fp, #" + to_string(offset) + "]" + endl;
-            else if (value->getType()->isFloat())
-                code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [fp, #" + to_string(offset) + "]" + endl;
+            else if (isa<CallInst>(value))
+            {
+                if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
+                    code += space + "str\tr0, [fp, #" + to_string(offset) + "]" + endl;
+                else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
+                    code += space + "vstr.32\ts0, [fp, #" + to_string(offset) + "]" + endl;
+            }
+            else
+            {
+                if (value->getType()->isInt())
+                    code += space + "str\tr" + value->getName() + ", [fp, #" + to_string(offset) + "]" + endl;
+                else if (value->getType()->isFloat())
+                    code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [fp, #" + to_string(offset) + "]" + endl;
+            }
         }
         return code;
     }
+
     pair<RegId, string> CodeGen::loadInst_gen(LoadInst *ldInst, RegId dstRegId)
     {
         string code;
