@@ -57,9 +57,8 @@ namespace sysy
       // if is a scalar
       if (dims.size() == 0)
       {
-        auto init = varDef->ASSIGN()
-                        ? any_cast<Value *>((varDef->initValue()->exp()->accept(this)))
-                        : nullptr;
+        auto init = varDef->ASSIGN() ? any_cast<Value *>((varDef->initValue()->exp()->accept(this)))
+                                     : nullptr;
         //******************Revised by lyq BEGIN***************************************
         auto global_value = module->createGlobalValue(name, type, dims, init, isConst);
         //******************Revised by lyq END*****************************************
@@ -69,13 +68,15 @@ namespace sysy
       // if is an array
       else
       {
-        auto global_value = module->createGlobalValue(name, type, dims, nullptr, isConst);
+        auto init = varDef->ASSIGN() ? any_cast<Value *>(dims[0])
+                                     : nullptr;
+        auto global_value = module->createGlobalValue(name, type, dims, init, isConst);
         // if initialize
         if (varDef->ASSIGN())
         {
           d = 0;
           n = 0;
-          path.empty();
+          path.clear();
           path = vector<int>(dims.size(), 0);
           isalloca = false;
           current_type = global_value->getType()->as<PointerType>()->getBaseType();
@@ -148,7 +149,7 @@ namespace sysy
         {
           d = 0;
           n = 0;
-          path.empty();
+          path.clear();
           path = vector<int>(alloca->getNumDims(), 0);
           isalloca = true;
           current_alloca = alloca;
@@ -273,7 +274,7 @@ namespace sysy
     // and update the symbol table
     auto entry = function->addBasicBlock(entry_name);
     // auto entry = function->getEntryBlock();
-    for (auto i = 0; i < paramTypes.size(); ++i)
+    for (std::size_t i = 0; i < paramTypes.size(); ++i)
     {
       auto arg = entry->createArgument(paramTypes[i], paramNames[i]);
       symbols.insert(paramNames[i], arg);

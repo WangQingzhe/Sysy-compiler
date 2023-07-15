@@ -822,7 +822,7 @@ namespace sysy
       if (isConst && dims.size() > 0)
       {
         int size = 1;
-        for (int i = 0; i < dims.size(); i++)
+        for (std::size_t i = 0; i < dims.size(); i++)
           size *= dynamic_cast<ConstantValue *>(dims[i])->getInt();
         if (static_cast<const PointerType *>(getType())->getBaseType()->isInt())
           int_array = new int[size];
@@ -1082,6 +1082,7 @@ namespace sysy
     bool Int = false;
     int *int_array;
     double *double_array;
+    int size = 1;
 
   protected:
     //******************Revised by lyq BEGIN***************************************
@@ -1092,17 +1093,17 @@ namespace sysy
     {
       assert(type->isPointer());
       addOperands(dims);
+      size = 1;
       if (init)
         addOperand(init);
       if (dims.size() > 0)
       {
-        int size = 1;
-        for (int i = 0; i < dims.size(); i++)
+        for (std::size_t i = 0; i < dims.size(); i++)
           size *= dynamic_cast<ConstantValue *>(dims[i])->getInt();
         if (static_cast<const PointerType *>(getType())->getBaseType()->isInt())
-          int_array = new int[size];
+          int_array = new int[size]{};
         else if (static_cast<const PointerType *>(getType())->getBaseType()->isFloat())
-          double_array = new double[size];
+          double_array = new double[size]{};
       }
     }
 
@@ -1164,7 +1165,10 @@ namespace sysy
       }
       return double_array[offset];
     }
+    int *getIntarray() { return int_array; }
+    double *getDoublearray() { return double_array; }
     bool isInt() { return Int; }
+    int getsize() { return size; }
 
   public:
     void print(std::ostream &os) const override;

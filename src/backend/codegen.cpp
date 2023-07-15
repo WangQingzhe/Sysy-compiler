@@ -39,7 +39,8 @@ namespace backend
             if (bblist.empty())
                 continue;
             // generate asmcode for each function
-            textCode += function_gen(func) + endl;
+            if (libfunc.find(func->getName()) == libfunc.end())
+                textCode += function_gen(func) + endl;
         }
         if (imms.size())
             immcode += ".IMM:" + endl;
@@ -199,8 +200,6 @@ namespace backend
     string CodeGen::function_gen(Function *func)
     {
         string code;
-        if (libfunc.find(func->getName()) != libfunc.end())
-            return code;
         curFunc = func;
         clearFunctionRecord(func);
         string bbCode;
@@ -221,7 +220,7 @@ namespace backend
         // backpatch parasoffset
         int start_pos = 0;
         int index = 0;
-        while ((start_pos = bbCode.find("unk", start_pos)) != std::string::npos)
+        while ((const std::size_t)(start_pos = bbCode.find("unk", start_pos)) != std::string::npos)
         {
             int arg_offset = paramsStOffset[backpatch[index++]];
             bbCode.replace(start_pos, 3, to_string(arg_offset));
@@ -414,14 +413,7 @@ namespace backend
         // 各种指令分开处理
         if (bInst->getKind() == Instruction::kFAdd)
         {
-            if (lconst && rconst)
-            {
-                double val = dynamic_cast<ConstantValue *>(lhs)->getDouble() + dynamic_cast<ConstantValue *>(rhs)->getDouble();
-                unsigned num;
-                memcpy(&num, &val, sizeof(val));
-                code += space + "vmov.f32\ts" + res + "#" + to_string(num) + endl;
-            }
-            else if (lconst)
+            if (lconst)
             {
                 double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
                 // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
@@ -451,14 +443,7 @@ namespace backend
         }
         else if (bInst->getKind() == Instruction::kFSub)
         {
-            if (lconst && rconst)
-            {
-                double val = dynamic_cast<ConstantValue *>(lhs)->getDouble() - dynamic_cast<ConstantValue *>(rhs)->getDouble();
-                unsigned num;
-                memcpy(&num, &val, sizeof(val));
-                code += space + "vmov.f32\ts" + res + "#" + to_string(num) + endl;
-            }
-            else if (lconst)
+            if (lconst)
             {
                 double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
                 std::string dname = to_string(16 + std::stoi(rhs->getName()));
@@ -488,14 +473,7 @@ namespace backend
         }
         else if (bInst->getKind() == Instruction::kFMul)
         {
-            if (lconst && rconst)
-            {
-                double val = dynamic_cast<ConstantValue *>(lhs)->getDouble() * dynamic_cast<ConstantValue *>(rhs)->getDouble();
-                unsigned num;
-                memcpy(&num, &val, sizeof(val));
-                code += space + "vmov.f32\ts" + res + "#" + to_string(num) + endl;
-            }
-            else if (lconst)
+            if (lconst)
             {
                 double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
                 std::string dname = to_string(16 + std::stoi(rhs->getName()));
@@ -524,14 +502,7 @@ namespace backend
         }
         else if (bInst->getKind() == Instruction::kFDiv)
         {
-            if (lconst && rconst)
-            {
-                double val = dynamic_cast<ConstantValue *>(lhs)->getDouble() - dynamic_cast<ConstantValue *>(rhs)->getDouble();
-                unsigned num;
-                memcpy(&num, &val, sizeof(val));
-                code += space + "vmov.f32\ts" + res + "#" + to_string(num) + endl;
-            }
-            else if (lconst)
+            if (lconst)
             {
                 double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
                 std::string dname = to_string(16 + std::stoi(rhs->getName()));
@@ -710,6 +681,7 @@ namespace backend
         int NumIndices = stInst->getNumIndices(); // numindices denotes dimensions of pointer
 
         auto dims_len = dynamic_cast<AllocaInst *>(pointer)->getDims();
+        // code += to_string(dynamic_cast<ConstantValue *>(dynamic_cast<AllocaInst *>(pointer)->getDim(0))->getInt());
         int offset_array = 0;
         int dim = 0;
         int full_num = 1;
@@ -718,6 +690,10 @@ namespace backend
         {
             // dim_len.push_back(dynamic_cast<ConstantValue *>(*iter)->getInt());
             // code += to_string(static_cast<const ConstantValue *>(*iter)->getInt()) + endl;
+        }
+        for (int i = 0; i < NumIndices; i++)
+        {
+            dim_len.push_back(dynamic_cast<ConstantValue *>(dynamic_cast<AllocaInst *>(pointer)->getDim(i))->getInt());
         }
         for (auto iter = stInst->getIndices().end(); iter != stInst->getIndices().begin(); iter--)
         {
@@ -768,7 +744,7 @@ namespace backend
                 }
                 return code;
             }
-            int offset;
+            int offset = 0;
             if (localVarStOffset.find(dynamic_cast<Instruction *>(pointer)) != localVarStOffset.end())
                 offset = localVarStOffset[dynamic_cast<Instruction *>(pointer)];
             else if (paramsStOffset.find(dynamic_cast<Argument *>(pointer)) != paramsStOffset.end())
@@ -810,7 +786,7 @@ namespace backend
         else // 如果store的是数组
              // 数组是全局变量还没实现
         {
-            int offset;
+            int offset = 0;
             if (localVarStOffset.find(dynamic_cast<Instruction *>(pointer)) != localVarStOffset.end())
                 // offset = localVarStOffset[dynamic_cast<Instruction *>(pointer)];
                 offset = top_offset + 4;
@@ -907,7 +883,7 @@ namespace backend
             else if (retval->getType()->isFloat())
             {
                 unsigned num1;
-                double val1;
+                float val1;
                 val1 = dynamic_cast<ConstantValue *>(retval)->getDouble();
                 memcpy(&num1, &val1, sizeof(val1));
                 code += space + "movw\tr3, #" + to_string(num1 & 0x0000FFFF) + endl;
@@ -955,7 +931,7 @@ namespace backend
             auto rhs = bInst->getRhs();
             if (isa<ConstantValue>(lhs) && isa<ConstantValue>(rhs))
             {
-                float lvalue, rvalue;
+                float lvalue = 0, rvalue = 0;
                 if (lhs->getType()->isInt())
                     lvalue = dynamic_cast<ConstantValue *>(lhs)->getInt();
                 else if (lhs->getType()->isFloat())
@@ -1254,25 +1230,70 @@ namespace backend
             if (glbvl->isconst())
                 asmCode += space + ".section" + space + ".rodata" + endl;
             //******************Revised by lyq END*****************************************
-            {
-                asmCode += space + ".align\t2" + endl;
-            }
-            asmCode += space + ".type\t" + name + ", " + "%" + "object" + endl;
-            asmCode += space + ".size\t" + name + ", 4" + endl;
+            asmCode += space + ".align\t2" + endl;
+            asmCode += space + ".type\t" + name + ", %" + "object" + endl;
+            asmCode += space + ".size\t" + name + ", " + to_string(glbvl->getsize() * 4) + endl;
             asmCode += name + ":\n";
-            auto value = dyncast<ConstantValue>(glbvl->getOperand(0));
-            string val;
-            std::stringstream ss;
-            if (type->isInt())
-                val = to_string(value->getInt());
-            else if (type->isFloat())
+            // globalvalue is a scalar
+            if (glbvl->getNumDims() == 0)
             {
-                float constant_value = value->getDouble();
-                int dec;
-                std::memcpy(&dec, &constant_value, sizeof(dec));
-                val = to_string(dec);
+                auto value = dyncast<ConstantValue>(glbvl->getOperand(0));
+                string val;
+                if (type->isInt())
+                    val = to_string(value->getInt());
+                else if (type->isFloat())
+                {
+                    float constant_value = value->getDouble();
+                    int dec;
+                    std::memcpy(&dec, &constant_value, sizeof(dec));
+                    val = to_string(dec);
+                }
+                asmCode += space + ".word\t" + val + endl;
             }
-            asmCode += space + ".word\t" + val + endl;
+            // globalvalue is an array
+            else
+            {
+                int continue_zero = 0;
+                if (type->isInt())
+                {
+                    int *array = glbvl->getIntarray();
+                    for (int i = 0; i < glbvl->getsize(); i++)
+                    {
+                        if (array[i] != 0)
+                        {
+                            if (continue_zero)
+                                asmCode += space + ".space\t" + to_string(4 * continue_zero) + endl;
+                            continue_zero = 0;
+                            asmCode += space + ".word\t" + to_string(array[i]) + endl;
+                        }
+                        else
+                            continue_zero++;
+                    }
+                    if (continue_zero)
+                        asmCode += space + ".space\t" + to_string(4 * continue_zero) + endl;
+                }
+                else if (type->isFloat())
+                {
+                    double *array = glbvl->getDoublearray();
+                    for (int i = 0; i < glbvl->getsize(); i++)
+                    {
+                        if (array[i] != 0)
+                        {
+                            if (continue_zero)
+                                asmCode += space + ".space\t" + to_string(4 * continue_zero) + endl;
+                            continue_zero = 0;
+                            float num = array[i];
+                            int dec = 0;
+                            memcpy(&dec, &num, sizeof(num));
+                            asmCode += space + ".word\t" + to_string(dec) + endl;
+                        }
+                        else
+                            continue_zero++;
+                    }
+                    if (continue_zero)
+                        asmCode += space + ".space\t" + to_string(4 * continue_zero) + endl;
+                }
+            }
         }
         // no init
         else
@@ -1282,13 +1303,11 @@ namespace backend
             if (glbvl->isconst())
                 asmCode += space + ".section" + space + "rodata" + endl;
             //******************Revised by lyq END*****************************************
-            {
-                asmCode += space + ".align\t2" + endl;
-            }
+            asmCode += space + ".align\t2" + endl;
             asmCode += space + ".type\t" + name + ", %object" + endl;
-            asmCode += space + ".size\t" + name + ", 4" + endl;
+            asmCode += space + ".size\t" + name + ", " + to_string(glbvl->getsize() * 4) + endl;
             asmCode += name + ":\n";
-            asmCode += space + ".space\t4" + endl;
+            asmCode += space + ".space\t" + to_string(4 * glbvl->getsize()) + endl;
         }
 
         return asmCode;
