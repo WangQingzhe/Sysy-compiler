@@ -383,6 +383,7 @@ namespace sysy
     int getIndex() const { return index; }
     int getNumDims() const { return dims.size(); }
     auto getDims() const { return make_range(dims.begin(), dims.end()); }
+    int getDim(int index) const { return dims[index]; }
 
   public:
     void print(std::ostream &os) const override;

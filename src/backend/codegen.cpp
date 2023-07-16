@@ -641,7 +641,10 @@ namespace backend
         {
             num *= static_cast<const ConstantValue *>(*iter)->getInt();
         }
-        localVarStOffset.emplace(aInst, top_offset);
+        if (NumDims == 0)
+            localVarStOffset.emplace(aInst, top_offset);
+        else if (NumDims > 0)
+            localVarStOffset.emplace(aInst, top_offset - 4 * num + 4);
         int top_offset_old = top_offset;
         top_offset -= 4 * num;
         if (NumDims && num >= 2)
@@ -852,65 +855,169 @@ namespace backend
         // dst register
         int reg_num = dstRegId == RegManager::RANY ? stoi(ldInst->getName()) : dstRegId;
         // variable to be loaded
-        auto var = ldInst->getPointer();
+        auto pointer = ldInst->getPointer();
+        auto type = pointer->getType()->as<PointerType>()->getBaseType();
         // variable's position in the stack
         int pos;
-        bool found = false;
-        // find var in localvar
         int NumIndices = ldInst->getNumIndices(); // numindices denotes dimensions of pointer
-        auto dims_len = dynamic_cast<AllocaInst *>(var)->getDims();
-        int offset_array = 0;
-        int dim = NumIndices - 1;
-        // int full_num = 1;
-        vector<int> dim_len;
-        vector<int> full_num;
-        for (int i = 0; i < NumIndices; i++)
+
+        // if pointer is a localvariable
+        if (localVarStOffset.find(dynamic_cast<Instruction *>(pointer)) != localVarStOffset.end())
         {
-            dim_len.push_back(dynamic_cast<ConstantValue *>(dynamic_cast<AllocaInst *>(var)->getDim(i))->getInt());
+            // 局部变量的维度,(起始)地址偏移量
+            auto local_variable = dynamic_cast<AllocaInst *>(pointer);
+            int NumDims = local_variable->getNumDims();
+            pos = localVarStOffset[dynamic_cast<Instruction *>(pointer)];
+            // 局部标量
+            if (NumDims == 0)
+            {
+                if (type->isInt())
+                    code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                else if (type->isFloat())
+                    code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+            }
+            // 局部数组
+            else if (NumDims > 0)
+            {
+                // 求出元素的偏移/数组的首地址偏移
+                int offset_array = 0;
+                int dim = NumDims - 1;
+                vector<int> dim_len;
+                vector<int> full_num;
+                for (int i = 0; i < NumDims; i++)
+                    dim_len.push_back(dynamic_cast<ConstantValue *>(local_variable->getDim(i))->getInt());
+                reverse(dim_len.begin(), dim_len.end());
+                full_num.push_back(1);
+                for (int i = 0; i < NumIndices; i++)
+                    full_num.push_back(dim_len[i] * full_num[i]);
+                for (auto iter = ldInst->getIndices().begin(); iter != ldInst->getIndices().end(); iter++)
+                {
+                    // index 是数组下标
+                    int index = dynamic_cast<ConstantValue *>(*iter)->getInt();
+                    offset_array += index * full_num[dim--];
+                }
+                pos += offset_array * 4;
+                // load出数组的一个元素
+                if (NumIndices == NumDims)
+                {
+                    if (type->isInt())
+                        code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                    else if (type->isFloat())
+                        code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                }
+                // load出一个(子)数组,求出其首地址
+                else if (NumIndices < NumDims)
+                {
+                    code += space + "sub\tr" + to_string(reg_num) + ", fp, #" + to_string(-pos) + endl;
+                }
+            }
         }
-        reverse(dim_len.begin(), dim_len.end());
-        full_num.push_back(1);
-        for (int i = 0; i < NumIndices; i++)
+        // if pointer is a globalvalue
+        else if (globalval.find(dynamic_cast<GlobalValue *>(pointer)) != globalval.end())
         {
-            full_num.push_back(dim_len[i] * full_num[i]);
+            // 全局变量的维度,(起始)地址偏移量
+            auto global_value = dynamic_cast<GlobalValue *>(pointer);
+            int NumDims = global_value->getNumDims();
+            pos = 0;
+            // 获取全局数组(首)地址
+            code += space + "movw\tr10, #:lower16:" + pointer->getName() + endl;
+            code += space + "movt\tr10, #:upper16:" + pointer->getName() + endl;
+            // 全局标量
+            if (NumDims == 0)
+            {
+                if (type->isInt())
+                    code += space + "ldr\tr" + to_string(reg_num) + ", [r10]" + endl;
+                else if (type->isFloat())
+                    code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r10]" + endl;
+            }
+            // 全局数组
+            else if (NumDims > 0)
+            {
+                // 求出元素的偏移/数组的首地址偏移
+                int offset_array = 0;
+                int dim = NumDims - 1;
+                vector<int> dim_len;
+                vector<int> full_num;
+                for (int i = 0; i < NumDims; i++)
+                    dim_len.push_back(dynamic_cast<ConstantValue *>(global_value->getDim(i))->getInt());
+                reverse(dim_len.begin(), dim_len.end());
+                full_num.push_back(1);
+                for (int i = 0; i < NumIndices; i++)
+                    full_num.push_back(dim_len[i] * full_num[i]);
+                for (auto iter = ldInst->getIndices().begin(); iter != ldInst->getIndices().end(); iter++)
+                {
+                    // index 是数组下标
+                    int index = dynamic_cast<ConstantValue *>(*iter)->getInt();
+                    offset_array += index * full_num[dim--];
+                }
+                pos += offset_array * 4;
+                // load出数组的一个元素
+                if (NumIndices == NumDims)
+                {
+                    if (type->isInt())
+                        code += space + "ldr\tr" + to_string(reg_num) + ", [r10, #" + to_string(pos) + "]" + endl;
+                    else if (type->isFloat())
+                        code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r10, #" + to_string(pos) + "]" + endl;
+                }
+                // load出一个(子)数组,求出其首地址
+                else if (NumIndices < NumDims)
+                {
+                    code += space + "add\tr10, r10, #" + to_string(pos) + endl;
+                }
+            }
         }
-        for (auto iter = ldInst->getIndices().begin(); iter != ldInst->getIndices().end(); iter++)
-        {
-            // num 是数组下标
-            int num = dynamic_cast<ConstantValue *>(*iter)->getInt();
-            offset_array += num * full_num[dim];
-            // code += to_string(offset_array) + endl;
-            dim -= 1;
-        }
-        if (localVarStOffset.find(dynamic_cast<Instruction *>(var)) != localVarStOffset.end())
-        {
-            if (!NumIndices)
-                pos = localVarStOffset[dynamic_cast<Instruction *>(var)];
-            else
-                pos = top_offset + (1 + offset_array) * 4;
-            if (var->getType()->as<PointerType>()->getBaseType()->isInt())
-                code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
-            else if (var->getType()->as<PointerType>()->getBaseType()->isFloat())
-                code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
-        }
-        // if var is a globalvalue
-        else if (globalval.find(dynamic_cast<GlobalValue *>(var)) != globalval.end())
-        {
-            code += space + "movw\tr10, #:lower16:" + var->getName() + endl;
-            code += space + "movt\tr10, #:upper16:" + var->getName() + endl;
-            if (var->getType()->as<PointerType>()->getBaseType()->isInt())
-                code += space + "ldr\tr" + to_string(reg_num) + ", [r10]" + endl;
-            else if (var->getType()->as<PointerType>()->getBaseType()->isFloat())
-                code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r10]" + endl;
-        }
-        // if var is an argument
+        // if pointer is an argument
         else
-        {
-            if (var->getType()->as<PointerType>()->getBaseType()->isInt())
-                code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #unk]" + endl;
-            else if (var->getType()->as<PointerType>()->getBaseType()->isInt())
-                code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [fp, #unk]" + endl;
-            backpatch.push_back(dynamic_cast<Argument *>(var));
+        { // 参数的维度,(起始)地址偏移量
+            auto arg = dynamic_cast<Argument *>(pointer);
+            int NumDims = arg->getNumDims();
+            pos = 0;
+            // 参数标量
+            if (NumDims == 0)
+            {
+                if (type->isInt())
+                    code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #unk]" + endl;
+                else if (type->isFloat())
+                    code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [fp, #unk]" + endl;
+            }
+            // 参数数组
+            else if (NumDims > 0)
+            {
+                // 求出元素的偏移/数组的首地址偏移
+                int offset_array = 0;
+                int dim = NumDims - 1;
+                vector<int> dim_len;
+                vector<int> full_num;
+                for (int i = 0; i < NumDims; i++)
+                    dim_len.push_back(arg->getDim(i));
+                reverse(dim_len.begin(), dim_len.end());
+                full_num.push_back(1);
+                for (int i = 0; i < NumIndices; i++)
+                    full_num.push_back(dim_len[i] * full_num[i]);
+                for (auto iter = ldInst->getIndices().begin(); iter != ldInst->getIndices().end(); iter++)
+                {
+                    // index 是数组下标
+                    int index = dynamic_cast<ConstantValue *>(*iter)->getInt();
+                    offset_array += index * full_num[dim--];
+                }
+                pos += offset_array * 4;
+                // load出数组的一个元素
+                if (NumIndices == NumDims)
+                {
+                    code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #unk]" + endl;
+                    if (type->isInt())
+                        code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(pos) + "]" + endl;
+                    else if (type->isFloat())
+                        code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(pos) + "]" + endl;
+                }
+                // load出一个(子)数组,求出其首地址
+                else if (NumIndices < NumDims)
+                {
+                    code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #unk]" + endl;
+                    code += space + "add\tr" + to_string(reg_num) + ", fp, #" + to_string(pos) + endl;
+                }
+            }
+            backpatch.push_back(arg);
         }
         return {dstRegId, code};
     }
