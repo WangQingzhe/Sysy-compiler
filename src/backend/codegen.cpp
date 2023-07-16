@@ -644,7 +644,7 @@ namespace backend
         localVarStOffset.emplace(aInst, top_offset);
         int top_offset_old = top_offset;
         top_offset -= 4 * num;
-        if (NumDims)
+        if (NumDims && num >= 2)
         {
             code += space + "sub\tr3, fp, #" + to_string(-top_offset - 4) + endl;
             if (num >= 18)
@@ -674,6 +674,16 @@ namespace backend
                 {
                     code += space + "vstr\td18, [r3, #" + to_string(i * 8) + "]" + endl;
                 }
+            }
+            else
+            {
+                int i;
+                code += space + "vmov\td18, d16\t@ v8qi" + endl;
+                for (i = 0; i < num / 2; i++)
+                {
+                    code += space + "vstr\td18, [r3, #" + to_string(i * 8) + "]" + endl;
+                }
+                code += space + "vstr\td18, [r3, #" + to_string(i * 8 - 4) + "]" + endl;
             }
         }
         dstRegId = RegManager::RNONE;
@@ -847,9 +857,37 @@ namespace backend
         int pos;
         bool found = false;
         // find var in localvar
+        int NumIndices = ldInst->getNumIndices(); // numindices denotes dimensions of pointer
+        auto dims_len = dynamic_cast<AllocaInst *>(var)->getDims();
+        int offset_array = 0;
+        int dim = NumIndices - 1;
+        // int full_num = 1;
+        vector<int> dim_len;
+        vector<int> full_num;
+        for (int i = 0; i < NumIndices; i++)
+        {
+            dim_len.push_back(dynamic_cast<ConstantValue *>(dynamic_cast<AllocaInst *>(var)->getDim(i))->getInt());
+        }
+        reverse(dim_len.begin(), dim_len.end());
+        full_num.push_back(1);
+        for (int i = 0; i < NumIndices; i++)
+        {
+            full_num.push_back(dim_len[i] * full_num[i]);
+        }
+        for (auto iter = ldInst->getIndices().begin(); iter != ldInst->getIndices().end(); iter++)
+        {
+            // num 是数组下标
+            int num = dynamic_cast<ConstantValue *>(*iter)->getInt();
+            offset_array += num * full_num[dim];
+            // code += to_string(offset_array) + endl;
+            dim -= 1;
+        }
         if (localVarStOffset.find(dynamic_cast<Instruction *>(var)) != localVarStOffset.end())
         {
-            pos = localVarStOffset[dynamic_cast<Instruction *>(var)];
+            if (!NumIndices)
+                pos = localVarStOffset[dynamic_cast<Instruction *>(var)];
+            else
+                pos = top_offset + (1 + offset_array) * 4;
             if (var->getType()->as<PointerType>()->getBaseType()->isInt())
                 code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
             else if (var->getType()->as<PointerType>()->getBaseType()->isFloat())
@@ -876,6 +914,7 @@ namespace backend
         }
         return {dstRegId, code};
     }
+
     string CodeGen::returnInst_gen(ReturnInst *retInst)
     {
         string code;
