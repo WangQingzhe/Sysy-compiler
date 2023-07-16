@@ -274,10 +274,24 @@ namespace sysy
     // and update the symbol table
     auto entry = function->addBasicBlock(entry_name);
     // auto entry = function->getEntryBlock();
-    for (std::size_t i = 0; i < paramTypes.size(); ++i)
+    if (ctx->funcFParams())
     {
-      auto arg = entry->createArgument(paramTypes[i], paramNames[i]);
-      symbols.insert(paramNames[i], arg);
+      auto params = ctx->funcFParams()->funcFParam();
+      vector<int> dims;
+      for (std::size_t i = 0; i < paramTypes.size(); ++i)
+      {
+        dims.clear();
+        // if param is an array
+        if (params[i]->LBRACKET().size())
+        {
+          dims.push_back(0);
+          for (auto exp : params[i]->exp())
+            dims.push_back(dynamic_cast<ConstantValue *>(any_cast<Value *>(exp->accept(this)))->getInt());
+        }
+        auto arg = entry->createArgument(paramTypes[i], dims, paramNames[i]);
+        // auto arg = entry->createArgument(paramTypes[i], paramNames[i]);
+        symbols.insert(paramNames[i], arg);
+      }
     }
     // setup the instruction insert point
     builder.setPosition(entry, entry->end());
@@ -410,7 +424,7 @@ namespace sysy
     }
     else if (isa<Argument>(value))
     {
-      value = builder.createLoadInst(value);
+      value = builder.createLoadInst(value, indices);
     }
     return value;
   }

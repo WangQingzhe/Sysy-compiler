@@ -241,9 +241,9 @@ namespace sysy
       os << getDouble();
   }
 
-  Argument::Argument(Type *type, BasicBlock *block, int index,
+  Argument::Argument(Type *type, BasicBlock *block, int index, const std::vector<int> &dims,
                      const std::string &name)
-      : Value(kArgument, type, name), block(block), index(index)
+      : Value(kArgument, type, name), block(block), index(index), dims(dims)
   {
     if (not hasName())
       setName(to_string(block->getParent()->allocateVariableID()));
@@ -252,7 +252,19 @@ namespace sysy
   void Argument::print(std::ostream &os) const
   {
     assert(hasName());
-    printVarName(os, this) << ": " << *getType();
+    printVarName(os, this) << ": ";
+    // os << getNumDims();
+    if (getNumDims())
+    {
+      for (auto iter = getDims().begin(); iter != getDims().end(); iter++)
+      {
+        if (iter == getDims().begin())
+          os << "[]";
+        else
+          os << "[" << *iter << "]";
+      }
+    }
+    os << *getType();
   }
 
   BasicBlock::BasicBlock(Function *parent, const std::string &name)
@@ -273,11 +285,14 @@ namespace sysy
     if (b != e)
     {
       os << '(';
-      printVarName(os, b->get()) << ": " << *b->get()->getType();
+      // printVarName(os, b->get()) << ": " << *b->get()->getType();
+      (*b).get()->print(os);
+
       for (auto &arg : make_range(std::next(b), e))
       {
         os << ", ";
-        printVarName(os, arg.get()) << ": " << *arg->getType();
+        // printVarName(os, arg.get()) << ": " << *arg->getType();
+        arg.get()->print(os);
       }
       os << ')';
     }

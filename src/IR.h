@@ -366,9 +366,10 @@ namespace sysy
   protected:
     BasicBlock *block;
     int index;
+    std::vector<int> dims;
 
   public:
-    Argument(Type *type, BasicBlock *block, int index,
+    Argument(Type *type, BasicBlock *block, int index, const std::vector<int> &dims = {},
              const std::string &name = "");
 
   public:
@@ -380,6 +381,8 @@ namespace sysy
   public:
     BasicBlock *getParent() const { return block; }
     int getIndex() const { return index; }
+    int getNumDims() const { return dims.size(); }
+    auto getDims() const { return make_range(dims.begin(), dims.end()); }
 
   public:
     void print(std::ostream &os) const override;
@@ -433,9 +436,11 @@ namespace sysy
     iterator begin() { return instructions.begin(); }
     iterator end() { return instructions.end(); }
     iterator terminator() { return std::prev(end()); }
-    Argument *createArgument(Type *type, const std::string &name = "")
+    Argument *createArgument(Type *type, const std::vector<int> &dims = {}, const std::string &name = "")
+    // Argument *createArgument(Type *type, const std::string &name = "")
     {
-      auto arg = new Argument(type, this, arguments.size(), name);
+      auto arg = new Argument(type, this, arguments.size(), dims, name);
+      // auto arg = new Argument(type, this, arguments.size(), name);
       assert(arg);
       arguments.emplace_back(arg);
       return arguments.back().get();
