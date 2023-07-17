@@ -241,6 +241,7 @@ namespace backend
          *code in here
          */
         string lname, rname;
+        int instrname = stoi(bInst->getName());
         auto lhs = bInst->getLhs();
         auto rhs = bInst->getRhs();
         bool lconst = false, rconst = false;
@@ -334,7 +335,109 @@ namespace backend
                 code += space + "mul\tr" + res + ", " + lname + ", " + rname + endl;
         }
         else if (bInst->getKind() == Instruction::kDiv)
-            code += space + "div\tr" + res + ", " + lname + ", " + rname + endl;
+        {
+            /*
+                因为除法硬件开销很大，所以我考虑对除法的特定情况进行优化
+                1. 如果被除数已知但是除数非已知，这种情况目前没办法优化
+                2. 如果除数已知但是被除数非已知 eg： a//CONSTANT 那么分两种情况
+                2.1 如果被除数是二的幂次，那么直接移位即可：
+                    ###
+                        CONSTANT = 2 ** b
+                        a//CONSTANT = a >> b
+                    ###
+                2.2 如果被除数不是二的幂次，那么可以这样优化：
+                    首先，把除法转换成乘法；
+                    ###
+                        a//CONSTANT <=> a * (1/CONSTANT)
+                    ###
+                    然后，考虑用整数的乘法指令SMULL来做，那么可以将（1/CONSTANT) 左移 32 位，
+                    考虑截断误差，加1即可，经检验在int的范围内，不存在的额外进位。
+                    再带入上面的等式就得到；
+                    ###
+                        r = (1 // CONSTANT) << 32
+                        a//CONSTANT <=> [a *(r+1)] >> 32;
+                    ###
+            */
+            if (lconst)
+            {
+                code += space + "mov\tr" + res + ", " + lname + endl;
+                code += space + "sdiv\tr" + res + ", " + rname + endl;
+            }
+            else if (rconst)
+            {
+                int rvalue = dynamic_cast<ConstantValue *>(rhs)->getInt();
+                int num1 = 0;
+                int rval = rvalue;
+                while (rval > 0)
+                {
+                    if ((rval & 1) == 1)
+                        num1 += 1;
+                    rval = rval >> 1;
+                }
+                if (num1 == 1)
+                {
+                    int b = 0;
+                    rvalue = rvalue >> 1;
+                    while (rvalue)
+                    {
+                        b++;
+                        rvalue = rvalue >> 1;
+                    }
+                    code += space + "asr\tr" + res + ", " + lname + ", #" + to_string(b) + endl;
+                }
+                else
+                {
+                    int C = rvalue;
+                    long Power32 = 0x100000000;
+                    int r = Power32 / C + 1;
+                    code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(int(r & 0xffff)) + endl;
+                    code += space + "movt\tr" + to_string(instrname) + ", #" + to_string(int(r & 0xFFFF0000) >> 16) + endl;
+                    code += space + "smull\tr" + to_string(instrname) + ", r" + to_string(instrname + 1) + ", r" + to_string(instrname) + ", " + lname + endl;
+                    code += space + "asr\tr" + to_string(instrname) + ", " + lname + ", #31" + endl;
+                    code += space + "sub\tr" + to_string(instrname) + ", r" + to_string(instrname + 1) + ", r" + to_string(instrname) + endl;
+                }
+            }
+        }
+        else if (bInst->getKind() == Instruction::kRem)
+        {
+            if (lconst)
+            {
+                code += space + "mov\tr" + to_string(instrname + 1) + ", " + lname + endl;
+                code += space + "sdiv\tr" + res + ", r" + to_string(instrname + 1) + ", " + rname + endl;
+                code += space + "mul\tr" + res + ", r" + to_string(instrname) + ", " + rname + endl;
+                code += space + "sub\tr" + res + ", r" + to_string(instrname + 1) + ", r" + res + endl;
+            }
+            else if (rconst)
+            {
+                int rvalue = dynamic_cast<ConstantValue *>(rhs)->getInt();
+                int num1 = 0;
+                int rval = rvalue;
+                while (rval > 0)
+                {
+                    if ((rval & 1) == 1)
+                        num1 += 1;
+                    rval = rval >> 1;
+                }
+                if (num1 == 1)
+                {
+                    code += space + "and\tr" + res + ", " + lname + ", #" + to_string(rvalue - 1) + endl;
+                }
+                else
+                {
+                    int C = rvalue;
+                    long Power32 = 0x100000000;
+                    int r = Power32 / C + 1;
+                    code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(int(r & 0xffff)) + endl;
+                    code += space + "movt\tr" + to_string(instrname) + ", #" + to_string(int(r & 0xFFFF0000) >> 16) + endl;
+                    code += space + "smull\tr" + to_string(instrname) + ", r" + to_string(instrname + 1) + ", r" + to_string(instrname) + ", " + lname + endl;
+                    code += space + "asr\tr" + to_string(instrname) + ", " + lname + ", #31" + endl;
+                    code += space + "sub\tr" + to_string(instrname) + ", r" + to_string(instrname + 1) + ", r" + to_string(instrname) + endl;
+                    code += space + "mov\tr" + to_string(instrname + 1) + ", #" + to_string(rvalue) + endl;
+                    code += space + "mul\tr" + to_string(instrname + 1) + ", r" + to_string(instrname) + ", r" + to_string(instrname + 1) + endl;
+                    code += space + "sub\tr" + res + ", " + lname + ", r" + to_string(instrname + 1) + endl;
+                }
+            }
+        }
         else if (lconst && rconst)
             return {dstRegId, code};
         else if (bInst->getKind() == Instruction::kICmpEQ)
@@ -1768,6 +1871,7 @@ namespace backend
         case Instruction::kMul:
         case Instruction::kSub:
         case Instruction::kDiv:
+        case Instruction::kRem:
         {
             BinaryInst *bInst = dynamic_cast<BinaryInst *>(instr);
             // registers are used only for instruction operation, consider use which register (any one that is free for use)
