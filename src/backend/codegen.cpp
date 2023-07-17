@@ -747,7 +747,8 @@ namespace backend
                     if (value->isInt())
                     {
                         int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                        code += space + "mov\tr3, #" + to_string(constant_value) + endl;
+                        code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
+                        code += space + "movt\tr3, #" + to_string(constant_value >> 16) + endl;
                         code += space + "str\tr3, [fp, #" + to_string(pos) + "]" + endl;
                     }
                     else if (value->isFloat())
@@ -809,7 +810,8 @@ namespace backend
                     if (value->isInt())
                     {
                         int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                        code += space + "mov\tr3, #" + to_string(constant_value) + endl;
+                        code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
+                        code += space + "movt\tr3, #" + to_string(constant_value >> 16) + endl;
                         code += space + "str\tr3, [r" + first_var->getName() + "]" + endl;
                     }
                     else if (value->isFloat())
@@ -888,7 +890,8 @@ namespace backend
                     if (value->isInt())
                     {
                         int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                        code += space + "mov\tr3, #" + to_string(constant_value) + endl;
+                        code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
+                        code += space + "movt\tr3, #" + to_string(constant_value >> 16) + endl;
                         code += space + "str\tr3, [r10, #" + to_string(pos) + "]" + endl;
                     }
                     else if (value->isFloat())
@@ -948,7 +951,8 @@ namespace backend
                     if (value->isInt())
                     {
                         int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                        code += space + "mov\tr3, #" + to_string(constant_value) + endl;
+                        code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
+                        code += space + "movt\tr3, #" + to_string(constant_value >> 16) + endl;
                         code += space + "str\tr3, [r" + first_var->getName() + "]" + endl;
                     }
                     else if (value->isFloat())
@@ -996,7 +1000,8 @@ namespace backend
                     if (value->isInt())
                     {
                         int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                        code += space + "mov\tr3, #" + to_string(constant_value) + endl;
+                        code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
+                        code += space + "movt\tr3, #" + to_string(constant_value >> 16) + endl;
                         code += space + "str\tr3, [fp, #unk]" + endl;
                     }
                     else if (value->isFloat())
@@ -1065,7 +1070,8 @@ namespace backend
                         if (value->isInt())
                         {
                             int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                            code += space + "mov\tr3, #" + to_string(constant_value) + endl;
+                            code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
+                            code += space + "movt\tr3, #" + to_string(constant_value >> 16) + endl;
                             code += space + "str\tr3, [r0, #" + to_string(pos) + "]" + endl;
                         }
                         else if (value->isFloat())
@@ -1130,7 +1136,8 @@ namespace backend
                         if (value->isInt())
                         {
                             int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                            code += space + "mov\tr3, #" + to_string(constant_value) + endl;
+                            code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
+                            code += space + "movt\tr3, #" + to_string(constant_value >> 16) + endl;
                             code += space + "str\tr3, [r" + first_var->getName() + "]" + endl;
                         }
                         else if (value->isFloat())
@@ -1160,9 +1167,9 @@ namespace backend
                         code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #unk]" + endl;
                         code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r" + to_string(src_reg) + endl;
                         if (value->getType()->isInt())
-                            code += space + "str\tr" + value->getName() + ", [r" + to_string(src_reg) + ", #" + to_string(pos) + "]" + endl;
+                            code += space + "str\tr" + value->getName() + ", [r" + first_var->getName() + "]" + endl;
                         else if (value->getType()->isFloat())
-                            code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r" + to_string(src_reg) + ", #" + to_string(pos) + "]" + endl;
+                            code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r" + first_var->getName() + "]" + endl;
                     }
                 }
             }
