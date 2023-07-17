@@ -694,161 +694,262 @@ namespace backend
     }
     string CodeGen::storeInst_gen(StoreInst *stInst)
     {
-
         string code;
         auto value = stInst->getValue();
         auto pointer = stInst->getPointer();
+        auto type = pointer->getType()->as<PointerType>()->getBaseType();
+        int pos = 0;                              // variable's position in the stack
         int NumIndices = stInst->getNumIndices(); // numindices denotes dimensions of pointer
 
-        auto dims_len = dynamic_cast<AllocaInst *>(pointer)->getDims();
-        int offset_array = 0;
-        int dim = NumIndices - 1;
-        // int full_num = 1;
-        vector<int> dim_len;
-        vector<int> full_num;
-        for (int i = 0; i < NumIndices; i++)
+        // if pointer is a localvariable
+        if (localVarStOffset.find(dynamic_cast<Instruction *>(pointer)) != localVarStOffset.end())
         {
-            dim_len.push_back(dynamic_cast<ConstantValue *>(dynamic_cast<AllocaInst *>(pointer)->getDim(i))->getInt());
-        }
-        reverse(dim_len.begin(), dim_len.end());
-        full_num.push_back(1);
-        for (int i = 0; i < NumIndices; i++)
-        {
-            full_num.push_back(dim_len[i] * full_num[i]);
-        }
-        for (auto iter = stInst->getIndices().begin(); iter != stInst->getIndices().end(); iter++)
-        {
-            // num 是数组下标
-            int num = dynamic_cast<ConstantValue *>(*iter)->getInt();
-            offset_array += num * full_num[dim];
-            // code += to_string(offset_array) + endl;
-            dim -= 1;
-        }
-        if (NumIndices == 0)
-        {
-            if (globalval.find(dynamic_cast<GlobalValue *>(pointer)) != globalval.end())
+            // 局部变量的维度,(起始)地址偏移量
+            auto local_variable = dynamic_cast<AllocaInst *>(pointer);
+            int NumDims = local_variable->getNumDims();
+            pos = localVarStOffset[dynamic_cast<Instruction *>(pointer)];
+            // 局部标量的偏移量(已求出)
+            // 局部数组的偏移量
+            if (NumDims > 0)
             {
-                code += space + "movw\tr10, #:lower16:" + pointer->getName() + endl;
-                code += space + "movt\tr10, #:upper16:" + pointer->getName() + endl;
+                // 求出元素的偏移
+                int offset_array = 0;
+                int dim = NumDims - 1;
+                vector<int> dim_len;
+                vector<int> full_num;
+                for (int i = 0; i < NumDims; i++)
+                    dim_len.push_back(dynamic_cast<ConstantValue *>(local_variable->getDim(i))->getInt());
+                reverse(dim_len.begin(), dim_len.end());
+                full_num.push_back(1);
+                for (int i = 0; i < NumIndices; i++)
+                    full_num.push_back(dim_len[i] * full_num[i]);
+                for (auto iter = stInst->getIndices().begin(); iter != stInst->getIndices().end(); iter++)
+                {
+                    // index 是数组下标
+                    int index = dynamic_cast<ConstantValue *>(*iter)->getInt();
+                    offset_array += index * full_num[dim--];
+                }
+                pos += offset_array * 4;
+            }
+            // 存入常数
+            if (isa<ConstantValue>(value))
+            {
+                if (value->isInt())
+                {
+                    int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
+                    code += space + "mov\tr3, #" + to_string(constant_value) + endl;
+                    code += space + "str\tr3, [fp, #" + to_string(pos) + "]" + endl;
+                }
+                else if (value->isFloat())
+                {
+                    float constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
+                    unsigned dec;
+                    std::memcpy(&dec, &constant_value, sizeof(dec));
+                    code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
+                    code += space + "movt\tr3, #" + to_string(dec >> 16) + endl;
+                    code += space + "str\tr3, [fp, #" + to_string(pos) + "]\t@ float" + endl;
+                }
+            }
+            // 存入函数返回值
+            else if (isa<CallInst>(value))
+            {
+                if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
+                    code += space + "str\tr0, [fp, #" + to_string(pos) + "]" + endl;
+                else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
+                    code += space + "vstr.32\ts0, [fp, #" + to_string(pos) + "]" + endl;
+            }
+            // 存入其他值
+            else
+            {
+                if (value->getType()->isInt())
+                    code += space + "str\tr" + value->getName() + ", [fp, #" + to_string(pos) + "]" + endl;
+                else if (value->getType()->isFloat())
+                    code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [fp, #" + to_string(pos) + "]" + endl;
+            }
+        }
+        // if pointer is a globalvalue
+        else if (globalval.find(dynamic_cast<GlobalValue *>(pointer)) != globalval.end())
+        {
+            // 全局变量的维度,(起始)地址偏移量
+            auto global_value = dynamic_cast<GlobalValue *>(pointer);
+            int NumDims = global_value->getNumDims();
+            pos = 0;
+            // 获取全局数组(首)地址
+            code += space + "movw\tr10, #:lower16:" + pointer->getName() + endl;
+            code += space + "movt\tr10, #:upper16:" + pointer->getName() + endl;
+            // 全局数组的偏移量
+            if (NumDims > 0)
+            {
+                // 求出元素的偏移
+                int offset_array = 0;
+                int dim = NumDims - 1;
+                vector<int> dim_len;
+                vector<int> full_num;
+                for (int i = 0; i < NumDims; i++)
+                    dim_len.push_back(dynamic_cast<ConstantValue *>(global_value->getDim(i))->getInt());
+                reverse(dim_len.begin(), dim_len.end());
+                full_num.push_back(1);
+                for (int i = 0; i < NumIndices; i++)
+                    full_num.push_back(dim_len[i] * full_num[i]);
+                for (auto iter = stInst->getIndices().begin(); iter != stInst->getIndices().end(); iter++)
+                {
+                    // index 是数组下标
+                    int index = dynamic_cast<ConstantValue *>(*iter)->getInt();
+                    offset_array += index * full_num[dim--];
+                }
+                pos += offset_array * 4;
+            }
+            // 存入常数
+            if (isa<ConstantValue>(value))
+            {
+                if (value->isInt())
+                {
+                    int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
+                    code += space + "mov\tr3, #" + to_string(constant_value) + endl;
+                    code += space + "str\tr3, [r10, #" + to_string(pos) + "]" + endl;
+                }
+                else if (value->isFloat())
+                {
+                    float constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
+                    unsigned dec;
+                    std::memcpy(&dec, &constant_value, sizeof(dec));
+                    code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
+                    code += space + "movt\tr3, #" + to_string(dec >> 16) + endl;
+                    code += space + "str\tr3, [r10, #" + to_string(pos) + "]\t@ float" + endl;
+                }
+            }
+            // 存入函数返回值
+            else if (isa<CallInst>(value))
+            {
+                if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
+                    code += space + "str\tr0, [r10, #" + to_string(pos) + "]" + endl;
+                else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
+                    code += space + "vstr.32\ts0, [r10, #" + to_string(pos) + "]" + endl;
+            }
+            // 存入其他值
+            else
+            {
+                if (value->getType()->isInt())
+                    code += space + "str\tr" + value->getName() + ", [r10, #" + to_string(pos) + "]" + endl;
+                else if (value->getType()->isFloat())
+                    code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r10, #" + to_string(pos) + "]" + endl;
+            }
+
+            return code;
+        }
+        // if pointer is an argument
+        else
+        {
+            // 参数的维度,(起始)地址偏移量
+            auto arg = dynamic_cast<Argument *>(pointer);
+            int NumDims = arg->getNumDims();
+            pos = 0;
+            // 参数标量
+            if (NumDims == 0)
+            {
+                // 存入常数
                 if (isa<ConstantValue>(value))
                 {
                     if (value->isInt())
                     {
                         int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
                         code += space + "mov\tr3, #" + to_string(constant_value) + endl;
-                        code += space + "str\tr3, [r10]" + endl;
+                        code += space + "str\tr3, [fp, #unk]" + endl;
                     }
                     else if (value->isFloat())
                     {
-                        double constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
+                        float constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
                         unsigned dec;
                         std::memcpy(&dec, &constant_value, sizeof(dec));
                         code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
                         code += space + "movt\tr3, #" + to_string(dec >> 16) + endl;
-                        code += space + "str\tr3, [r10]\t@ float" + endl;
+                        code += space + "str\tr3, [fp, #unk]\t@ float" + endl;
                     }
                 }
+                // 存入函数返回值
                 else if (isa<CallInst>(value))
                 {
                     if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
-                        code += space + "str\tr0, [r10]" + endl;
+                        code += space + "str\tr0, [fp, #unk]" + endl;
                     else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
-                        code += space + "vstr.32\tr0, [r10]" + endl;
+                        code += space + "vstr.32\ts0, [fp, #unk]" + endl;
                 }
+                // 存入其他值
                 else
                 {
                     if (value->getType()->isInt())
-                        code += space + "str\tr" + value->getName() + ", [r10]" + endl;
+                        code += space + "str\tr" + value->getName() + ", [fp, #unk]" + endl;
                     else if (value->getType()->isFloat())
-                        code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r10]" + endl;
+                        code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [fp, #unk]" + endl;
                 }
-                return code;
             }
-            int offset;
-            if (localVarStOffset.find(dynamic_cast<Instruction *>(pointer)) != localVarStOffset.end())
-                offset = localVarStOffset[dynamic_cast<Instruction *>(pointer)];
-            else if (paramsStOffset.find(dynamic_cast<Argument *>(pointer)) != paramsStOffset.end())
-                offset = paramsStOffset[dynamic_cast<Argument *>(pointer)];
-            if (isa<ConstantValue>(value))
+            // 参数数组
+            else if (NumDims > 0)
             {
-                if (value->isInt())
+                // 求出元素的偏移/数组的首地址偏移
+                int offset_array = 0;
+                int dim = NumDims - 1;
+                vector<int> dim_len;
+                vector<int> full_num;
+                for (int i = 0; i < NumDims; i++)
+                    dim_len.push_back(arg->getDim(i));
+                reverse(dim_len.begin(), dim_len.end());
+                full_num.push_back(1);
+                for (int i = 0; i < NumIndices; i++)
+                    full_num.push_back(dim_len[i] * full_num[i]);
+                for (auto iter = stInst->getIndices().begin(); iter != stInst->getIndices().end(); iter++)
                 {
-                    int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                    code += space + "mov\tr3, #" + to_string(constant_value) + endl;
-                    code += space + "str\tr3, [fp, #" + to_string(offset) + "]" + endl;
+                    // index 是数组下标
+                    int index = dynamic_cast<ConstantValue *>(*iter)->getInt();
+                    offset_array += index * full_num[dim--];
                 }
-                else if (value->isFloat())
-                {
-                    float constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
+                pos += offset_array * 4;
 
-                    unsigned dec;
-                    std::memcpy(&dec, &constant_value, sizeof(dec));
-                    code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
-                    code += space + "movt\tr3, #" + to_string(dec >> 16) + endl;
-                    code += space + "str\tr3, [fp, #" + to_string(offset) + "]\t@ float" + endl;
-                }
-            }
-            else if (isa<CallInst>(value))
-            {
-                if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
-                    code += space + "str\tr0, [fp, #" + to_string(offset) + "]" + endl;
-                else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
-                    code += space + "vstr.32\ts0, [fp, #" + to_string(offset) + "]" + endl;
-            }
-            else
-            {
-                if (value->getType()->isInt())
-                    code += space + "str\tr" + value->getName() + ", [fp, #" + to_string(offset) + "]" + endl;
-                else if (value->getType()->isFloat())
-                    code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [fp, #" + to_string(offset) + "]" + endl;
-            }
-        }
-        else // 如果store的是数组
-             // 数组是全局变量还没实现
-        {
-            int offset;
-            if (localVarStOffset.find(dynamic_cast<Instruction *>(pointer)) != localVarStOffset.end())
-                // offset = localVarStOffset[dynamic_cast<Instruction *>(pointer)];
-                offset = top_offset + (offset_array + 1) * 4;
-            else if (paramsStOffset.find(dynamic_cast<Argument *>(pointer)) != paramsStOffset.end())
-                offset = paramsStOffset[dynamic_cast<Argument *>(pointer)];
-            if (isa<ConstantValue>(value))
-            {
-                if (value->isInt())
+                // 存入常数
+                if (isa<ConstantValue>(value))
                 {
-                    int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                    code += space + "mov\tr3, #" + to_string(constant_value) + endl;
-                    code += space + "str\tr3, [fp, #" + to_string(offset) + "]" + endl;
+                    code += space + "ldr\tr0, [fp, #unk]" + endl;
+                    if (value->isInt())
+                    {
+                        int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
+                        code += space + "mov\tr3, #" + to_string(constant_value) + endl;
+                        code += space + "str\tr3, [r0, #" + to_string(pos) + "]" + endl;
+                    }
+                    else if (value->isFloat())
+                    {
+                        float constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
+                        unsigned dec;
+                        std::memcpy(&dec, &constant_value, sizeof(dec));
+                        code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
+                        code += space + "movt\tr3, #" + to_string(dec >> 16) + endl;
+                        code += space + "str\tr3, [r0, #" + to_string(pos) + "]\t@ float" + endl;
+                    }
                 }
-                else if (value->isFloat())
+                // 存入函数返回值
+                else if (isa<CallInst>(value))
                 {
-                    float constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
-
-                    unsigned dec;
-                    std::memcpy(&dec, &constant_value, sizeof(dec));
-                    code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
-                    code += space + "movt\tr3, #" + to_string(dec >> 16) + endl;
-                    code += space + "str\tr3, [fp, #" + to_string(offset) + "]\t@ float" + endl;
+                    code += space + "ldr\tr1, [fp, #unk]" + endl;
+                    if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
+                        code += space + "str\tr0, [r1, #" + to_string(pos) + "]" + endl;
+                    else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
+                        code += space + "vstr.32\ts0, [r1, #" + to_string(pos) + "]" + endl;
                 }
+                // 存入其他值
+                else
+                {
+                    int src_reg = (1 + std::stoi(value->getName())) % 11;
+                    code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #unk]" + endl;
+                    if (value->getType()->isInt())
+                        code += space + "str\tr" + value->getName() + ", [r" + to_string(src_reg) + ", #" + to_string(pos) + "]" + endl;
+                    else if (value->getType()->isFloat())
+                        code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r" + to_string(src_reg) + ", #" + to_string(pos) + "]" + endl;
+                }
+                backpatch.push_back(arg);
             }
-            else if (isa<CallInst>(value))
-            {
-                if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
-                    code += space + "str\tr0, [fp, #" + to_string(offset) + "]" + endl;
-                else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
-                    code += space + "vstr.32\ts0, [fp, #" + to_string(offset) + "]" + endl;
-            }
-            else
-            {
-                if (value->getType()->isInt())
-                    code += space + "str\tr" + value->getName() + ", [fp, #" + to_string(offset) + "]" + endl;
-                else if (value->getType()->isFloat())
-                    code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [fp, #" + to_string(offset) + "]" + endl;
-            }
+            backpatch.push_back(arg);
         }
         return code;
     }
-
     pair<RegId, string> CodeGen::loadInst_gen(LoadInst *ldInst, RegId dstRegId)
     {
         string code;
@@ -857,8 +958,7 @@ namespace backend
         // variable to be loaded
         auto pointer = ldInst->getPointer();
         auto type = pointer->getType()->as<PointerType>()->getBaseType();
-        // variable's position in the stack
-        int pos;
+        int pos;                                  // variable's position in the stack
         int NumIndices = ldInst->getNumIndices(); // numindices denotes dimensions of pointer
 
         // if pointer is a localvariable
@@ -962,13 +1062,14 @@ namespace backend
                 // load出一个(子)数组,求出其首地址
                 else if (NumIndices < NumDims)
                 {
-                    code += space + "add\tr10, r10, #" + to_string(pos) + endl;
+                    code += space + "add\tr" + to_string(reg_num) + ", r10, #" + to_string(pos) + endl;
                 }
             }
         }
         // if pointer is an argument
         else
-        { // 参数的维度,(起始)地址偏移量
+        {
+            // 参数的维度,(起始)地址偏移量
             auto arg = dynamic_cast<Argument *>(pointer);
             int NumDims = arg->getNumDims();
             pos = 0;
