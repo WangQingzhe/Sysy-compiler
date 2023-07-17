@@ -789,7 +789,8 @@ namespace backend
                         dim--;
                     else if (flag == false)
                     {
-                        code += space + "mov\tr10, #" + to_string(full_num[dim--]) + endl;
+                        code += space + "movw\tr10, #" + to_string(full_num[dim--] & 0x0000ffff) + endl;
+                        code += space + "movt\tr10, #" + to_string(full_num[dim--] >> 16) + endl;
                         code += space + "mul\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", r10" + endl;
                         code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(offset_array) + endl;
                         flag = true;
@@ -932,7 +933,8 @@ namespace backend
                         dim--;
                     else if (flag == false)
                     {
-                        code += space + "mov\tr9, #" + to_string(full_num[dim--]) + endl;
+                        code += space + "movw\tr9, #" + to_string(full_num[dim--] & 0x0000FFFF) + endl;
+                        code += space + "movt\tr9, #" + to_string(full_num[dim--] >> 16) + endl;
                         code += space + "mul\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", r9" + endl;
                         code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(offset_array) + endl;
                         flag = true;
@@ -1116,14 +1118,16 @@ namespace backend
                             dim--;
                         else if (flag == false)
                         {
-                            code += space + "mov\tr10, #" + to_string(full_num[dim--]) + endl;
+                            code += space + "movw\tr10, #" + to_string(full_num[dim--] & 0x0000FFFF) + endl;
+                            code += space + "movt\tr10, #" + to_string(full_num[dim--] >> 16) + endl;
                             code += space + "mul\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", r10" + endl;
                             code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(offset_array) + endl;
                             flag = true;
                         }
                         else
                         {
-                            code += space + "mov\tr10, #" + to_string(full_num[dim--]) + endl;
+                            code += space + "movw\tr10, #" + to_string(full_num[dim--] && 0x0000FFFF) + endl;
+                            code += space + "movt\tr10, #" + to_string(full_num[dim--] >> 16) + endl;
                             code += space + "mla\tr" + first_var->getName() + ", r" + (*iter)->getName() + ", r10, r" + first_var->getName() + endl;
                         }
                     }
@@ -1260,14 +1264,16 @@ namespace backend
                             dim--;
                         else if (flag == false)
                         {
-                            code += space + "mov\tr10, #" + to_string(full_num[dim--]) + endl;
+                            code += space + "movw\tr10, #" + to_string(full_num[dim--] & 0x0000FFFF) + endl;
+                            code += space + "movt\tr10, #" + to_string(full_num[dim--] >> 16) + endl;
                             code += space + "mul\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", r10" + endl;
                             code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(offset_array) + endl;
                             flag = true;
                         }
                         else
                         {
-                            code += space + "mov\tr10, #" + to_string(full_num[dim--]) + endl;
+                            code += space + "movw\tr10, #" + to_string(full_num[dim--] & 0x0000FFFF) + endl;
+                            code += space + "movt\tr10, #" + to_string(full_num[dim--] >> 16) + endl;
                             code += space + "mla\tr" + first_var->getName() + ", r" + (*iter)->getName() + ", r10, r" + first_var->getName() + endl;
                         }
                     }
@@ -1365,7 +1371,8 @@ namespace backend
                             dim--;
                         else if (flag == false)
                         {
-                            code += space + "mov\tr9, #" + to_string(full_num[dim--]) + endl;
+                            code += space + "movw\tr9, #" + to_string(full_num[dim--] & 0x0000FFFF) + endl;
+                            code += space + "movt\tr9, #" + to_string(full_num[dim--] >> 16) + endl;
                             code += space + "mul\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", r9" + endl;
                             code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(offset_array) + endl;
                             flag = true;
@@ -1468,7 +1475,8 @@ namespace backend
                             dim--;
                         else if (flag == false)
                         {
-                            code += space + "mov\tr10, #" + to_string(full_num[dim--]) + endl;
+                            code += space + "movw\tr10, #" + to_string(full_num[dim--] & 0x0000FFFF) + endl;
+                            code += space + "movt\tr10, #" + to_string(full_num[dim--] >> 16) + endl;
                             code += space + "mul\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", r10" + endl;
                             code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(offset_array) + endl;
                             flag = true;
