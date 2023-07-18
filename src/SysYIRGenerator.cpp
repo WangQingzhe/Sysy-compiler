@@ -326,9 +326,6 @@ namespace sysy
 
   any SysYIRGenerator::visitAssignStmt(SysYParser::AssignStmtContext *ctx)
   {
-    vector<Value *> indices;
-    for (auto exp : ctx->lValue()->exp())
-      indices.push_back(any_cast<Value *>(exp->accept(this)));
     // generate the rhs expression
     auto rhs = any_cast<Value *>(ctx->exp()->accept(this));
     // get the address of the lhs variable
@@ -356,6 +353,9 @@ namespace sysy
     else if (pointer->getType()->as<PointerType>()->getBaseType()->isFloat() && rhs->getType()->isInt())
       rhs = builder.createIToFInst(rhs);
     // update the variable
+    vector<Value *> indices;
+    for (auto exp : ctx->lValue()->exp())
+      indices.push_back(any_cast<Value *>(exp->accept(this)));
     Value *store = builder.createStoreInst(rhs, pointer, indices);
     return store;
   }

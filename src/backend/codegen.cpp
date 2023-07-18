@@ -912,21 +912,22 @@ namespace backend
                 // 存入常数
                 if (isa<ConstantValue>(value))
                 {
+                    int src_reg = std::stoi(first_var->getName()) + 1;
                     if (value->isInt())
                     {
                         int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                        code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
-                        code += space + "movt\tr3, #" + to_string(constant_value >> 16) + endl;
-                        code += space + "str\tr3, [r" + first_var->getName() + "]" + endl;
+                        code += space + "movw\tr" + to_string(src_reg) + ", #" + to_string(constant_value & 0x0000FFFF) + endl;
+                        code += space + "movt\tr" + to_string(src_reg) + ", #" + to_string(constant_value >> 16) + endl;
+                        code += space + "str\tr" + to_string(src_reg) + ", [r " + first_var->getName() + "] " + endl;
                     }
                     else if (value->isFloat())
                     {
                         float constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
                         unsigned dec;
                         std::memcpy(&dec, &constant_value, sizeof(dec));
-                        code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
-                        code += space + "movt\tr3, #" + to_string(dec >> 16) + endl;
-                        code += space + "str\tr3, [r" + first_var->getName() + "]\t@ float" + endl;
+                        code += space + "movw\tr" + to_string(src_reg) + ", #" + to_string(dec & 0x0000FFFF) + endl;
+                        code += space + "movt\tr" + to_string(src_reg) + ", #" + to_string(dec >> 16) + endl;
+                        code += space + "str\tr" + to_string(src_reg) + ", [r" + first_var->getName() + "]\t@ float" + endl;
                     }
                 }
                 // 存入函数返回值
@@ -1055,21 +1056,22 @@ namespace backend
                 // 存入常数
                 if (isa<ConstantValue>(value))
                 {
+                    int src_reg = std::stoi(first_var->getName()) + 1;
                     if (value->isInt())
                     {
                         int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                        code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
-                        code += space + "movt\tr3, #" + to_string(constant_value >> 16) + endl;
-                        code += space + "str\tr3, [r" + first_var->getName() + "]" + endl;
+                        code += space + "movw\tr" + to_string(src_reg) + ", #" + to_string(constant_value & 0x0000FFFF) + endl;
+                        code += space + "movt\tr" + to_string(src_reg) + ", #" + to_string(constant_value >> 16) + endl;
+                        code += space + "str\tr" + to_string(src_reg) + ", [r" + first_var->getName() + "]" + endl;
                     }
                     else if (value->isFloat())
                     {
                         float constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
                         unsigned dec;
                         std::memcpy(&dec, &constant_value, sizeof(dec));
-                        code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
-                        code += space + "movt\tr3, #" + to_string(dec >> 16) + endl;
-                        code += space + "str\tr3, [r" + first_var->getName() + "]\t@ float" + endl;
+                        code += space + "movw\tr" + to_string(src_reg) + ", #" + to_string(dec & 0x0000FFFF) + endl;
+                        code += space + "movt\tr" + to_string(src_reg) + ", #" + to_string(dec >> 16) + endl;
+                        code += space + "str\tr" + to_string(src_reg) + ", [r" + first_var->getName() + "]\t@ float" + endl;
                     }
                 }
                 // 存入函数返回值
@@ -1240,42 +1242,42 @@ namespace backend
                         }
                     }
                     code += space + "lsl\tr" + first_var->getName() + ", r" + first_var->getName() + ", #2" + endl;
+                    int src_reg = (1 + std::stoi(first_var->getName())) % 11;
                     // 存入常数
                     if (isa<ConstantValue>(value))
                     {
-                        code += space + "ldr\tr1, [fp, #unk]" + endl;
-                        code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r1" + endl;
+                        code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #unk]" + endl;
+                        code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r" + to_string(src_reg) + endl;
                         if (value->isInt())
                         {
                             int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                            code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
-                            code += space + "movt\tr3, #" + to_string(constant_value >> 16) + endl;
-                            code += space + "str\tr3, [r" + first_var->getName() + "]" + endl;
+                            code += space + "movw\tr" + to_string(src_reg) + ", #" + to_string(constant_value & 0x0000FFFF) + endl;
+                            code += space + "movt\tr" + to_string(src_reg) + ", #" + to_string(constant_value >> 16) + endl;
+                            code += space + "str\tr" + to_string(src_reg) + ", [r" + first_var->getName() + "]" + endl;
                         }
                         else if (value->isFloat())
                         {
                             float constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
                             unsigned dec;
                             std::memcpy(&dec, &constant_value, sizeof(dec));
-                            code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
-                            code += space + "movt\tr3, #" + to_string(dec >> 16) + endl;
-                            code += space + "str\tr3, [r" + first_var->getName() + "]\t@ float" + endl;
+                            code += space + "movw\tr" + to_string(src_reg) + ", #" + to_string(dec & 0x0000FFFF) + endl;
+                            code += space + "movt\tr" + to_string(src_reg) + ", #" + to_string(dec >> 16) + endl;
+                            code += space + "str\tr" + to_string(src_reg) + ", [r" + first_var->getName() + "]\t@ float" + endl;
                         }
                     }
                     // 存入函数返回值
                     else if (isa<CallInst>(value))
                     {
-                        code += space + "ldr\tr1, [fp, #unk]" + endl;
-                        code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r1" + endl;
+                        code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #unk]" + endl;
+                        code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r" + to_string(src_reg) + endl;
                         if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
-                            code += space + "str\tr" + to_string(std::stoi(value->getName()) + 1) + ", [r" + first_var->getName() + "]" + endl;
+                            code += space + "str\tr0, [r" + first_var->getName() + "]" + endl;
                         else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
                             code += space + "vstr.32\ts0, [r" + first_var->getName() + "]" + endl;
                     }
                     // 存入其他值
                     else
                     {
-                        int src_reg = (1 + std::stoi(value->getName())) % 11;
                         code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #unk]" + endl;
                         code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r" + to_string(src_reg) + endl;
                         if (value->getType()->isInt())
@@ -1630,7 +1632,10 @@ namespace backend
         if (isa<ConstantValue>(retval))
         {
             if (retval->getType()->isInt())
-                code += space + "mov\tr0, #" + to_string(dynamic_cast<ConstantValue *>(retval)->getInt()) + endl;
+            {
+                code += space + "movw\tr0, #" + to_string(dynamic_cast<ConstantValue *>(retval)->getInt() & 0x0000FFFF) + endl;
+                code += space + "movt\tr0, #" + to_string(dynamic_cast<ConstantValue *>(retval)->getInt() >> 16) + endl;
+            }
             else if (retval->getType()->isFloat())
             {
                 unsigned num1;
