@@ -498,6 +498,7 @@ namespace backend
             else if (rconst)
             {
                 int rvalue = dynamic_cast<ConstantValue *>(rhs)->getInt();
+                rvalue = rvalue > 0 ? rvalue : -rvalue;
                 int num1 = 0;
                 int rval = rvalue;
                 while (rval > 0)
@@ -520,7 +521,8 @@ namespace backend
                     code += space + "smull\tr" + to_string(instrname) + ", r" + to_string(instrname + 1) + ", r" + to_string(instrname) + ", " + lname + endl;
                     code += space + "asr\tr" + to_string(instrname) + ", " + lname + ", #31" + endl;
                     code += space + "sub\tr" + to_string(instrname) + ", r" + to_string(instrname + 1) + ", r" + to_string(instrname) + endl;
-                    code += space + "mov\tr" + to_string(instrname + 1) + ", #" + to_string(rvalue) + endl;
+                    code += space + "movw\tr" + to_string(instrname + 1) + ", #" + to_string(rvalue & 0xffff) + endl;
+                    code += space + "movt\tr" + to_string(instrname + 1) + ", #" + to_string(((rvalue >> 16) & 0xffff)) + endl;
                     code += space + "mul\tr" + to_string(instrname + 1) + ", r" + to_string(instrname) + ", r" + to_string(instrname + 1) + endl;
                     code += space + "sub\tr" + res + ", " + lname + ", r" + to_string(instrname + 1) + endl;
                 }
