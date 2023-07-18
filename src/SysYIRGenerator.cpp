@@ -664,9 +664,15 @@ namespace sysy
     vector<Value *> args;
     if (auto rArgs = ctx->funcRParams())
     {
+      auto iter = func->getParamTypes().begin();
       for (auto exp : rArgs->exp())
       {
-        args.push_back(any_cast<Value *>(exp->accept(this)));
+        Value *arg = any_cast<Value *>(exp->accept(this));
+        if ((*iter)->isInt() && arg->getType()->isFloat())
+          arg = builder.createFtoIInst(arg);
+        else if ((*iter)->isFloat() && arg->getType()->isInt())
+          arg = builder.createIToFInst(arg);
+        args.push_back(arg);
       }
     }
     Value *call = builder.createCallInst(func, args);

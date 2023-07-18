@@ -819,6 +819,7 @@ namespace backend
         else if (uInst->getKind() == Instruction::kItoF)
         {
             val_name = "s" + to_string(15 - std::stoi(val->getName()));
+            code += space + "vmov\t" + val_name + ", r" + val->getName() + endl;
             code += space + "vcvt.f32.s32\ts" + to_string(15 - std::stoi(uInst->getName())) + "," + val_name + endl;
         }
         return {dstRegId, code};
@@ -1297,11 +1298,10 @@ namespace backend
                     {
                         int src_reg = (1 + std::stoi(value->getName())) % 11;
                         code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #unk]" + endl;
-                        code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r" + to_string(src_reg) + endl;
                         if (value->getType()->isInt())
-                            code += space + "str\tr" + value->getName() + ", [r" + first_var->getName() + "]" + endl;
+                            code += space + "str\tr" + value->getName() + ", [r" + to_string(src_reg) + "]" + endl;
                         else if (value->getType()->isFloat())
-                            code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r" + first_var->getName() + "]" + endl;
+                            code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r" + to_string(src_reg) + "]" + endl;
                     }
                 }
                 // 数组下标含有变量
