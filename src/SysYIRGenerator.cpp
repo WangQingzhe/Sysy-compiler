@@ -707,6 +707,7 @@ namespace sysy
       exitblock->getPredecessors().push_back(current_block);
       Value *CondBr = builder.createCondBrInst(cond, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
       builder.poptarget();
+      func->resetVariableID();
       builder.setPosition(thenblock, thenblock->begin());
       visitStmt(ctx->stmt()[0]);
       Value *then_br = builder.createUncondBrInst(exitblock, vector<Value *>());
@@ -738,6 +739,7 @@ namespace sysy
       auto cond = any_cast<Value *>(ctx->exp()->accept(this));
       CondBrInst *CondBr = builder.createCondBrInst(cond, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
       builder.poptarget();
+      func->resetVariableID();
       builder.setPosition(thenblock, thenblock->begin());
       visitStmt(ctx->stmt()[0]);
       Value *then_br = builder.createUncondBrInst(exitblock, vector<Value *>());
@@ -760,6 +762,7 @@ namespace sysy
     char headername[20];
     sprintf(headername, "header%d", builder.get_whilecnt());
     auto headerblock = func->addBasicBlock(headername);
+    Value *head_uncondbr = builder.createUncondBrInst(headerblock, vector<Value *>{});
     builder.setPosition(headerblock, headerblock->begin());
     current_block->getSuccessors().push_back(headerblock);
     headerblock->getPredecessors().push_back(current_block);
@@ -790,6 +793,7 @@ namespace sysy
     // create condbr in header
     Value *header_condbr = builder.createCondBrInst(cond, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
     builder.poptarget();
+    func->resetVariableID();
     // generate code in body block
     builder.setPosition(bodyblock, bodyblock->begin());
     visitStmt(ctx->stmt());

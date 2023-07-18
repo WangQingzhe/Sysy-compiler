@@ -1049,7 +1049,7 @@ namespace sysy
       blocks.remove_if([&](std::unique_ptr<BasicBlock> &b) -> bool
                        { return block == b.get(); });
     }
-    int allocateVariableID() { return variableID++; }
+    int allocateVariableID() { return variableID++ % 11; }
     void resetVariableID() { variableID = 0; }
     int allocateblockID() { return blockID++; }
 
