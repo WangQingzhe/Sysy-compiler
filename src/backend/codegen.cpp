@@ -815,6 +815,7 @@ namespace backend
         {
             val_name = "s" + to_string(15 - std::stoi(val->getName()));
             code += space + "vcvt.s32.f32\ts" + to_string(15 - std::stoi(uInst->getName())) + "," + val_name + endl;
+            code += space + "vmov\tr" + to_string(std::stoi(uInst->getName())) + ", s" + to_string(15 - std::stoi(uInst->getName())) + endl;
         }
         else if (uInst->getKind() == Instruction::kItoF)
         {
