@@ -1008,7 +1008,7 @@ namespace backend
                         int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
                         code += space + "movw\tr" + to_string(src_reg) + ", #" + to_string(unsigned(constant_value & 0x0000FFFF)) + endl;
                         code += space + "movt\tr" + to_string(src_reg) + ", #" + to_string(unsigned((constant_value >> 16) & 0xffff)) + endl;
-                        code += space + "str\tr" + to_string(src_reg) + ", [r " + first_var->getName() + "] " + endl;
+                        code += space + "str\tr" + to_string(src_reg) + ", [r" + first_var->getName() + "] " + endl;
                     }
                     else if (value->isFloat())
                     {
@@ -1662,7 +1662,7 @@ namespace backend
                     else if (NumIndices < NumDims)
                     {
                         code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #unk]" + endl;
-                        code += space + "add\tr" + to_string(reg_num) + ", fp, #" + to_string(pos) + endl;
+                        code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(pos) + endl;
                     }
                 }
                 // 数组下标含有变量
