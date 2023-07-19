@@ -722,7 +722,12 @@ namespace sysy
       for (auto exp : rArgs->exp())
       {
         Value *arg = any_cast<Value *>(exp->accept(this));
-        if ((*iter)->isInt() && arg->getType()->isFloat())
+        if (isa<ConstantValue>(arg))
+        {
+          auto parent_func = builder.getBasicBlock()->getParent();
+          int id = parent_func->allocateVariableID();
+        }
+        else if ((*iter)->isInt() && arg->getType()->isFloat())
           arg = builder.createFtoIInst(arg);
         else if ((*iter)->isFloat() && arg->getType()->isInt())
           arg = builder.createIToFInst(arg);
