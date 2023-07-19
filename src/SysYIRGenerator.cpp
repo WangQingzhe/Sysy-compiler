@@ -689,19 +689,22 @@ namespace sysy
         ctx->exp() ? any_cast<Value *>(ctx->exp()->accept(this)) : nullptr;
     auto current_block = builder.getBasicBlock();
     auto func = current_block->getParent();
-    if (func->getReturnType()->isInt() && value->getType()->isFloat())
+    if (value)
     {
-      if (isa<ConstantValue>(value))
-        value = ConstantValue::get((int)dynamic_cast<ConstantValue *>(value)->getDouble());
-      else
-        value = builder.createFtoIInst(value);
-    }
-    else if (func->getReturnType()->isFloat() && value->getType()->isInt())
-    {
-      if (isa<ConstantValue>(value))
-        value = ConstantValue::get((float)dynamic_cast<ConstantValue *>(value)->getInt());
-      else
-        value = builder.createIToFInst(value);
+      if (func->getReturnType()->isInt() && value->getType()->isFloat())
+      {
+        if (isa<ConstantValue>(value))
+          value = ConstantValue::get((int)dynamic_cast<ConstantValue *>(value)->getDouble());
+        else
+          value = builder.createFtoIInst(value);
+      }
+      else if (func->getReturnType()->isFloat() && value->getType()->isInt())
+      {
+        if (isa<ConstantValue>(value))
+          value = ConstantValue::get((float)dynamic_cast<ConstantValue *>(value)->getInt());
+        else
+          value = builder.createIToFInst(value);
+      }
     }
     Value *result = builder.createReturnInst(value, current_block);
     return result;

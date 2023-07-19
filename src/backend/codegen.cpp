@@ -1871,7 +1871,9 @@ namespace backend
         string code;
         string func_exit = retInst->getFunction()->getName() + "_exit";
         auto retval = retInst->getReturnValue();
-        if (isa<ConstantValue>(retval))
+        if (retval == nullptr)
+            ;
+        else if (isa<ConstantValue>(retval))
         {
             if (retval->getType()->isInt())
             {
@@ -1892,7 +1894,7 @@ namespace backend
         }
         else if (isa<CallInst>(retval))
             ;
-        else
+        else if (retval)
         {
             if (retval->getKind() == Instruction::kFtoI)
                 code += space + "vmov\tr0,s" + to_string(15 - stoi(retval->getName())) + endl;
