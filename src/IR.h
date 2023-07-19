@@ -558,6 +558,7 @@ namespace sysy
   protected:
     Kind kind;
     BasicBlock *parent;
+    bool need_to_store = false;
 
   protected:
     Instruction(Kind kind, Type *type, BasicBlock *parent = nullptr,
@@ -574,6 +575,8 @@ namespace sysy
     BasicBlock *getParent() const { return parent; }
     Function *getFunction() const { return parent->getParent(); }
     void setParent(BasicBlock *bb) { parent = bb; }
+    void set_store() { need_to_store = true; }
+    bool NeedToStore() { return need_to_store; }
 
     bool isBinary() const
     {

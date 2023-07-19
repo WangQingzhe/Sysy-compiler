@@ -485,6 +485,8 @@ namespace sysy
     // generate the operands
     auto lhs = any_cast<Value *>(ctx->exp(0)->accept(this));
     auto rhs = any_cast<Value *>(ctx->exp(1)->accept(this));
+    if (isa<CallInst>(rhs) && !isa<ConstantValue>(lhs))
+      dynamic_cast<Instruction *>(lhs)->set_store();
     // judge if lhs is a constant
     bool lconst = false;
     int lint = 0;
@@ -583,6 +585,8 @@ namespace sysy
     // generate the operands
     auto lhs = any_cast<Value *>(ctx->exp(0)->accept(this));
     auto rhs = any_cast<Value *>(ctx->exp(1)->accept(this));
+    if (isa<CallInst>(rhs) && !isa<ConstantValue>(lhs))
+      dynamic_cast<Instruction *>(lhs)->set_store();
     // judge if lhs is a constant
     bool lconst = false;
     int lint = 0;
@@ -933,6 +937,8 @@ namespace sysy
     // generate the operands
     auto lhs = any_cast<Value *>(ctx->exp(0)->accept(this));
     auto rhs = any_cast<Value *>(ctx->exp(1)->accept(this));
+    if (isa<CallInst>(rhs) && !isa<ConstantValue>(lhs))
+      dynamic_cast<Instruction *>(lhs)->set_store();
     // create convert instruction if needed
     auto lhsTy = lhs->getType();
     auto rhsTy = rhs->getType();
@@ -963,6 +969,8 @@ namespace sysy
     // generate the operands
     auto lhs = any_cast<Value *>(ctx->exp(0)->accept(this));
     auto rhs = any_cast<Value *>(ctx->exp(1)->accept(this));
+    if (isa<CallInst>(rhs) && !isa<ConstantValue>(lhs))
+      dynamic_cast<Instruction *>(lhs)->set_store();
     // create convert instruction if needed
     auto lhsTy = lhs->getType();
     auto rhsTy = rhs->getType();

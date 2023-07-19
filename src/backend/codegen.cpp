@@ -174,7 +174,6 @@ namespace backend
         haveCall = false;
         clearFunctionRecord(func);
         string bbCode;
-        auto bbs = func->getBasicBlocks();
         // if there is callinst in function
         auto bbs = func->getBasicBlocks();
         for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
@@ -260,9 +259,10 @@ namespace backend
             rconst = true;
             r_val = dynamic_cast<ConstantValue *>(rhs)->getInt();
         }
-        else if (isa<CallInst>(rhs))
+        else if (isa<CallInst>(rhs) && !lconst)
         {
             rname = "r" + rhs->getName();
+            code += space + "ldr\tr" + lhs->getName() + ", [fp, #-8]" + endl;
         }
         else
             rname = "r" + rhs->getName();
@@ -699,6 +699,8 @@ namespace backend
             else
                 code += space + "cmp\t" + lname + ", " + rname + endl;
         }
+        if (bInst->NeedToStore())
+            code += space + "str\tr" + res + ", [fp, #-8]" + endl;
         return {dstRegId, code};
     }
 
@@ -937,7 +939,8 @@ namespace backend
                 code += space + "vcmpe.f32\t" + lname + ", " + rname + endl;
             code += space + "vmrs\tAPSR_nzcv, FPSCR" + endl;
         }
-
+        if (bInst->NeedToStore())
+            code += space + "vstr\ts" + res + ", [fp, #-8]" + endl;
         return {dstRegId, code};
     }
 
@@ -962,23 +965,31 @@ namespace backend
                 val_name = "r" + val->getName();
                 code += space + "rsb\tr" + uInst->getName() + ", " + val_name + ", #0" + endl;
             }
+            if (uInst->NeedToStore())
+                code += space + "str\tr" + uInst->getName() + ", [fp, #-8]" + endl;
         }
         else if (uInst->getKind() == Instruction::kFNeg)
         {
             val_name = "s" + to_string(15 - std::stoi(val->getName()));
             code += space + "vneg.f32\ts" + to_string(15 - std::stoi(uInst->getName())) + ", " + val_name + endl;
+            if (uInst->NeedToStore())
+                code += space + "vstr\ts" + to_string(15 - std::stoi(uInst->getName())) + ", [fp, #-8]" + endl;
         }
         else if (uInst->getKind() == Instruction::kFtoI)
         {
             val_name = "s" + to_string(15 - std::stoi(val->getName()));
             code += space + "vcvt.s32.f32\ts" + to_string(15 - std::stoi(uInst->getName())) + "," + val_name + endl;
             code += space + "vmov\tr" + to_string(std::stoi(uInst->getName())) + ", s" + to_string(15 - std::stoi(uInst->getName())) + endl;
+            if (uInst->NeedToStore())
+                code += space + "str\tr" + uInst->getName() + ", [fp, #-8]" + endl;
         }
         else if (uInst->getKind() == Instruction::kItoF)
         {
             val_name = "s" + to_string(15 - std::stoi(val->getName()));
             code += space + "vmov\t" + val_name + ", r" + val->getName() + endl;
             code += space + "vcvt.f32.s32\ts" + to_string(15 - std::stoi(uInst->getName())) + "," + val_name + endl;
+            if (uInst->NeedToStore())
+                code += space + "vstr\ts" + to_string(15 - std::stoi(uInst->getName())) + ", [fp, #-8]" + endl;
         }
         return {dstRegId, code};
     }
@@ -2062,11 +2073,26 @@ namespace backend
             arg_num++;
             if (arg_num > 4)
             {
-                int reg_num = stoi(arg->getName());
-                if (para_offset == 0)
-                    code += space + "str\tr" + to_string(reg_num) + ", [sp]" + endl;
-                else
-                    code += space + "str\tr" + to_string(reg_num) + ", [sp, #" + to_string(para_offset) + "]" + endl;
+                if (arg->getType()->isInt())
+                {
+                    if (isa<ConstantValue>(arg))
+                    {
+                        code += space + "mov\tr4, #" + to_string(dynamic_cast<ConstantValue *>(arg)->getInt()) + endl;
+                        code += space + "str\tr4, [sp, #" + to_string(para_offset) + "]" + endl;
+                    }
+                    else
+                        code += space + "str\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
+                }
+                else if (arg->getType()->isFloat())
+                {
+                    if (isa<ConstantValue>(arg))
+                    {
+                        // code += space + "mov\tr4, #" + to_string(dynamic_cast<ConstantValue *>(arg)->getInt());
+                        code += space + "vstr\ts4, [sp, #" + to_string(para_offset) + "]" + endl;
+                    }
+                    else
+                        code += space + "vstr\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
+                }
                 para_offset += 4;
                 continue;
             }
@@ -2099,9 +2125,19 @@ namespace backend
         }
         code += space + "bl\t" + callee_fuc->getName() + endl;
         if (callInst->getType()->isInt())
-            code += space + "mov\tr" + callInst->getName() + ", r0" + endl;
+        {
+            if (callInst->NeedToStore())
+                code += space + "str\tr0, [fp, #-8]" + endl;
+            else
+                code += space + "mov\tr" + callInst->getName() + ", r0" + endl;
+        }
         else if (callInst->getType()->isFloat())
-            code += space + "vmov\ts" + to_string(16 - stoi(callInst->getName())) + ", s0" + endl;
+        {
+            if (callInst->NeedToStore())
+                code += space + "vstr\ts0, [fp, #-8]" + endl;
+            else
+                code += space + "vmov\ts" + to_string(16 - stoi(callInst->getName())) + ", s0" + endl;
+        }
         return {dstRegId, code};
     }
     string CodeGen::instruction_gen(Instruction *instr)
