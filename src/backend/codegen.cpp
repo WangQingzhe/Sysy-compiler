@@ -1700,7 +1700,7 @@ namespace backend
                         if (type->isInt())
                             code += space + "ldr\tr" + to_string(reg_num) + ", [r" + first_var->getName() + "]" + endl;
                         else if (type->isFloat())
-                            code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(pos) + "]" + endl;
+                            code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + first_var->getName() + "]" + endl;
                     }
                     // load出一个(子)数组,求出其首地址
                     else if (NumIndices < NumDims)
