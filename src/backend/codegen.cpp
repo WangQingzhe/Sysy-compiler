@@ -100,21 +100,6 @@ namespace backend
     string CodeGen::prologueCode_gen(Function *func)
     {
         string code;
-        // if there is callinst in function
-        auto bbs = func->getBasicBlocks();
-        for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
-        {
-            auto bb = iter->get();
-            for (auto &instr : bb->getInstructions())
-            {
-                auto instrType = instr->getKind();
-                if (instrType == Value::Kind::kCall)
-                {
-                    haveCall = true;
-                    break;
-                }
-            }
-        }
         // put arguments in the stack
         auto entry_block = func->getEntryBlock();
         auto args = entry_block->getArguments();
@@ -190,7 +175,22 @@ namespace backend
         clearFunctionRecord(func);
         string bbCode;
         auto bbs = func->getBasicBlocks();
-        top_offset = -8;
+        // if there is callinst in function
+        auto bbs = func->getBasicBlocks();
+        for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
+        {
+            auto bb = iter->get();
+            for (auto &instr : bb->getInstructions())
+            {
+                auto instrType = instr->getKind();
+                if (instrType == Value::Kind::kCall)
+                {
+                    haveCall = true;
+                    break;
+                }
+            }
+        }
+        top_offset = haveCall ? -12 : -8;
         above_offset = 4;
         max_param = 0;
         backpatch.clear();
@@ -261,7 +261,9 @@ namespace backend
             r_val = dynamic_cast<ConstantValue *>(rhs)->getInt();
         }
         else if (isa<CallInst>(rhs))
-            rname = "r" + to_string(stoi(rhs->getName()) + 1);
+        {
+            rname = "r" + rhs->getName();
+        }
         else
             rname = "r" + rhs->getName();
         auto res = bInst->getName();
