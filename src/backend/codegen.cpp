@@ -1300,9 +1300,9 @@ namespace backend
                         int src_reg = (1 + std::stoi(value->getName())) % 11;
                         code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #unk]" + endl;
                         if (value->getType()->isInt())
-                            code += space + "str\tr" + value->getName() + ", [r" + to_string(src_reg) + "]" + endl;
+                            code += space + "str\tr" + value->getName() + ", [r" + to_string(src_reg) + ", #" + to_string(pos) + "]" + endl;
                         else if (value->getType()->isFloat())
-                            code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r" + to_string(src_reg) + "]" + endl;
+                            code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r" + to_string(src_reg) + ", #" + to_string(pos) + "]" + endl;
                     }
                 }
                 // 数组下标含有变量
