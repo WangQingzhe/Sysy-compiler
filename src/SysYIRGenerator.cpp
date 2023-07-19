@@ -22,14 +22,65 @@ namespace sysy
     auto getint_type = Type::getFunctionType(Type::getIntType());
     auto f_getint = pModule->createFunction("getint", getint_type);
     symbols.insert("getint", f_getint);
-    auto getint_entry = f_getint->addBasicBlock("getint_entry");
+    // auto getint_entry = f_getint->addBasicBlock("getint_entry");
+    // create function:getch
+    auto getch_type = Type::getFunctionType(Type::getIntType());
+    auto f_getch = pModule->createFunction("getch", getint_type);
+    symbols.insert("getch", f_getch);
+    // auto getch_entry = f_getch->addBasicBlock("getch_entry");
+    // create function:getfloat
+    auto getfloat_type = Type::getFunctionType(Type::getFloatType());
+    auto f_getfloat = pModule->createFunction("getfloat", getfloat_type);
+    symbols.insert("getfloat", f_getfloat);
+    // auto getfloat_entry = f_getfloat->addBasicBlock("getfloat_entry");
+    // create function:getarray
+    auto getarray_type = Type::getFunctionType(Type::getIntType(), {Type::getIntType()});
+    auto f_getarray = pModule->createFunction("getarray", getarray_type);
+    symbols.insert("getarray", f_getarray);
+    // auto getarray_entry = f_getarray->addBasicBlock("getarray_entry");
+    // auto getarray_arg = getarray_entry->createArgument(Type::getPointerType(Type::getIntType()));
+    // create function:getfarray
+    auto getfarray_type = Type::getFunctionType(Type::getIntType(), {Type::getIntType()});
+    auto f_getfarray = pModule->createFunction("getfarray", getfarray_type);
+    symbols.insert("getfarray", f_getfarray);
     // create function:putint
-    auto putint_type = Type::getFunctionType(Type::getVoidType(), vector<Type *>({Type::getIntType()}));
+    auto putint_type = Type::getFunctionType(Type::getVoidType(), {Type::getIntType()});
     auto f_putint = pModule->createFunction("putint", putint_type);
     symbols.insert("putint", f_putint);
-    // SymbolTable::FunctionScope putint_scope(symbols);
-    auto putint_entry = f_putint->addBasicBlock("putint_entry");
-    auto putint_arg = putint_entry->createArgument(Type::getPointerType(Type::getIntType()));
+    // auto putint_entry = f_putint->addBasicBlock("putint_entry");
+    // auto putint_arg = putint_entry->createArgument(Type::getPointerType(Type::getIntType()));
+    // create function:putch
+    auto putch_type = Type::getFunctionType(Type::getVoidType(), {Type::getIntType()});
+    auto f_putch = pModule->createFunction("putch", putch_type);
+    symbols.insert("putch", f_putch);
+    // auto putint_entry = f_putint->addBasicBlock("putch_entry");
+    // auto putint_arg = putint_entry->createArgument(Type::getPointerType(Type::getIntType()));
+    // create function:putfloat
+    auto putfloat_type = Type::getFunctionType(Type::getVoidType(), {Type::getFloatType()});
+    auto f_putfloat = pModule->createFunction("putfloat", putfloat_type);
+    symbols.insert("putfloat", f_putfloat);
+    auto putfloat_entry = f_putfloat->addBasicBlock("putfloat_entry");
+    // auto putint_arg = putint_entry->createArgument(Type::getPointerType(Type::getIntType()));
+    // create function:putarray
+    auto putarray_type = Type::getFunctionType(Type::getVoidType(), {Type::getIntType(), Type::getIntType()});
+    auto f_putarray = pModule->createFunction("putarray", putarray_type);
+    symbols.insert("putarray", f_putarray);
+    // auto putint_entry = f_putint->addBasicBlock("putfloat_entry");
+    // auto putint_arg = putint_entry->createArgument(Type::getPointerType(Type::getIntType()));
+    // create function:putfarray
+    auto putfarray_type = Type::getFunctionType(Type::getVoidType(), {Type::getIntType(), Type::getIntType()});
+    auto f_putfarray = pModule->createFunction("putfarray", putfarray_type);
+    symbols.insert("putfarray", f_putfarray);
+    // auto putint_entry = f_putint->addBasicBlock("putfloat_entry");
+    // auto putint_arg = putint_entry->createArgument(Type::getPointerType(Type::getIntType()));
+    // create function:starttime
+    auto starttime_type = Type::getFunctionType(Type::getVoidType());
+    auto f_starttime = pModule->createFunction("starttime", starttime_type);
+    symbols.insert("starttime", f_starttime);
+    // create function:stoptime
+    auto stoptime_type = Type::getFunctionType(Type::getVoidType());
+    auto f_stoptime = pModule->createFunction("stoptime", stoptime_type);
+    symbols.insert("stoptime", f_stoptime);
     // generates globals and functions
     visitChildren(ctx);
     // return the IR module

@@ -191,7 +191,7 @@ namespace backend
         bool haveCall = false;
         // record arguments need to be backpatched
         vector<Argument *> backpatch;
-        set<string> libfunc = {"getint", "putint"};
+        set<string> libfunc = {"getint", "getch", "getfloat", "getarray", "getfarray", "putint", "putch", "putfloat", "putarray", "putfarray", "starttime", "stoptime", "putf"};
 
     public:
         CodeGen(Module *module) : module(module) {}

@@ -598,7 +598,7 @@ namespace sysy
   void Module::print(std::ostream &os) const
   {
     for (auto &value : children)
-      if (value->getName() != "getint" && value->getName() != "putint")
+      if (value->getName() != "getint" && value->getName() != "getch" && value->getName() != "getfloat" && value->getName() != "getarray" && value->getName() != "getfarray" && value->getName() != "putint" && value->getName() != "putch" && value->getName() != "putfloat" && value->getName() != "putarray" && value->getName() != "putfarray" && value->getName() != "starttime" && value->getName() != "stoptime" && value->getName() != "putf")
         os << *value << '\n';
   }
 
