@@ -679,7 +679,7 @@ namespace backend
             {
                 if (r_val > 0 && r_val < 0xffff)
                 {
-                    code += space + "cmp\t" + lname + ", r" + rname + endl;
+                    code += space + "cmp\t" + lname + ", " + rname + endl;
                 }
                 else
                 {
