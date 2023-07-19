@@ -562,6 +562,19 @@ namespace backend
                 code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
                 code += space + "cmp\tr" + to_string(instrname) + ", " + rname + endl;
             }
+            else if (rconst)
+            {
+                if (r_val > 0 && r_val < 0xff)
+                {
+                    code += space + "cmp\t" + lname + ", " + rname + endl;
+                }
+                else
+                {
+                    code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(r_val & 0xffff) + endl;
+                    code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((r_val >> 16) & 0xffff) + endl;
+                    code += space + "cmp\t" + lname + ", r" + to_string(instrname) + endl;
+                }
+            }
             else
                 code += space + "cmp\t" + lname + ", " + rname + endl;
         }
@@ -571,6 +584,19 @@ namespace backend
             {
                 code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
                 code += space + "cmp\tr" + to_string(instrname) + ", " + rname + endl;
+            }
+            else if (rconst)
+            {
+                if (r_val > 0 && r_val < 0xff)
+                {
+                    code += space + "cmp\t" + lname + ", " + rname + endl;
+                }
+                else
+                {
+                    code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(r_val & 0xffff) + endl;
+                    code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((r_val >> 16) & 0xffff) + endl;
+                    code += space + "cmp\t" + lname + ", r" + to_string(instrname) + endl;
+                }
             }
             else
                 code += space + "cmp\t" + lname + ", " + rname + endl;
@@ -582,6 +608,19 @@ namespace backend
                 code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
                 code += space + "cmp\tr" + to_string(instrname) + ", " + rname + endl;
             }
+            else if (rconst)
+            {
+                if (r_val > 0 && r_val < 0xff)
+                {
+                    code += space + "cmp\t" + lname + ", " + rname + endl;
+                }
+                else
+                {
+                    code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(r_val & 0xffff) + endl;
+                    code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((r_val >> 16) & 0xffff) + endl;
+                    code += space + "cmp\t" + lname + ", r" + to_string(instrname) + endl;
+                }
+            }
             else
                 code += space + "cmp\t" + lname + ", " + rname + endl;
         }
@@ -591,6 +630,19 @@ namespace backend
             {
                 code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
                 code += space + "cmp\tr" + to_string(instrname) + ", " + rname + endl;
+            }
+            else if (rconst)
+            {
+                if (r_val > 0 && r_val < 0xff)
+                {
+                    code += space + "cmp\t" + lname + ", " + rname + endl;
+                }
+                else
+                {
+                    code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(r_val & 0xffff) + endl;
+                    code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((r_val >> 16) & 0xffff) + endl;
+                    code += space + "cmp\t" + lname + ", r" + to_string(instrname) + endl;
+                }
             }
             else
                 code += space + "cmp\t" + lname + ", " + rname + endl;
@@ -602,6 +654,19 @@ namespace backend
                 code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
                 code += space + "cmp\tr" + to_string(instrname) + ", " + rname + endl;
             }
+            else if (rconst)
+            {
+                if (r_val > 0 && r_val < 0xff)
+                {
+                    code += space + "cmp\t" + lname + ", " + rname + endl;
+                }
+                else
+                {
+                    code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(r_val & 0xffff) + endl;
+                    code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((r_val >> 16) & 0xffff) + endl;
+                    code += space + "cmp\t" + lname + ", r" + to_string(instrname) + endl;
+                }
+            }
             else
                 code += space + "cmp\t" + lname + ", " + rname + endl;
         }
@@ -611,6 +676,19 @@ namespace backend
             {
                 code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
                 code += space + "cmp\tr" + to_string(instrname) + ", " + rname + endl;
+            }
+            else if (rconst)
+            {
+                if (r_val > 0 && r_val < 0xffff)
+                {
+                    code += space + "cmp\t" + lname + ", r" + rname + endl;
+                }
+                else
+                {
+                    code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(r_val & 0xffff) + endl;
+                    code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((r_val >> 16) & 0xffff) + endl;
+                    code += space + "cmp\t" + lname + ", r" + to_string(instrname) + endl;
+                }
             }
             else
                 code += space + "cmp\t" + lname + ", " + rname + endl;
