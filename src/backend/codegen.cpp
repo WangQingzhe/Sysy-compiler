@@ -527,6 +527,12 @@ namespace backend
                     code += space + "sub\tr" + res + ", " + lname + ", r" + to_string(instrname + 1) + endl;
                 }
             }
+            else
+            {
+                code += space + "sdiv\tr" + res + ", " + lname + ", " + rname + endl;
+                code += space + "mul\t" + rname + ", r" + res + ", " + rname + endl;
+                code += space + "sub\tr" + res + ", " + lname + ", " + rname + endl;
+            }
         }
         else if (lconst && rconst)
         {
