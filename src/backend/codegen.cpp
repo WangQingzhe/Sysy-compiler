@@ -252,10 +252,6 @@ namespace backend
             l_val = dynamic_cast<ConstantValue *>(lhs)->getInt();
             lconst = true;
         }
-        else if (isa<CallInst>(lhs))
-        {
-            lname = "r" + to_string(stoi(lhs->getName()) + 1);
-        }
         else
             lname = "r" + lhs->getName();
         if (isa<ConstantValue>(rhs))
@@ -2068,16 +2064,34 @@ namespace backend
             }
             // int src_reg = stoi(arg->getName()) + 4;
             string src_name;
-            if (isa<ConstantValue>(arg))
-                src_name = "#" + to_string(dynamic_cast<ConstantValue *>(arg)->getInt());
-            else
-                src_name = "r" + arg->getName();
-            code += space + "mov\tr" + to_string(arg_num - 1) + ", " + src_name + endl;
+            if (arg->getType()->isInt())
+            {
+                if (isa<ConstantValue>(arg))
+                    src_name = "#" + to_string(dynamic_cast<ConstantValue *>(arg)->getInt());
+                else
+                    src_name = "r" + arg->getName();
+                code += space + "mov\tr" + to_string(arg_num - 1) + ", " + src_name + endl;
+            }
+            else if (arg->getType()->isFloat())
+            {
+                if (isa<ConstantValue>(arg))
+                {
+                    float value = dynamic_cast<ConstantValue *>(arg)->getDouble();
+                    unsigned int dec;
+                    memcpy(&dec, &value, sizeof(float));
+                    src_name = "#" + to_string(dec);
+                }
+                else
+                {
+                    src_name = "s" + to_string(15 - std::stoi(arg->getName()));
+                }
+                code += space + "vmov.f32\ts" + to_string(arg_num - 1) + ", " + src_name + endl;
+            }
             // code += space + "mov\tr" + to_string(arg_num - 1) + ", r" + src + endl;
         }
         code += space + "bl\t" + callee_fuc->getName() + endl;
         if (callInst->getType()->isInt())
-            code += space + "mov\tr" + to_string(stoi(callInst->getName()) + 1) + ", r0" + endl;
+            code += space + "mov\tr" + callInst->getName() + ", r0" + endl;
         else if (callInst->getType()->isFloat())
             code += space + "vmov\ts" + to_string(16 - stoi(callInst->getName())) + ", s0" + endl;
         return {dstRegId, code};
