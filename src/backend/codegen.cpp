@@ -529,19 +529,92 @@ namespace backend
             }
         }
         else if (lconst && rconst)
-            return {dstRegId, code};
+        {
+            if (bInst->getKind() == Instruction::kICmpEQ)
+            {
+                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string((l_val == r_val) ? 1 : 0) + endl;
+            }
+            else if (bInst->getKind() == Instruction::kICmpGE)
+            {
+                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string((l_val >= r_val) ? 1 : 0) + endl;
+            }
+            else if (bInst->getKind() == Instruction::kICmpGT)
+            {
+                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string((l_val > r_val) ? 1 : 0) + endl;
+            }
+            else if (bInst->getKind() == Instruction::kICmpLE)
+            {
+                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string((l_val <= r_val) ? 1 : 0) + endl;
+            }
+            else if (bInst->getKind() == Instruction::kICmpLT)
+            {
+                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string((l_val < r_val) ? 1 : 0) + endl;
+            }
+            else if (bInst->getKind() == Instruction::kICmpNE)
+            {
+                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string((l_val != r_val) ? 1 : 0) + endl;
+            }
+        }
         else if (bInst->getKind() == Instruction::kICmpEQ)
-            code += space + "cmp\t" + lname + ", " + rname + endl;
+        {
+            if (lconst)
+            {
+                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
+                code += space + "cmp\tr" + to_string(instrname) + ", " + rname + endl;
+            }
+            else
+                code += space + "cmp\t" + lname + ", " + rname + endl;
+        }
         else if (bInst->getKind() == Instruction::kICmpGE)
-            code += space + "cmp\t" + lname + ", " + rname + endl;
+        {
+            if (lconst)
+            {
+                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
+                code += space + "cmp\tr" + to_string(instrname) + ", " + rname + endl;
+            }
+            else
+                code += space + "cmp\t" + lname + ", " + rname + endl;
+        }
         else if (bInst->getKind() == Instruction::kICmpGT)
-            code += space + "cmp\t" + lname + ", " + rname + endl;
+        {
+            if (lconst)
+            {
+                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
+                code += space + "cmp\tr" + to_string(instrname) + ", " + rname + endl;
+            }
+            else
+                code += space + "cmp\t" + lname + ", " + rname + endl;
+        }
         else if (bInst->getKind() == Instruction::kICmpLE)
-            code += space + "cmp\t" + lname + ", " + rname + endl;
+        {
+            if (lconst)
+            {
+                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
+                code += space + "cmp\tr" + to_string(instrname) + ", " + rname + endl;
+            }
+            else
+                code += space + "cmp\t" + lname + ", " + rname + endl;
+        }
         else if (bInst->getKind() == Instruction::kICmpLT)
-            code += space + "cmp\t" + lname + ", " + rname + endl;
+        {
+            if (lconst)
+            {
+                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
+                code += space + "cmp\tr" + to_string(instrname) + ", " + rname + endl;
+            }
+            else
+                code += space + "cmp\t" + lname + ", " + rname + endl;
+        }
         else if (bInst->getKind() == Instruction::kICmpNE)
-            code += space + "cmp\t" + lname + ", " + rname + endl;
+        {
+            if (lconst)
+            {
+                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
+                code += space + "cmp\tr" + to_string(instrname) + ", " + rname + endl;
+            }
+            else
+                code += space + "cmp\t" + lname + ", " + rname + endl;
+        }
         return {dstRegId, code};
     }
 
