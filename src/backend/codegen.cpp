@@ -528,7 +528,6 @@ namespace backend
                 }
             }
         }
-        // asasd
         else if (lconst && rconst)
         {
             if (bInst->getKind() == Instruction::kICmpEQ)
