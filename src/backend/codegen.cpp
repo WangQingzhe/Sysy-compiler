@@ -165,6 +165,8 @@ namespace backend
     string CodeGen::epilogueCode_gen(Function *func)
     {
         string code;
+        string func_exit = func->getName() + "_exit:";
+        code += func_exit + endl;
         if (haveCall)
         {
             code += space + "sub\tsp, fp, #4" + endl;
@@ -1867,9 +1869,7 @@ namespace backend
     string CodeGen::returnInst_gen(ReturnInst *retInst)
     {
         string code;
-        /**
-         *code in here
-         */
+        string func_exit = retInst->getFunction()->getName() + "_exit";
         auto retval = retInst->getReturnValue();
         if (isa<ConstantValue>(retval))
         {
@@ -1901,6 +1901,7 @@ namespace backend
             else if (retval->getType()->isFloat())
                 code += space + "vmov.f32\ts0, s" + to_string(15 - stoi(retval->getName())) + endl;
         }
+        code += space + "b\t" + func_exit + endl;
         return code;
     }
     string CodeGen::uncondBrInst_gen(UncondBrInst *ubInst)

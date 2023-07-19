@@ -258,9 +258,9 @@ namespace sysy
       return createBinaryInst(Instruction::kFCmpGE, Type::getFloatType(), lhs,
                               rhs, name);
     }
-    ReturnInst *createReturnInst(Value *value = nullptr)
+    ReturnInst *createReturnInst(Value *value = nullptr, BasicBlock *parent = nullptr)
     {
-      auto inst = new ReturnInst(value);
+      auto inst = new ReturnInst(value, parent);
       assert(inst);
       block->getInstructions().emplace(position, inst);
       return inst;

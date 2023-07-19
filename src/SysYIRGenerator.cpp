@@ -703,7 +703,7 @@ namespace sysy
       else
         value = builder.createIToFInst(value);
     }
-    Value *result = builder.createReturnInst(value);
+    Value *result = builder.createReturnInst(value, current_block);
     return result;
   }
 
