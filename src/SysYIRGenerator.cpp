@@ -726,13 +726,21 @@ namespace sysy
       auto iter = func->getParamTypes().begin();
       for (auto exp : rArgs->exp())
       {
+        auto arg_type = (*iter)->as<PointerType>()->getBaseType();
         Value *arg = any_cast<Value *>(exp->accept(this));
         if (isa<ConstantValue>(arg))
+        {
           int id = parent_func->allocateVariableID();
-        else if ((*iter)->isInt() && arg->getType()->isFloat())
+          if (arg_type->isInt() && arg->getType()->isFloat())
+            arg = ConstantValue::get((int)dynamic_cast<ConstantValue *>(arg)->getDouble());
+          else if (arg_type->isFloat() && arg->getType()->isInt())
+            arg = ConstantValue::get((double)dynamic_cast<ConstantValue *>(arg)->getInt());
+        }
+        else if (arg_type->isInt() && arg->getType()->isFloat())
           arg = builder.createFtoIInst(arg);
-        else if ((*iter)->isFloat() && arg->getType()->isInt())
+        else if (arg_type->isFloat() && arg->getType()->isInt())
           arg = builder.createIToFInst(arg);
+        iter++;
         args.push_back(arg);
       }
     }
