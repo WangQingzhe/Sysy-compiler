@@ -787,6 +787,7 @@ namespace sysy
       visitStmt(ctx->stmt()[0]);
       Value *then_br = builder.createUncondBrInst(exitblock, vector<Value *>());
       // setup the instruction insert position
+      func->resetVariableID();
       builder.setPosition(exitblock, exitblock->begin());
       func->moveExitBlock();
     }
@@ -818,10 +819,12 @@ namespace sysy
       builder.setPosition(thenblock, thenblock->begin());
       visitStmt(ctx->stmt()[0]);
       Value *then_br = builder.createUncondBrInst(exitblock, vector<Value *>());
+      func->resetVariableID();
       builder.setPosition(elseblock, elseblock->begin());
       visitStmt(ctx->stmt()[1]);
       Value *else_br = builder.createUncondBrInst(exitblock, vector<Value *>());
       // setup the instruction insert position
+      func->resetVariableID();
       builder.setPosition(exitblock, exitblock->begin());
       func->moveExitBlock();
     }
@@ -838,6 +841,7 @@ namespace sysy
     sprintf(headername, "header%d", builder.get_whilecnt());
     auto headerblock = func->addBasicBlock(headername);
     Value *head_uncondbr = builder.createUncondBrInst(headerblock, vector<Value *>{});
+    func->resetVariableID();
     builder.setPosition(headerblock, headerblock->begin());
     current_block->getSuccessors().push_back(headerblock);
     headerblock->getPredecessors().push_back(current_block);
@@ -876,6 +880,7 @@ namespace sysy
     builder.poploop();
     // create uncondbr in body block
     Value *body_uncondbr = builder.createUncondBrInst(headerblock, vector<Value *>());
+    func->resetVariableID();
     // setup the instruction insert position
     builder.setPosition(exitblock, exitblock->begin());
     func->moveExitBlock();
