@@ -34,41 +34,41 @@ namespace sysy
     symbols.insert("getfloat", f_getfloat);
     // auto getfloat_entry = f_getfloat->addBasicBlock("getfloat_entry");
     // create function:getarray
-    auto getarray_type = Type::getFunctionType(Type::getIntType(), {Type::getIntType()});
+    auto getarray_type = Type::getFunctionType(Type::getIntType(), {Type::getPointerType(Type::getIntType())});
     auto f_getarray = pModule->createFunction("getarray", getarray_type);
     symbols.insert("getarray", f_getarray);
     // auto getarray_entry = f_getarray->addBasicBlock("getarray_entry");
     // auto getarray_arg = getarray_entry->createArgument(Type::getPointerType(Type::getIntType()));
     // create function:getfarray
-    auto getfarray_type = Type::getFunctionType(Type::getIntType(), {Type::getIntType()});
+    auto getfarray_type = Type::getFunctionType(Type::getIntType(), {Type::getPointerType(Type::getIntType())});
     auto f_getfarray = pModule->createFunction("getfarray", getfarray_type);
     symbols.insert("getfarray", f_getfarray);
     // create function:putint
-    auto putint_type = Type::getFunctionType(Type::getVoidType(), {Type::getIntType()});
+    auto putint_type = Type::getFunctionType(Type::getVoidType(), {Type::getPointerType(Type::getIntType())});
     auto f_putint = pModule->createFunction("putint", putint_type);
     symbols.insert("putint", f_putint);
     // auto putint_entry = f_putint->addBasicBlock("putint_entry");
     // auto putint_arg = putint_entry->createArgument(Type::getPointerType(Type::getIntType()));
     // create function:putch
-    auto putch_type = Type::getFunctionType(Type::getVoidType(), {Type::getIntType()});
+    auto putch_type = Type::getFunctionType(Type::getVoidType(), {Type::getPointerType(Type::getIntType())});
     auto f_putch = pModule->createFunction("putch", putch_type);
     symbols.insert("putch", f_putch);
     // auto putint_entry = f_putint->addBasicBlock("putch_entry");
     // auto putint_arg = putint_entry->createArgument(Type::getPointerType(Type::getIntType()));
     // create function:putfloat
-    auto putfloat_type = Type::getFunctionType(Type::getVoidType(), {Type::getFloatType()});
+    auto putfloat_type = Type::getFunctionType(Type::getVoidType(), {Type::getPointerType(Type::getFloatType())});
     auto f_putfloat = pModule->createFunction("putfloat", putfloat_type);
     symbols.insert("putfloat", f_putfloat);
     auto putfloat_entry = f_putfloat->addBasicBlock("putfloat_entry");
     // auto putint_arg = putint_entry->createArgument(Type::getPointerType(Type::getIntType()));
     // create function:putarray
-    auto putarray_type = Type::getFunctionType(Type::getVoidType(), {Type::getIntType(), Type::getIntType()});
+    auto putarray_type = Type::getFunctionType(Type::getVoidType(), {Type::getPointerType(Type::getIntType()), Type::getPointerType(Type::getIntType())});
     auto f_putarray = pModule->createFunction("putarray", putarray_type);
     symbols.insert("putarray", f_putarray);
     // auto putint_entry = f_putint->addBasicBlock("putfloat_entry");
     // auto putint_arg = putint_entry->createArgument(Type::getPointerType(Type::getIntType()));
     // create function:putfarray
-    auto putfarray_type = Type::getFunctionType(Type::getVoidType(), {Type::getIntType(), Type::getIntType()});
+    auto putfarray_type = Type::getFunctionType(Type::getVoidType(), {Type::getPointerType(Type::getIntType()), Type::getPointerType(Type::getIntType())});
     auto f_putfarray = pModule->createFunction("putfarray", putfarray_type);
     symbols.insert("putfarray", f_putfarray);
     // auto putint_entry = f_putint->addBasicBlock("putfloat_entry");
@@ -726,7 +726,7 @@ namespace sysy
       auto iter = func->getParamTypes().begin();
       for (auto exp : rArgs->exp())
       {
-        auto arg_type = (*iter)->as<PointerType>()->getBaseType();
+        Type *arg_type = (*iter)->as<PointerType>()->getBaseType();
         Value *arg = any_cast<Value *>(exp->accept(this));
         if (isa<ConstantValue>(arg))
         {

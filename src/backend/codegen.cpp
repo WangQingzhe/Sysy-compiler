@@ -2095,6 +2095,22 @@ namespace backend
                         code += space + "vmov\ts4, " + "r4" + endl;
                         code += space + "vstr\ts4, [sp, #" + to_string(para_offset) + "]" + endl;
                     }
+                    else if (isa<LoadInst>(arg))
+                    {
+                        auto ld_inst = dynamic_cast<LoadInst *>(arg);
+                        auto pointer = ld_inst->getPointer();
+                        int numdims = 0;
+                        if (isa<GlobalValue>(pointer))
+                            numdims = dynamic_cast<GlobalValue *>(pointer)->getNumDims();
+                        else if (isa<AllocaInst>(pointer))
+                            numdims = dynamic_cast<AllocaInst *>(pointer)->getNumDims();
+                        else if (isa<Argument>(pointer))
+                            numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
+                        if (ld_inst->getNumIndices() < numdims)
+                            code += space + "str\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
+                        else
+                            code += space + "vstr\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
+                    }
                     else
                         code += space + "vstr\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
                 }
@@ -2121,6 +2137,25 @@ namespace backend
                     code += space + "movw\tr4, #" + to_string(dec & 0xffff) + endl;
                     code += space + "movt\tr4, #" + to_string((dec >> 16) & 0xffff) + endl;
                     code += space + "vmov\ts" + to_string(arg_num - 1) + ", r4" + endl;
+                }
+                else if (isa<LoadInst>(arg))
+                {
+                    auto ld_inst = dynamic_cast<LoadInst *>(arg);
+                    auto pointer = ld_inst->getPointer();
+                    int numdims = 0;
+                    if (isa<GlobalValue>(pointer))
+                        numdims = dynamic_cast<GlobalValue *>(pointer)->getNumDims();
+                    else if (isa<AllocaInst>(pointer))
+                        numdims = dynamic_cast<AllocaInst *>(pointer)->getNumDims();
+                    else if (isa<Argument>(pointer))
+                        numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
+                    if (ld_inst->getNumIndices() < numdims)
+                    {
+                        src_name = "r" + arg->getName();
+                        code += space + "mov\tr" + to_string(arg_num - 1) + ", " + src_name + endl;
+                    }
+                    else
+                        code += space + "vmov.f32\ts" + to_string(arg_num - 1) + ", " + "s" + to_string(15 - std::stoi(arg->getName())) + endl;
                 }
                 else
                 {
