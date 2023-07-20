@@ -2087,7 +2087,12 @@ namespace backend
                 {
                     if (isa<ConstantValue>(arg))
                     {
-                        // code += space + "mov\tr4, #" + to_string(dynamic_cast<ConstantValue *>(arg)->getInt());
+                        float Fvalue = dynamic_cast<ConstantValue *>(arg)->getFloat();
+                        int mid;
+                        memcpy(&mid, &Fvalue, sizeof(Fvalue));
+                        code += space + "movw\tr4, #" + to_string(mid & 0xffff) + endl;
+                        code += space + "movt\tr4, #" + to_string((mid >> 16) & 0xffff) + endl;
+                        code += space + "vmov\ts4, " + "r4" + endl;
                         code += space + "vstr\ts4, [sp, #" + to_string(para_offset) + "]" + endl;
                     }
                     else
@@ -2113,13 +2118,14 @@ namespace backend
                     float value = dynamic_cast<ConstantValue *>(arg)->getDouble();
                     unsigned int dec;
                     memcpy(&dec, &value, sizeof(float));
-                    src_name = "#" + to_string(dec);
+                    code += space + "movw\tr4, #" + to_string(dec & 0xffff) + endl;
+                    code += space + "movt\tr4, #" + to_string((dec >> 16) & 0xffff) + endl;
+                    code += space + "vmov\ts" + to_string(arg_num - 1) + ", r4" + endl;
                 }
                 else
                 {
-                    src_name = "s" + to_string(15 - std::stoi(arg->getName()));
+                    code += space + "vmov.f32\ts" + to_string(arg_num - 1) + ", " + "s" + to_string(15 - std::stoi(arg->getName())) + endl;
                 }
-                code += space + "vmov.f32\ts" + to_string(arg_num - 1) + ", " + src_name + endl;
             }
             // code += space + "mov\tr" + to_string(arg_num - 1) + ", r" + src + endl;
         }
