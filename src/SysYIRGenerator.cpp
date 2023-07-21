@@ -486,7 +486,8 @@ namespace sysy
     auto lhs = any_cast<Value *>(ctx->exp(0)->accept(this));
     auto rhs = any_cast<Value *>(ctx->exp(1)->accept(this));
     if (isa<CallInst>(rhs) && !isa<ConstantValue>(lhs))
-      dynamic_cast<Instruction *>(lhs)->set_store();
+      // 将lhs设为保护变量,偏移为0
+      dynamic_cast<Instruction *>(lhs)->set_protect();
     // judge if lhs is a constant
     bool lconst = false;
     int lint = 0;
@@ -562,7 +563,8 @@ namespace sysy
     auto lhs = any_cast<Value *>(ctx->exp(0)->accept(this));
     auto rhs = any_cast<Value *>(ctx->exp(1)->accept(this));
     if (isa<CallInst>(rhs) && !isa<ConstantValue>(lhs))
-      dynamic_cast<Instruction *>(lhs)->set_store();
+      // 将lhs设为保护变量,偏移为0
+      dynamic_cast<Instruction *>(lhs)->set_protect();
     // judge if lhs is a constant
     bool lconst = false;
     int lint = 0;
@@ -697,6 +699,8 @@ namespace sysy
     auto parent_func = builder.getBasicBlock()->getParent();
     assert(func);
     vector<Value *> args;
+    int arg_num = 0;
+    int last_call_num = 0;
     if (auto rArgs = ctx->funcRParams())
     {
       auto iter = func->getParamTypes().begin();
@@ -704,6 +708,10 @@ namespace sysy
       {
         Type *arg_type = (*iter)->as<PointerType>()->getBaseType();
         Value *arg = any_cast<Value *>(exp->accept(this));
+        // 记录最后出现的类型为callinst的参数的标号
+        if (isa<CallInst>(arg))
+          last_call_num = arg_num;
+        // 对参数进行类型转换
         if (isa<ConstantValue>(arg))
         {
           int id = parent_func->allocateVariableID();
@@ -716,11 +724,29 @@ namespace sysy
           arg = builder.createFtoIInst(arg);
         else if (arg_type->isFloat() && arg->getType()->isInt())
           arg = builder.createIToFInst(arg);
+        // 第5个参数开始,设置为直接存到栈中,并记录偏移
+        if (arg_num >= 4 && !isa<ConstantValue>(arg))
+          dynamic_cast<Instruction *>(arg)->set_pass(4 * (arg_num - 4));
+        arg_num++;
         iter++;
         args.push_back(arg);
       }
+      // 对于前四个参数,记录需要保护的非const参数,并设置偏移
+      int offset = 0;
+      last_call_num = last_call_num > 4 ? 4 : last_call_num;
+      for (int i = 0; i < last_call_num; i++)
+      {
+        auto arg = args[i];
+        if (!isa<ConstantValue>(arg))
+        {
+          // 将arg设为保护变量,并记录相对第一个保护变量的偏移
+          dynamic_cast<Instruction *>(arg)->set_protect(offset);
+          offset += 4;
+        }
+      }
     }
     Value *call = builder.createCallInst(func, args);
+    dynamic_cast<Instruction *>(call)->set_protect_cnt(last_call_num);
     return call;
   }
 
@@ -927,7 +953,8 @@ namespace sysy
     auto lhs = any_cast<Value *>(ctx->exp(0)->accept(this));
     auto rhs = any_cast<Value *>(ctx->exp(1)->accept(this));
     if (isa<CallInst>(rhs) && !isa<ConstantValue>(lhs))
-      dynamic_cast<Instruction *>(lhs)->set_store();
+      // 将lhs设为保护变量,偏移为0
+      dynamic_cast<Instruction *>(lhs)->set_protect();
     // judge if lhs is a constant
     bool lconst = false;
     int lint = 0;
@@ -997,7 +1024,8 @@ namespace sysy
     auto lhs = any_cast<Value *>(ctx->exp(0)->accept(this));
     auto rhs = any_cast<Value *>(ctx->exp(1)->accept(this));
     if (isa<CallInst>(rhs) && !isa<ConstantValue>(lhs))
-      dynamic_cast<Instruction *>(lhs)->set_store();
+      // 将lhs设为保护变量,偏移为0
+      dynamic_cast<Instruction *>(lhs)->set_protect();
     // create convert instruction if needed
     auto lhsTy = lhs->getType();
     auto rhsTy = rhs->getType();

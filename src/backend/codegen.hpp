@@ -183,14 +183,15 @@ namespace backend
         // label manager
         map<BasicBlock *, string> bb_labels;
         uint64_t label_no = 0;
-        int top_offset = 0;
+        int top_offset = -8;
         int above_offset = 4;
+        int temp_offset = 0;
+        int protect_reg_offset = 0;
         int max_param = 0;
+        int max_protect = 1;
         int imm_offset = 0;
         vector<double> imms;
         bool haveCall = false;
-        // record arguments need to be backpatched
-        vector<Argument *> backpatch;
         set<string> libfunc = {"getint", "getch", "getfloat", "getarray", "getfarray", "putint", "putch", "putfloat", "putarray", "putfarray", "starttime", "stoptime", "putf"};
 
     public:
@@ -240,6 +241,13 @@ namespace backend
             paramsStOffset.clear();
             retValueStOffset = 0;
             bb_labels.clear();
+            haveCall = false;
+            top_offset = -8;
+            above_offset = 4;
+            max_protect = 1;
+            max_param = 0;
+            temp_offset = 0;
+            protect_reg_offset = 0;
             //
             stOffsetAcc = 0;
         }

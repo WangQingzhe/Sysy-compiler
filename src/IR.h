@@ -558,7 +558,9 @@ namespace sysy
   protected:
     Kind kind;
     BasicBlock *parent;
-    bool need_to_store = false;
+    int protect_offset = -1;
+    int pass_offset = -1;
+    int protect_cnt = 0;
 
   protected:
     Instruction(Kind kind, Type *type, BasicBlock *parent = nullptr,
@@ -575,8 +577,12 @@ namespace sysy
     BasicBlock *getParent() const { return parent; }
     Function *getFunction() const { return parent->getParent(); }
     void setParent(BasicBlock *bb) { parent = bb; }
-    void set_store() { need_to_store = true; }
-    bool NeedToStore() { return need_to_store; }
+    void set_protect(int offset = 0) { protect_offset = offset; }
+    void set_pass(int offset) { pass_offset = offset; }
+    void set_protect_cnt(int cnt) { protect_cnt = cnt; }
+    int ProtectOffset() { return protect_offset; }
+    int PassOffset() { return pass_offset; }
+    int ProtectCnt() { return protect_cnt; }
 
     bool isBinary() const
     {

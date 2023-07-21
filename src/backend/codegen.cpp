@@ -100,51 +100,47 @@ namespace backend
     string CodeGen::prologueCode_gen(Function *func)
     {
         string code;
-        // put arguments in the stack
+        // 保护fp,lr
+        if (haveCall)
+        {
+            // push fp,lr
+            code += space + "push\t{fp,lr}" + endl;
+            // set fp
+            code += space + "add\tfp, sp, #4" + endl;
+        }
+        else
+        {
+            // push fp
+            code += space + "push\t{fp}" + endl;
+            // set fp
+            code += space + "add\tfp, sp, #0" + endl;
+        }
+        // 开辟栈空间
+        int imm = -(top_offset + 4);
+        if (imm > 255)
+        {
+            code += space + "sub\tsp, sp, #" + to_string(imm / 16 * 16) + endl;
+            if (imm % 16 != 0)
+                code += space + "sub\tsp, sp, #" + to_string(imm % 16) + endl;
+        }
+        else
+            code += space + "sub\tsp, sp, #" + to_string(imm) + endl;
+        // r0-r3入栈
         auto entry_block = func->getEntryBlock();
         auto args = entry_block->getArguments();
         int arg_num = 0;
         for (auto arg = args.begin(); arg != args.end(); ++arg)
         {
+            if (arg_num >= 4)
+                break;
+            int para_offset = paramsStOffset[arg->get()];
             // r0-r3
-            if (arg_num < 4)
-            {
-                paramsStOffset.emplace(arg->get(), top_offset);
-                code += space + "str\tr" + to_string(arg_num) + ", [fp, #" + to_string(top_offset) + "]" + endl;
-                top_offset -= 4;
-            }
-            // other
+            if (arg->get()->getType()->as<PointerType>()->getBaseType()->isInt() || arg->get()->getNumDims() > 0)
+                code += space + "str\tr" + to_string(arg_num) + ", [fp, #" + to_string(para_offset) + "]" + endl;
+            // s0-s3
             else
-            {
-                paramsStOffset.emplace(arg->get(), above_offset);
-                above_offset += 4;
-            }
+                code += space + "vstr\ts" + to_string(arg_num) + ", [fp, #" + to_string(para_offset) + "]" + endl;
             arg_num++;
-        }
-        if (max_param > 4)
-            top_offset -= (max_param - 4) * 4;
-        int imm = -(top_offset + 4);
-        if (imm > 255)
-        {
-            if (imm % 16 != 0)
-                code = space + "sub\tsp, sp, #" + to_string(imm % 16) + endl + code;
-            code = space + "sub\tsp, sp, #" + to_string(imm / 16 * 16) + endl + code;
-        }
-        else
-            code = space + "sub\tsp, sp, #" + to_string(imm) + endl + code;
-        if (haveCall)
-        {
-            // set fp
-            code = space + "add\tfp, sp, #4" + endl + code;
-            // push fp,lr
-            code = space + "push\t{fp,lr}" + endl + code;
-        }
-        else
-        {
-            // set fp
-            code = space + "add\tfp, sp, #0" + endl + code;
-            // push fp
-            code = space + "push\t{fp}" + endl + code;
         }
         return code;
     }
@@ -165,7 +161,6 @@ namespace backend
             code += space + "sub\tsp, fp, #4" + endl;
             code += space + "pop\t{fp,lr}" + endl;
         }
-
         else
         {
             code += space + "add\tsp, fp, #0" + endl;
@@ -178,11 +173,8 @@ namespace backend
     string CodeGen::function_gen(Function *func)
     {
         string code;
-        curFunc = func;
-        haveCall = false;
         clearFunctionRecord(func);
-        string bbCode;
-        // if there is callinst in function
+        // 第一遍扫描
         auto bbs = func->getBasicBlocks();
         for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
         {
@@ -190,17 +182,65 @@ namespace backend
             for (auto &instr : bb->getInstructions())
             {
                 auto instrType = instr->getKind();
+                // 判断是否有函数调用,以及子函数参数个数最大值,子函数需要保护的参数个数最大值
                 if (instrType == Value::Kind::kCall)
                 {
                     haveCall = true;
-                    break;
+                    int args_size = dynamic_cast<CallInst *>(instr.get())->getArguments().size();
+                    int protect_cnt = dynamic_cast<CallInst *>(instr.get())->ProtectCnt();
+                    max_param = args_size > max_param ? args_size : max_param;
+                    max_protect = protect_cnt > max_protect ? protect_cnt : max_protect;
+                }
+                // 为局部变量开辟栈空间
+                else if (instrType == Value::Kind::kAlloca)
+                {
+                    auto alloca_inst = dynamic_cast<AllocaInst *>(instr.get());
+                    int NumDims = alloca_inst->getNumDims();
+                    auto Dims = alloca_inst->getDims();
+                    int num = 1;
+                    for (auto iter = Dims.begin(); iter != Dims.end(); iter++)
+                        num *= static_cast<const ConstantValue *>(*iter)->getInt();
+                    if (NumDims == 0)
+                        localVarStOffset.emplace(alloca_inst, top_offset);
+                    else if (NumDims > 0)
+                        localVarStOffset.emplace(alloca_inst, top_offset - 4 * num + 4);
+                    top_offset -= 4 * num;
                 }
             }
         }
-        top_offset = haveCall ? -12 : -8;
-        above_offset = 4;
-        max_param = 0;
-        backpatch.clear();
+        // 开辟形式参数&中间变量&寄存器保护&实际参数的栈空间
+        {
+            // 形式参数
+            auto args = func->getEntryBlock()->getArguments();
+            int arg_num = 0;
+            for (auto arg = args.begin(); arg != args.end(); ++arg)
+            {
+                // r0-r3
+                if (arg_num < 4)
+                {
+                    paramsStOffset.emplace(arg->get(), top_offset);
+                    top_offset -= 4;
+                }
+                // other
+                else
+                {
+                    paramsStOffset.emplace(arg->get(), above_offset);
+                    above_offset += 4;
+                }
+                arg_num++;
+            }
+            // 中间变量
+            temp_offset = top_offset;
+            top_offset -= 4;
+            // 寄存器保护
+            protect_reg_offset = top_offset;
+            top_offset -= 4 * max_protect;
+            // 传递的实参
+            if (max_param > 4)
+                top_offset -= (max_param - 4) * 4;
+        }
+        // 第二遍扫描,生成汇编代码
+        string bbCode;
         for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
         {
             auto bb = iter->get();
@@ -210,15 +250,6 @@ namespace backend
         string prologueCode = prologueCode_gen(func);
         string epilogueCode = epilogueCode_gen(func);
         string literalPoolsCode = literalPoolsCode_gen(func);
-        // backpatch parasoffset
-        int start_pos = 0;
-        int index = 0;
-        while ((const std::size_t)(start_pos = bbCode.find("unk", start_pos)) != std::string::npos)
-        {
-            int arg_offset = paramsStOffset[backpatch[index++]];
-            bbCode.replace(start_pos, 3, to_string(arg_offset));
-            start_pos += to_string(arg_offset).length();
-        }
         code += funcHead + prologueCode + bbCode +
                 epilogueCode + literalPoolsCode;
 
@@ -270,7 +301,7 @@ namespace backend
         else if (isa<CallInst>(rhs) && !lconst)
         {
             rname = "r" + rhs->getName();
-            code += space + "ldr\tr" + lhs->getName() + ", [fp, #-8]" + endl;
+            code += space + "ldr\tr" + lhs->getName() + ", [fp, #" + to_string(protect_reg_offset) + "]" + endl;
         }
         else
             rname = "r" + rhs->getName();
@@ -707,8 +738,14 @@ namespace backend
             else
                 code += space + "cmp\t" + lname + ", " + rname + endl;
         }
-        if (bInst->NeedToStore())
-            code += space + "str\tr" + res + ", [fp, #-8]" + endl;
+        int protect_offset = bInst->ProtectOffset();
+        int pass_offset = bInst->PassOffset();
+        // 如果该指令需要被保护
+        if (protect_offset >= 0)
+            code += space + "str\tr" + res + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+        // 如果该指令需要立即传参(即为第4个之后的参数)
+        if (pass_offset >= 0)
+            code += space + "str\tr" + res + ", [sp, #" + to_string(pass_offset) + "]" + endl;
         return {dstRegId, code};
     }
 
@@ -734,10 +771,6 @@ namespace backend
             lname = "#" + to_string(val);
             lconst = true;
         }
-        else if (isa<CallInst>(lhs))
-        { // 如果左右操作数都是函数调用返回值，那么先把第一个左操作数的函数返回值放到s1里面，第二个操作数的值仍在s0里
-            lname = 's' + to_string(16 - stoi(lhs->getName()));
-        }
         else
             lname = "s" + to_string(15 - stoi(lhs->getName()));
         if (isa<ConstantValue>(rhs))
@@ -752,7 +785,10 @@ namespace backend
             rconst = true;
         }
         else if (isa<CallInst>(rhs))
-            rname = 's' + to_string(16 - stoi(rhs->getName()));
+        {
+            rname = 's' + to_string(15 - stoi(rhs->getName()));
+            code += space + "vldr.32\ts" + lhs->getName() + ", [fp, #" + to_string(protect_reg_offset) + "]" + endl;
+        }
         else
             rname = "s" + to_string(15 - std::stoi(rhs->getName()));
         auto res = to_string(15 - std::stoi(bInst->getName()));
@@ -961,8 +997,14 @@ namespace backend
                 code += space + "vcmpe.f32\t" + lname + ", " + rname + endl;
             code += space + "vmrs\tAPSR_nzcv, FPSCR" + endl;
         }
-        if (bInst->NeedToStore())
-            code += space + "vstr\ts" + res + ", [fp, #-8]" + endl;
+        int protect_offset = bInst->ProtectOffset();
+        int pass_offset = bInst->PassOffset();
+        // 如果该指令需要被保护
+        if (protect_offset >= 0)
+            code += space + "vstr\tr" + res + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+        // 如果该指令需要立即传参(即为第4个之后的参数)
+        if (pass_offset >= 0)
+            code += space + "vstr\tr" + res + ", [sp, #" + to_string(pass_offset) + "]" + endl;
         return {dstRegId, code};
     }
 
@@ -987,31 +1029,55 @@ namespace backend
                 val_name = "r" + val->getName();
                 code += space + "rsb\tr" + uInst->getName() + ", " + val_name + ", #0" + endl;
             }
-            if (uInst->NeedToStore())
-                code += space + "str\tr" + uInst->getName() + ", [fp, #-8]" + endl;
+            int protect_offset = uInst->ProtectOffset();
+            int pass_offset = uInst->PassOffset();
+            // 如果该指令需要被保护
+            if (protect_offset >= 0)
+                code += space + "str\tr" + uInst->getName() + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+            // 如果该指令需要立即传参(即为第4个之后的参数)
+            if (pass_offset >= 0)
+                code += space + "str\tr" + uInst->getName() + ", [sp, #" + to_string(pass_offset) + "]" + endl;
         }
         else if (uInst->getKind() == Instruction::kFNeg)
         {
             val_name = "s" + to_string(15 - std::stoi(val->getName()));
             code += space + "vneg.f32\ts" + to_string(15 - std::stoi(uInst->getName())) + ", " + val_name + endl;
-            if (uInst->NeedToStore())
-                code += space + "vstr\ts" + to_string(15 - std::stoi(uInst->getName())) + ", [fp, #-8]" + endl;
+            int protect_offset = uInst->ProtectOffset();
+            int pass_offset = uInst->PassOffset();
+            // 如果该指令需要被保护
+            if (protect_offset >= 0)
+                code += space + "vstr\ts" + to_string(15 - std::stoi(uInst->getName())) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+            // 如果该指令需要立即传参(即为第4个之后的参数)
+            if (pass_offset >= 0)
+                code += space + "vstr\ts" + to_string(15 - std::stoi(uInst->getName())) + ", [sp, #" + to_string(pass_offset) + "]" + endl;
         }
         else if (uInst->getKind() == Instruction::kFtoI)
         {
             val_name = "s" + to_string(15 - std::stoi(val->getName()));
             code += space + "vcvt.s32.f32\ts" + to_string(15 - std::stoi(uInst->getName())) + "," + val_name + endl;
-            code += space + "vmov\tr" + to_string(std::stoi(uInst->getName())) + ", s" + to_string(15 - std::stoi(uInst->getName())) + endl;
-            if (uInst->NeedToStore())
-                code += space + "str\tr" + uInst->getName() + ", [fp, #-8]" + endl;
+            code += space + "vmov\tr" + uInst->getName() + ", s" + to_string(15 - std::stoi(uInst->getName())) + endl;
+            int protect_offset = uInst->ProtectOffset();
+            int pass_offset = uInst->PassOffset();
+            // 如果该指令需要被保护
+            if (protect_offset >= 0)
+                code += space + "str\tr" + uInst->getName() + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+            // 如果该指令需要立即传参(即为第4个之后的参数)
+            if (pass_offset >= 0)
+                code += space + "str\tr" + uInst->getName() + ", [sp, #" + to_string(pass_offset) + "]" + endl;
         }
         else if (uInst->getKind() == Instruction::kItoF)
         {
             val_name = "s" + to_string(15 - std::stoi(val->getName()));
             code += space + "vmov\t" + val_name + ", r" + val->getName() + endl;
             code += space + "vcvt.f32.s32\ts" + to_string(15 - std::stoi(uInst->getName())) + "," + val_name + endl;
-            if (uInst->NeedToStore())
-                code += space + "vstr\ts" + to_string(15 - std::stoi(uInst->getName())) + ", [fp, #-8]" + endl;
+            int protect_offset = uInst->ProtectOffset();
+            int pass_offset = uInst->PassOffset();
+            // 如果该指令需要被保护
+            if (protect_offset >= 0)
+                code += space + "vstr\ts" + to_string(15 - std::stoi(uInst->getName())) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+            // 如果该指令需要立即传参(即为第4个之后的参数)
+            if (pass_offset >= 0)
+                code += space + "vstr\ts" + to_string(15 - std::stoi(uInst->getName())) + ", [sp, #" + to_string(pass_offset) + endl;
         }
         return {dstRegId, code};
     }
@@ -1019,22 +1085,16 @@ namespace backend
     CodeGen::allocaInst_gen(AllocaInst *aInst, RegManager::RegId dstRegId)
     {
         string code;
+        // 计算元素个数
         int NumDims = aInst->getNumDims();
         auto Dims = aInst->getDims();
         int num = 1;
         for (auto iter = Dims.begin(); iter != Dims.end(); iter++)
-        {
             num *= static_cast<const ConstantValue *>(*iter)->getInt();
-        }
-        if (NumDims == 0)
-            localVarStOffset.emplace(aInst, top_offset);
-        else if (NumDims > 0)
-            localVarStOffset.emplace(aInst, top_offset - 4 * num + 4);
-        int top_offset_old = top_offset;
-        top_offset -= 4 * num;
+        // 对超过1个元素的数组进行初始化
         if (NumDims && num >= 2)
         {
-            int imm = -(top_offset + 4);
+            int imm = -localVarStOffset[aInst];
             if (imm < 256)
                 code += space + "sub\tr3, fp, #" + to_string(imm) + endl;
             else
@@ -1045,7 +1105,7 @@ namespace backend
             }
             if (num >= 18)
             {
-                code += space + "mov\tr2, #" + to_string(top_offset_old - top_offset) + endl;
+                code += space + "mov\tr2, #" + to_string(4 * num) + endl;
                 code += space + "mov\tr1, #0" + endl;
                 code += space + "mov\tr0, r3" + endl;
                 code += space + "bl\tmemset" + endl;
@@ -1389,7 +1449,7 @@ namespace backend
             // 参数的维度,(起始)地址偏移量
             auto arg = dynamic_cast<Argument *>(pointer);
             int NumDims = arg->getNumDims();
-            pos = 0;
+            pos = paramsStOffset[arg];
             // 参数标量
             if (NumDims == 0)
             {
@@ -1401,7 +1461,7 @@ namespace backend
                         int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
                         code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
                         code += space + "movt\tr3, #" + to_string((constant_value >> 16) & 0xffff) + endl;
-                        code += space + "str\tr3, [fp, #unk]" + endl;
+                        code += space + "str\tr3, [fp, #" + to_string(pos) + "]" + endl;
                     }
                     else if (value->isFloat())
                     {
@@ -1410,24 +1470,24 @@ namespace backend
                         std::memcpy(&dec, &constant_value, sizeof(dec));
                         code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
                         code += space + "movt\tr3, #" + to_string((dec >> 16) & 0xffff) + endl;
-                        code += space + "str\tr3, [fp, #unk]\t@ float" + endl;
+                        code += space + "str\tr3, [fp, #" + to_string(pos) + "]\t@ float" + endl;
                     }
                 }
                 // 存入函数返回值
                 else if (isa<CallInst>(value))
                 {
                     if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
-                        code += space + "str\tr0, [fp, #unk]" + endl;
+                        code += space + "str\tr0, [fp, #" + to_string(pos) + "]" + endl;
                     else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
-                        code += space + "vstr.32\ts0, [fp, #unk]" + endl;
+                        code += space + "vstr.32\ts0, [fp, #" + to_string(pos) + "]" + endl;
                 }
                 // 存入其他值
                 else
                 {
                     if (value->getType()->isInt())
-                        code += space + "str\tr" + value->getName() + ", [fp, #unk]" + endl;
+                        code += space + "str\tr" + value->getName() + ", [fp, #" + to_string(pos) + "]" + endl;
                     else if (value->getType()->isFloat())
-                        code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [fp, #unk]" + endl;
+                        code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [fp, #" + to_string(pos) + "]" + endl;
                 }
             }
             // 参数数组
@@ -1461,17 +1521,17 @@ namespace backend
                 // 数组下标均为常数
                 if (flag == false)
                 {
-                    pos += offset_array * 4;
+                    offset_array *= 4;
                     // 存入常数
                     if (isa<ConstantValue>(value))
                     {
-                        code += space + "ldr\tr0, [fp, #unk]" + endl;
+                        code += space + "ldr\tr0, [fp, #" + to_string(pos) + "]" + endl;
                         if (value->isInt())
                         {
                             int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
                             code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
                             code += space + "movt\tr3, #" + to_string((constant_value >> 16) & 0xffff) + endl;
-                            code += space + "str\tr3, [r0, #" + to_string(pos) + "]" + endl;
+                            code += space + "str\tr3, [r0, #" + to_string(offset_array) + "]" + endl;
                         }
                         else if (value->isFloat())
                         {
@@ -1480,27 +1540,27 @@ namespace backend
                             std::memcpy(&dec, &constant_value, sizeof(dec));
                             code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
                             code += space + "movt\tr3, #" + to_string((dec >> 16) & 0xffff) + endl;
-                            code += space + "str\tr3, [r0, #" + to_string(pos) + "]\t@ float" + endl;
+                            code += space + "str\tr3, [r0, #" + to_string(offset_array) + "]\t@ float" + endl;
                         }
                     }
                     // 存入函数返回值
                     else if (isa<CallInst>(value))
                     {
-                        code += space + "ldr\tr1, [fp, #unk]" + endl;
+                        code += space + "ldr\tr1, [fp, #" + to_string(pos) + "]" + endl;
                         if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
-                            code += space + "str\tr0, [r1, #" + to_string(pos) + "]" + endl;
+                            code += space + "str\tr0, [r1, #" + to_string(offset_array) + "]" + endl;
                         else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
-                            code += space + "vstr.32\ts0, [r1, #" + to_string(pos) + "]" + endl;
+                            code += space + "vstr.32\ts0, [r1, #" + to_string(offset_array) + "]" + endl;
                     }
                     // 存入其他值
                     else
                     {
                         int src_reg = (1 + std::stoi(value->getName())) % 11;
-                        code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #unk]" + endl;
+                        code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #" + to_string(pos) + "]" + endl;
                         if (value->getType()->isInt())
-                            code += space + "str\tr" + value->getName() + ", [r" + to_string(src_reg) + ", #" + to_string(pos) + "]" + endl;
+                            code += space + "str\tr" + value->getName() + ", [r" + to_string(src_reg) + ", #" + to_string(offset_array) + "]" + endl;
                         else if (value->getType()->isFloat())
-                            code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r" + to_string(src_reg) + ", #" + to_string(pos) + "]" + endl;
+                            code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r" + to_string(src_reg) + ", #" + to_string(offset_array) + "]" + endl;
                     }
                 }
                 // 数组下标含有变量
@@ -1535,7 +1595,7 @@ namespace backend
                     // 存入常数
                     if (isa<ConstantValue>(value))
                     {
-                        code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #unk]" + endl;
+                        code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #" + to_string(paramsStOffset[arg]) + "]" + endl;
                         code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r" + to_string(src_reg) + endl;
                         if (value->isInt())
                         {
@@ -1557,7 +1617,7 @@ namespace backend
                     // 存入函数返回值
                     else if (isa<CallInst>(value))
                     {
-                        code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #unk]" + endl;
+                        code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #" + to_string(paramsStOffset[arg]) + "]" + endl;
                         code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r" + to_string(src_reg) + endl;
                         if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
                             code += space + "str\tr0, [r" + first_var->getName() + "]" + endl;
@@ -1567,7 +1627,7 @@ namespace backend
                     // 存入其他值
                     else
                     {
-                        code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #unk]" + endl;
+                        code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #" + to_string(paramsStOffset[arg]) + "]" + endl;
                         code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r" + to_string(src_reg) + endl;
                         if (value->getType()->isInt())
                             code += space + "str\tr" + value->getName() + ", [r" + first_var->getName() + "]" + endl;
@@ -1576,7 +1636,6 @@ namespace backend
                     }
                 }
             }
-            backpatch.push_back(arg);
         }
         return code;
     }
@@ -1590,7 +1649,6 @@ namespace backend
         auto type = pointer->getType()->as<PointerType>()->getBaseType();
         int pos;                                  // variable's position in the stack
         int NumIndices = ldInst->getNumIndices(); // numindices denotes dimensions of pointer
-
         // if pointer is a localvariable
         if (localVarStOffset.find(dynamic_cast<Instruction *>(pointer)) != localVarStOffset.end())
         {
@@ -1823,14 +1881,14 @@ namespace backend
             // 参数的维度,(起始)地址偏移量
             auto arg = dynamic_cast<Argument *>(pointer);
             int NumDims = arg->getNumDims();
-            pos = 0;
+            pos = paramsStOffset[arg];
             // 参数标量
             if (NumDims == 0)
             {
                 if (type->isInt())
-                    code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #unk]" + endl;
+                    code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
                 else if (type->isFloat())
-                    code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [fp, #unk]" + endl;
+                    code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
             }
             // 参数数组
             else if (NumDims > 0)
@@ -1863,23 +1921,23 @@ namespace backend
                 // 数组下标均为常数
                 if (flag == false)
                 {
-                    pos += offset_array * 4;
+                    offset_array *= 4;
                     // load出数组的一个元素
                     if (NumIndices == NumDims)
                     {
-                        code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #unk]" + endl;
+                        code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
                         if (type->isInt())
-                            code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(pos) + "]" + endl;
+                            code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(offset_array) + "]" + endl;
                         else if (type->isFloat())
-                            code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(pos) + "]" + endl;
+                            code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(offset_array) + "]" + endl;
                     }
                     // load出一个(子)数组,求出其首地址
                     else if (NumIndices < NumDims)
                     {
-                        int imm = pos;
-                        code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #unk]" + endl;
+                        int imm = offset_array;
+                        code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
                         if (imm < 256)
-                            code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(pos) + endl;
+                            code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm) + endl;
                         else
                         {
                             code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 16 * 16) + endl;
@@ -1913,7 +1971,7 @@ namespace backend
                     }
                     code += space + "lsl\tr" + first_var->getName() + ", r" + first_var->getName() + ", #2" + endl;
                     // 参数数组的首地址
-                    code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #unk]" + endl;
+                    code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
                     // 获得地址
                     code += space + "add\tr" + first_var->getName() + ", r" + to_string(reg_num) + ", r" + first_var->getName() + endl;
                     // load出数组的一个元素
@@ -1930,7 +1988,47 @@ namespace backend
                     }
                 }
             }
-            backpatch.push_back(arg);
+        }
+        // 判断是否要被保护/直接存入传参栈中
+        int protect_offset = ldInst->ProtectOffset();
+        int pass_offset = ldInst->PassOffset();
+        if (ldInst->getType()->isInt())
+        {
+            // 如果该指令需要被保护
+            if (protect_offset >= 0)
+                code += space + "str\tr" + ldInst->getName() + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+            // 如果该指令需要立即传参(即为第4个之后的参数)
+            if (pass_offset >= 0)
+                code += space + "str\tr" + ldInst->getName() + ", [sp, #" + to_string(pass_offset) + "]" + endl;
+        }
+        else if (ldInst->getType()->isFloat())
+        {
+            int numdims = 0;
+            if (isa<GlobalValue>(pointer))
+                numdims = dynamic_cast<GlobalValue *>(pointer)->getNumDims();
+            else if (isa<AllocaInst>(pointer))
+                numdims = dynamic_cast<AllocaInst *>(pointer)->getNumDims();
+            else if (isa<Argument>(pointer))
+                numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
+            // 若load出的是一个float数组,其首地址仍用r寄存器
+            if (ldInst->getNumIndices() < numdims)
+            {
+                // 如果该指令需要被保护
+                if (protect_offset >= 0)
+                    code += space + "str\tr" + ldInst->getName() + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+                // 如果该指令需要立即传参(即为第4个之后的参数)
+                if (pass_offset >= 0)
+                    code += space + "str\tr" + ldInst->getName() + ", [sp, #" + to_string(pass_offset) + "]" + endl;
+            }
+            else
+            {
+                // 如果该指令需要被保护
+                if (protect_offset >= 0)
+                    code += space + "vstr\ts" + ldInst->getName() + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+                // 如果该指令需要立即传参(即为第4个之后的参数)
+                if (pass_offset >= 0)
+                    code += space + "vstr\ts" + ldInst->getName() + ", [sp, #" + to_string(pass_offset) + "]" + endl;
+            }
         }
         return {dstRegId, code};
     }
@@ -1978,9 +2076,6 @@ namespace backend
     string CodeGen::uncondBrInst_gen(UncondBrInst *ubInst)
     {
         string code;
-        /**
-         *code in here
-         */
         auto goal = ubInst->getBlock();
         code += space + "b\t" + goal->getName() + endl;
         return code;
@@ -1988,9 +2083,6 @@ namespace backend
     string CodeGen::condBrInst_gen(CondBrInst *cbInst)
     {
         string code;
-        /**
-         *code in here
-         */
         auto cond = cbInst->getCondition();
         auto then_block = cbInst->getThenBlock();
         auto else_block = cbInst->getElseBlock();
@@ -2120,8 +2212,6 @@ namespace backend
         RegId dst_reg = RegManager::R0;
         int arg_num = 0;
         int para_offset = 0;
-        // the max number of all subfunctions' arguments
-        max_param = args.size() > max_param ? args.size() : max_param;
         for (auto arg : args)
         {
             arg_num++;
@@ -2134,8 +2224,8 @@ namespace backend
                         code += space + "mov\tr4, #" + to_string(dynamic_cast<ConstantValue *>(arg)->getInt()) + endl;
                         code += space + "str\tr4, [sp, #" + to_string(para_offset) + "]" + endl;
                     }
-                    else
-                        code += space + "str\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
+                    // else
+                    //     code += space + "str\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
                 }
                 else if (arg->getType()->isFloat())
                 {
@@ -2149,24 +2239,24 @@ namespace backend
                         code += space + "vmov\ts4, " + "r4" + endl;
                         code += space + "vstr\ts4, [sp, #" + to_string(para_offset) + "]" + endl;
                     }
-                    else if (isa<LoadInst>(arg))
-                    {
-                        auto ld_inst = dynamic_cast<LoadInst *>(arg);
-                        auto pointer = ld_inst->getPointer();
-                        int numdims = 0;
-                        if (isa<GlobalValue>(pointer))
-                            numdims = dynamic_cast<GlobalValue *>(pointer)->getNumDims();
-                        else if (isa<AllocaInst>(pointer))
-                            numdims = dynamic_cast<AllocaInst *>(pointer)->getNumDims();
-                        else if (isa<Argument>(pointer))
-                            numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
-                        if (ld_inst->getNumIndices() < numdims)
-                            code += space + "str\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
-                        else
-                            code += space + "vstr\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
-                    }
-                    else
-                        code += space + "vstr\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
+                    // else if (isa<LoadInst>(arg))
+                    // {
+                    //     auto ld_inst = dynamic_cast<LoadInst *>(arg);
+                    //     auto pointer = ld_inst->getPointer();
+                    //     int numdims = 0;
+                    //     if (isa<GlobalValue>(pointer))
+                    //         numdims = dynamic_cast<GlobalValue *>(pointer)->getNumDims();
+                    //     else if (isa<AllocaInst>(pointer))
+                    //         numdims = dynamic_cast<AllocaInst *>(pointer)->getNumDims();
+                    //     else if (isa<Argument>(pointer))
+                    //         numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
+                    //     if (ld_inst->getNumIndices() < numdims)
+                    //         code += space + "str\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
+                    //     else
+                    //         code += space + "vstr\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
+                    // }
+                    // else
+                    //     code += space + "vstr\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
                 }
                 para_offset += 4;
                 continue;
@@ -2178,7 +2268,12 @@ namespace backend
                 if (isa<ConstantValue>(arg))
                     src_name = "#" + to_string(dynamic_cast<ConstantValue *>(arg)->getInt());
                 else
+                {
                     src_name = "r" + arg->getName();
+                    int protect_offset = dynamic_cast<Instruction *>(arg)->ProtectOffset();
+                    if (protect_offset >= 0)
+                        code += space + "ldr\t" + src_name + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+                }
                 code += space + "mov\tr" + to_string(arg_num - 1) + ", " + src_name + endl;
             }
             else if (arg->getType()->isFloat())
@@ -2203,16 +2298,26 @@ namespace backend
                         numdims = dynamic_cast<AllocaInst *>(pointer)->getNumDims();
                     else if (isa<Argument>(pointer))
                         numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
+                    int protect_offset = dynamic_cast<Instruction *>(arg)->ProtectOffset();
                     if (ld_inst->getNumIndices() < numdims)
                     {
                         src_name = "r" + arg->getName();
+                        if (protect_offset >= 0)
+                            code += space + "ldr\t" + src_name + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
                         code += space + "mov\tr" + to_string(arg_num - 1) + ", " + src_name + endl;
                     }
                     else
+                    {
+                        if (protect_offset >= 0)
+                            code += space + "vldr.32\t" + to_string(15 - std::stoi(arg->getName())) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
                         code += space + "vmov.f32\ts" + to_string(arg_num - 1) + ", " + "s" + to_string(15 - std::stoi(arg->getName())) + endl;
+                    }
                 }
                 else
                 {
+                    int protect_offset = dynamic_cast<Instruction *>(arg)->ProtectOffset();
+                    if (protect_offset >= 0)
+                        code += space + "vldr.32\t" + to_string(15 - std::stoi(arg->getName())) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
                     code += space + "vmov.f32\ts" + to_string(arg_num - 1) + ", " + "s" + to_string(15 - std::stoi(arg->getName())) + endl;
                 }
             }
@@ -2221,15 +2326,29 @@ namespace backend
         code += space + "bl\t" + callee_fuc->getName() + endl;
         if (callInst->getType()->isInt())
         {
-            if (callInst->NeedToStore())
-                code += space + "str\tr0, [fp, #-8]" + endl;
+            int protect_offset = callInst->ProtectOffset();
+            int pass_offset = callInst->PassOffset();
+            // 如果函数返回值需要被保护
+            if (protect_offset >= 0)
+                code += space + "str\tr0, [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+            // 如果函数返回值需要立即传参(即为第4个之后的参数)
+            else if (pass_offset >= 0)
+                code += space + "str\tr0, [sp, #" + to_string(pass_offset) + "]" + endl;
+            // 否则将返回值mov到相应寄存器
             else
                 code += space + "mov\tr" + callInst->getName() + ", r0" + endl;
         }
         else if (callInst->getType()->isFloat())
         {
-            if (callInst->NeedToStore())
-                code += space + "vstr\ts0, [fp, #-8]" + endl;
+            int protect_offset = callInst->ProtectOffset();
+            int pass_offset = callInst->PassOffset();
+            // 如果函数返回值需要被保护
+            if (protect_offset >= 0)
+                code += space + "vstr\ts0, [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+            // 如果函数返回值需要立即传参(即为第4个之后的参数)
+            else if (pass_offset >= 0)
+                code += space + "vstr\ts0, [sp, #" + to_string(pass_offset) + "]" + endl;
+            // 否则将返回值mov到相应寄存器
             else
                 code += space + "vmov\ts" + to_string(16 - stoi(callInst->getName())) + ", s0" + endl;
         }
