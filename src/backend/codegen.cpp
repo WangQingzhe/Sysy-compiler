@@ -123,7 +123,15 @@ namespace backend
         }
         if (max_param > 4)
             top_offset -= (max_param - 4) * 4;
-        code = space + "sub\tsp, sp, #" + to_string(-top_offset - 4) + endl + code;
+        int imm = -(top_offset + 4);
+        if (imm > 255)
+        {
+            if (imm % 16 != 0)
+                code = space + "sub\tsp, sp, #" + to_string(imm % 16) + endl + code;
+            code = space + "sub\tsp, sp, #" + to_string(imm / 16 * 16) + endl + code;
+        }
+        else
+            code = space + "sub\tsp, sp, #" + to_string(imm) + endl + code;
         if (haveCall)
         {
             // set fp
@@ -243,7 +251,7 @@ namespace backend
         int instrname = stoi(bInst->getName());
         auto lhs = bInst->getLhs();
         auto rhs = bInst->getRhs();
-        int r_val, l_val;
+        int r_val = 0, l_val = 0;
         bool lconst = false, rconst = false;
         if (isa<ConstantValue>(lhs))
         {
@@ -1012,7 +1020,15 @@ namespace backend
         top_offset -= 4 * num;
         if (NumDims && num >= 2)
         {
-            code += space + "sub\tr3, fp, #" + to_string(-top_offset - 4) + endl;
+            int imm = -(top_offset + 4);
+            if (imm < 256)
+                code += space + "sub\tr3, fp, #" + to_string(imm) + endl;
+            else
+            {
+                code += space + "sub\tr3, fp, #" + to_string(imm / 16 * 16) + endl;
+                if (imm % 16 != 0)
+                    code += space + "sub\tr3, r3, #" + to_string(imm % 16) + endl;
+            }
             if (num >= 18)
             {
                 code += space + "mov\tr2, #" + to_string(top_offset_old - top_offset) + endl;
@@ -1619,7 +1635,15 @@ namespace backend
                     // load出一个(子)数组,求出其首地址
                     else if (NumIndices < NumDims)
                     {
-                        code += space + "sub\tr" + to_string(reg_num) + ", fp, #" + to_string(-pos) + endl;
+                        int imm = -pos;
+                        if (imm < 256)
+                            code += space + "sub\tr" + to_string(reg_num) + ", fp, #" + to_string(-pos) + endl;
+                        else
+                        {
+                            code += space + "sub\tr" + to_string(reg_num) + ", fp, #" + to_string(imm / 16 * 16) + endl;
+                            if (imm % 16 != 0)
+                                code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 16) + endl;
+                        }
                     }
                 }
                 // 数组下标含有变量
@@ -1726,7 +1750,15 @@ namespace backend
                     // load出一个(子)数组,求出其首地址
                     else if (NumIndices < NumDims)
                     {
-                        code += space + "add\tr" + to_string(reg_num) + ", r10, #" + to_string(pos) + endl;
+                        int imm = pos;
+                        if (imm < 256)
+                            code += space + "add\tr" + to_string(reg_num) + ", r10, #" + to_string(pos) + endl;
+                        else
+                        {
+                            code += space + "add\tr" + to_string(reg_num) + ", r10, #" + to_string(imm / 16 * 16) + endl;
+                            if (imm % 16 != 0)
+                                code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 16) + endl;
+                        }
                     }
                 }
                 // 数组下标含有变量
@@ -1830,8 +1862,16 @@ namespace backend
                     // load出一个(子)数组,求出其首地址
                     else if (NumIndices < NumDims)
                     {
+                        int imm = pos;
                         code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #unk]" + endl;
-                        code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(pos) + endl;
+                        if (imm < 256)
+                            code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(pos) + endl;
+                        else
+                        {
+                            code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 16 * 16) + endl;
+                            if (imm % 16 != 0)
+                                code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 16) + endl;
+                        }
                     }
                 }
                 // 数组下标含有变量
