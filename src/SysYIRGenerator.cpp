@@ -504,18 +504,6 @@ namespace sysy
         // lfloat = dynamic_cast<ConstantValue *>(lhs)->getFloat();
         ldouble = dynamic_cast<ConstantValue *>(lhs)->getDouble();
     }
-    // else if (isa<AllocaInst>(lhs) && dynamic_cast<AllocaInst *>(lhs)->Const())
-    // {
-    //   lconst = true;
-    //   if (dynamic_cast<AllocaInst *>(lhs)->isInt())
-    //   {
-    //     lint = dynamic_cast<AllocaInst *>(lhs)->getInt();
-    //     ldouble = dynamic_cast<AllocaInst *>(lhs)->getInt();
-    //   }
-    //   else
-    //     // lfloat = dynamic_cast<AllocaInst *>(lhs)->getFloat();
-    //     ldouble = dynamic_cast<AllocaInst *>(lhs)->getDouble();
-    // }
     // judge if rhs is a constant
     bool rconst = false;
     int rint = 0;
@@ -533,18 +521,6 @@ namespace sysy
         // rfloat = dynamic_cast<ConstantValue *>(rhs)->getFloat();
         rdouble = dynamic_cast<ConstantValue *>(rhs)->getDouble();
     }
-    // else if (isa<AllocaInst>(rhs) && dynamic_cast<AllocaInst *>(rhs)->Const())
-    // {
-    //   rconst = true;
-    //   if (dynamic_cast<AllocaInst *>(rhs)->isInt())
-    //   {
-    //     rint = dynamic_cast<AllocaInst *>(rhs)->getInt();
-    //     rdouble = dynamic_cast<AllocaInst *>(rhs)->getInt();
-    //   }
-    //   else
-    //     // rfloat = dynamic_cast<AllocaInst *>(rhs)->getFloat();
-    //     rdouble = dynamic_cast<AllocaInst *>(rhs)->getDouble();
-    // }
     // create convert instruction if needed
     auto lhsTy = lhs->getType();
     auto rhsTy = rhs->getType();
@@ -952,13 +928,51 @@ namespace sysy
     auto rhs = any_cast<Value *>(ctx->exp(1)->accept(this));
     if (isa<CallInst>(rhs) && !isa<ConstantValue>(lhs))
       dynamic_cast<Instruction *>(lhs)->set_store();
+    // judge if lhs is a constant
+    bool lconst = false;
+    int lint = 0;
+    float lfloat = 0;
+    double ldouble = 0;
+    if (isa<ConstantValue>(lhs))
+    {
+      lconst = true;
+      if (lhs->isInt())
+      {
+        lint = dynamic_cast<ConstantValue *>(lhs)->getInt();
+        ldouble = dynamic_cast<ConstantValue *>(lhs)->getInt();
+      }
+      else if (lhs->isFloat())
+        // lfloat = dynamic_cast<ConstantValue *>(lhs)->getFloat();
+        ldouble = dynamic_cast<ConstantValue *>(lhs)->getDouble();
+    }
+    // judge if rhs is a constant
+    bool rconst = false;
+    int rint = 0;
+    float rfloat = 0;
+    double rdouble = 0;
+    if (isa<ConstantValue>(rhs))
+    {
+      rconst = true;
+      if (rhs->isInt())
+      {
+        rint = dynamic_cast<ConstantValue *>(rhs)->getInt();
+        rdouble = dynamic_cast<ConstantValue *>(rhs)->getInt();
+      }
+      else if (rhs->isFloat())
+        // rfloat = dynamic_cast<ConstantValue *>(rhs)->getFloat();
+        rdouble = dynamic_cast<ConstantValue *>(rhs)->getDouble();
+    }
     // create convert instruction if needed
     auto lhsTy = lhs->getType();
     auto rhsTy = rhs->getType();
     auto type = getArithmeticResultType(lhsTy, rhsTy);
-    if (lhsTy != type)
+    if (lhsTy != type && lconst)
+      lhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(lhs)->getInt()));
+    else if (lhsTy != type)
       lhs = builder.createIToFInst(lhs);
-    if (rhsTy != type)
+    if (rhsTy != type && rconst)
+      rhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(rhs)->getInt()));
+    else if (rhsTy != type)
       rhs = builder.createIToFInst(rhs);
 
     Value *result = nullptr;
