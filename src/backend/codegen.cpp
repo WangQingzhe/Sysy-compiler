@@ -723,6 +723,8 @@ namespace backend
         auto lhs = bInst->getLhs();
         auto rhs = bInst->getRhs();
         bool lconst = false, rconst = false;
+        int rvalue;
+        int instrname = stoi(bInst->getName());
         if (isa<ConstantValue>(lhs))
         {
             // float val = dynamic_cast<ConstantValue *>(lhs)->getFloat();
@@ -743,7 +745,7 @@ namespace backend
             // float val = dynamic_cast<ConstantValue *>(rhs)->getFloat();
             float val = dynamic_cast<ConstantValue *>(rhs)->getDouble();
             // unsigned int num;
-            // memcpy(&num, &val, sizeof(val));
+            memcpy(&rvalue, &val, sizeof(val));
             char s[200];
             sprintf(s, "%3.1e", val);
             rname = "#" + string(s);
@@ -879,8 +881,10 @@ namespace backend
         {
             if (rconst)
             {
-                string immname = to_string(15 - std::stoi(bInst->getName()));
-                code += space + "vmov.f32\ts" + immname + ", " + rname + endl;
+                string immname = to_string(15 - instrname);
+                code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(rvalue & 0xffff) + endl;
+                code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((rvalue >> 16) & 0xffff) + endl;
+                code += space + "vmov\ts" + immname + ", r" + to_string(instrname) + endl;
                 code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
             }
             else
@@ -891,8 +895,10 @@ namespace backend
         {
             if (rconst)
             {
-                string immname = to_string(15 - std::stoi(bInst->getName()));
-                code += space + "vmov.f32\ts" + immname + ", " + rname + endl;
+                string immname = to_string(15 - instrname);
+                code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(rvalue & 0xffff) + endl;
+                code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((rvalue >> 16) & 0xffff) + endl;
+                code += space + "vmov\ts" + immname + ", r" + to_string(instrname) + endl;
                 code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
             }
             else
@@ -903,8 +909,10 @@ namespace backend
         {
             if (rconst)
             {
-                string immname = to_string(15 - std::stoi(bInst->getName()));
-                code += space + "vmov.f32\ts" + immname + ", " + rname + endl;
+                string immname = to_string(15 - instrname);
+                code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(rvalue & 0xffff) + endl;
+                code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((rvalue >> 16) & 0xffff) + endl;
+                code += space + "vmov\ts" + immname + ", r" + to_string(instrname) + endl;
                 code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
             }
             else
@@ -915,8 +923,10 @@ namespace backend
         {
             if (rconst)
             {
-                string immname = to_string(15 - std::stoi(bInst->getName()));
-                code += space + "vmov.f32\ts" + immname + ", " + rname + endl;
+                string immname = to_string(15 - instrname);
+                code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(rvalue & 0xffff) + endl;
+                code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((rvalue >> 16) & 0xffff) + endl;
+                code += space + "vmov\ts" + immname + ", r" + to_string(instrname) + endl;
                 code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
             }
             else
@@ -927,8 +937,10 @@ namespace backend
         {
             if (rconst)
             {
-                string immname = to_string(15 - std::stoi(bInst->getName()));
-                code += space + "vmov.f32\ts" + immname + ", " + rname + endl;
+                string immname = to_string(15 - instrname);
+                code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(rvalue & 0xffff) + endl;
+                code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((rvalue >> 16) & 0xffff) + endl;
+                code += space + "vmov\ts" + immname + ", r" + to_string(instrname) + endl;
                 code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
             }
             else
@@ -939,8 +951,10 @@ namespace backend
         {
             if (rconst)
             {
-                string immname = to_string(15 - std::stoi(bInst->getName()));
-                code += space + "vmov.f32\ts" + immname + ", " + rname + endl;
+                string immname = to_string(15 - instrname);
+                code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(rvalue & 0xffff) + endl;
+                code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((rvalue >> 16) & 0xffff) + endl;
+                code += space + "vmov\ts" + immname + ", r" + to_string(instrname) + endl;
                 code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
             }
             else
