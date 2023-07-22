@@ -2309,7 +2309,7 @@ namespace backend
                     else
                     {
                         if (protect_offset >= 0)
-                            code += space + "vldr.32\t" + to_string(15 - std::stoi(arg->getName())) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+                            code += space + "vldr.32\ts" + to_string(15 - std::stoi(arg->getName())) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
                         code += space + "vmov.f32\ts" + to_string(arg_num - 1) + ", " + "s" + to_string(15 - std::stoi(arg->getName())) + endl;
                     }
                 }
@@ -2317,7 +2317,7 @@ namespace backend
                 {
                     int protect_offset = dynamic_cast<Instruction *>(arg)->ProtectOffset();
                     if (protect_offset >= 0)
-                        code += space + "vldr.32\t" + to_string(15 - std::stoi(arg->getName())) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+                        code += space + "vldr.32\ts" + to_string(15 - std::stoi(arg->getName())) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
                     code += space + "vmov.f32\ts" + to_string(arg_num - 1) + ", " + "s" + to_string(15 - std::stoi(arg->getName())) + endl;
                 }
             }
@@ -2350,7 +2350,7 @@ namespace backend
                 code += space + "vstr\ts0, [sp, #" + to_string(pass_offset) + "]" + endl;
             // 否则将返回值mov到相应寄存器
             else
-                code += space + "vmov\ts" + to_string(16 - stoi(callInst->getName())) + ", s0" + endl;
+                code += space + "vmov\ts" + to_string(15 - stoi(callInst->getName())) + ", s0" + endl;
         }
         return {dstRegId, code};
     }
