@@ -40,7 +40,7 @@ namespace sysy
     // auto getarray_entry = f_getarray->addBasicBlock("getarray_entry");
     // auto getarray_arg = getarray_entry->createArgument(Type::getPointerType(Type::getIntType()));
     // create function:getfarray
-    auto getfarray_type = Type::getFunctionType(Type::getIntType(), {Type::getPointerType(Type::getIntType())});
+    auto getfarray_type = Type::getFunctionType(Type::getIntType(), {Type::getPointerType(Type::getFloatType())});
     auto f_getfarray = pModule->createFunction("getfarray", getfarray_type);
     symbols.insert("getfarray", f_getfarray);
     // create function:putint
@@ -68,7 +68,7 @@ namespace sysy
     // auto putint_entry = f_putint->addBasicBlock("putfloat_entry");
     // auto putint_arg = putint_entry->createArgument(Type::getPointerType(Type::getIntType()));
     // create function:putfarray
-    auto putfarray_type = Type::getFunctionType(Type::getVoidType(), {Type::getPointerType(Type::getIntType()), Type::getPointerType(Type::getIntType())});
+    auto putfarray_type = Type::getFunctionType(Type::getVoidType(), {Type::getPointerType(Type::getIntType()), Type::getPointerType(Type::getFloatType())});
     auto f_putfarray = pModule->createFunction("putfarray", putfarray_type);
     symbols.insert("putfarray", f_putfarray);
     // auto putint_entry = f_putint->addBasicBlock("putfloat_entry");
@@ -110,6 +110,14 @@ namespace sysy
       {
         auto init = varDef->ASSIGN() ? any_cast<Value *>((varDef->initValue()->exp()->accept(this)))
                                      : nullptr;
+        if (init && isa<ConstantValue>(init))
+        {
+          Type *btype = type->as<PointerType>()->getBaseType();
+          if (btype->isInt() && init->getType()->isFloat())
+            init = ConstantValue::get((int)dynamic_cast<ConstantValue *>(init)->getDouble());
+          else if (btype->isFloat() && init->getType()->isInt())
+            init = ConstantValue::get((double)dynamic_cast<ConstantValue *>(init)->getInt());
+        }
         //******************Revised by lyq BEGIN***************************************
         auto global_value = module->createGlobalValue(name, type, dims, init, isConst);
         //******************Revised by lyq END*****************************************
