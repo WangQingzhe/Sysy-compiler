@@ -20,6 +20,7 @@ namespace backend
         // clear last module's label record
         clearModuleRecord(module);
         code += space + ".arch armv7ve " + endl;
+        code += space + ".fpu neon" + endl;
         code += space + ".text " + endl;
         // generate asmcode for all global values
         auto global_values = module->getGlobalValues();
@@ -42,20 +43,7 @@ namespace backend
             if (libfunc.find(func->getName()) == libfunc.end())
                 textCode += function_gen(func) + endl;
         }
-        if (imms.size())
-            immcode += ".IMM:" + endl;
-        for (auto imm : imms)
-        {
-            double Dimm = imm;
-            long long num;
-            int num1, num2;
-            memcpy(&num, &Dimm, sizeof(Dimm));
-            num1 = (num & 0x00000000FFFFFFFF);
-            num2 = (num >> 32) & 0xFFFFFFFF;
-            immcode += space + ".word\t" + to_string(num1) + endl;
-            immcode += space + ".word\t" + to_string(num2) + endl;
-        }
-        code += (dataCode + textCode + immcode + endl);
+        code += (dataCode + immcode + textCode + endl);
         return code;
     }
 
@@ -167,6 +155,21 @@ namespace backend
             code += space + "pop\t{fp}" + endl;
         }
         code += space + "bx\tlr" + endl;
+        string immcode;
+        if (imms.size())
+            immcode += imms_name + ":" + endl;
+        for (auto imm : imms)
+        {
+            double Dimm = imm;
+            long long num;
+            int num1, num2;
+            memcpy(&num, &Dimm, sizeof(Dimm));
+            num1 = (num & 0x00000000FFFFFFFF);
+            num2 = (num >> 32) & 0xFFFFFFFF;
+            immcode += space + ".word\t" + to_string(num1) + endl;
+            immcode += space + ".word\t" + to_string(num2) + endl;
+        }
+        code += immcode;
         return code;
     }
 
@@ -802,7 +805,7 @@ namespace backend
                 std::string dname = to_string(16 + std::stoi(rhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
                 code += space + "vcvt.f64.f32\td" + dname + ", " + rname + endl;
-                code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
+                code += space + "vldr.64\td" + immname + ", " + imms_name + "+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_l);
                 code += space + "vadd.f64\td" + immname + ", d" + immname + ", d" + dname + endl;
@@ -814,7 +817,7 @@ namespace backend
                 std::string dname = to_string(16 + std::stoi(lhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
                 code += space + "vcvt.f64.f32\td" + dname + ", " + lname + endl;
-                code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
+                code += space + "vldr.64\td" + immname + ", " + imms_name + "+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_r);
                 code += space + "vadd.f64\td" + immname + ", d" + immname + ", d" + dname + endl;
@@ -831,7 +834,7 @@ namespace backend
                 std::string dname = to_string(16 + std::stoi(rhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
                 code += space + "vcvt.f64.f32\td" + dname + ", " + rname + endl;
-                code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
+                code += space + "vldr.64\td" + immname + ", " + imms_name + "+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
 
                 imms.push_back(val_l);
@@ -844,7 +847,7 @@ namespace backend
                 std::string dname = to_string(16 + std::stoi(lhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
                 code += space + "vcvt.f64.f32\td" + dname + ", " + lname + endl;
-                code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
+                code += space + "vldr.64\td" + immname + ", " + imms_name + "+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_r);
                 code += space + "vsub.f64\td" + dname + ", d" + dname + ", d" + immname + endl;
@@ -861,7 +864,7 @@ namespace backend
                 std::string dname = to_string(16 + std::stoi(rhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
                 code += space + "vcvt.f64.f32\td" + dname + ", " + rname + endl;
-                code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
+                code += space + "vldr.64\td" + immname + ", " + imms_name + "+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_l);
                 code += space + "vmul.f64\td" + immname + ", d" + immname + ", d" + dname + endl;
@@ -873,7 +876,7 @@ namespace backend
                 std::string dname = to_string(16 + std::stoi(lhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
                 code += space + "vcvt.f64.f32\td" + dname + ", " + lname + endl;
-                code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
+                code += space + "vldr.64\td" + immname + ", " + imms_name + "+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_r);
                 code += space + "vmul.f64\td" + immname + ", d" + immname + ", d" + dname + endl;
@@ -890,7 +893,7 @@ namespace backend
                 std::string dname = to_string(16 + std::stoi(rhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
                 code += space + "vcvt.f64.f32\td" + dname + ", " + rname + endl;
-                code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
+                code += space + "vldr.64\td" + immname + ", " + imms_name + "+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_l);
                 code += space + "vdiv.f64\td" + immname + ", d" + immname + ", d" + dname + endl;
@@ -902,7 +905,7 @@ namespace backend
                 std::string dname = to_string(16 + std::stoi(lhs->getName()));
                 std::string immname = to_string(16 + std::stoi(bInst->getName()));
                 code += space + "vcvt.f64.f32\td" + dname + ", " + lname + endl;
-                code += space + "vldr.64\td" + immname + ", .IMM+" + to_string(imm_offset) + endl;
+                code += space + "vldr.64\td" + immname + ", " + imms_name + "+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_r);
                 code += space + "vdiv.f64\td" + immname + ", d" + dname + ", d" + immname + endl;

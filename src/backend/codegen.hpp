@@ -191,6 +191,7 @@ namespace backend
         int max_protect = 1;
         int imm_offset = 0;
         vector<double> imms;
+        string imms_name;
         bool haveCall = false;
         set<string> libfunc = {"getint", "getch", "getfloat", "getarray", "getfarray", "putint", "putch", "putfloat", "putarray", "putfarray", "starttime", "stoptime", "putf"};
 
@@ -248,6 +249,9 @@ namespace backend
             max_param = 0;
             temp_offset = 0;
             protect_reg_offset = 0;
+            imm_offset = 0;
+            imms.clear();
+            imms_name = "IMM_" + func->getName();
             //
             stOffsetAcc = 0;
         }

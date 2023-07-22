@@ -754,6 +754,8 @@ namespace sysy
       }
     }
     Value *call = builder.createCallInst(func, args);
+    if (call->getType()->isVoid())
+      parent_func->resetVariableID();
     dynamic_cast<Instruction *>(call)->set_protect_cnt(last_call_num);
     return call;
   }
