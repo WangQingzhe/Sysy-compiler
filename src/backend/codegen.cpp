@@ -1339,7 +1339,15 @@ namespace backend
                     }
                 }
                 code += space + "lsl\tr" + first_var->getName() + ", r" + first_var->getName() + ", #2" + endl;
-                code += space + "sub\tr" + first_var->getName() + ", r" + first_var->getName() + ", #" + to_string(-pos) + endl;
+                int imm = -pos;
+                if (imm < 256)
+                    code += space + "sub\tr" + first_var->getName() + ", r" + first_var->getName() + ", #" + to_string(-pos) + endl;
+                else
+                {
+                    code += space + "sub\tr" + first_var->getName() + ", r" + first_var->getName() + ", #" + to_string(imm / 256 * 256) + endl;
+                    if (imm % 256 != 0)
+                        code += space + "sub\tr" + first_var->getName() + ", r" + first_var->getName() + ", #" + to_string(imm % 256) + endl;
+                }
                 code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", fp" + endl;
 
                 // 存入常数

@@ -451,12 +451,18 @@ namespace sysy
     if (not value)
       error(ctx, "undefined variable");
     vector<Value *> indices;
+    bool const_indices = true;
     for (auto exp : ctx->lValue()->exp())
-      indices.push_back(any_cast<Value *>(exp->accept(this)));
+    {
+      auto indice = any_cast<Value *>(exp->accept(this));
+      if (!isa<ConstantValue>(indice))
+        const_indices = false;
+      indices.push_back(indice);
+    }
     if (isa<GlobalValue>(value))
     {
       auto global_val = dynamic_cast<GlobalValue *>(value);
-      if (global_val->isconst())
+      if (global_val->isconst() && const_indices)
       {
         if (global_val->getNumDims() == 0)
           value = global_val->init();
@@ -471,7 +477,7 @@ namespace sysy
     else if (isa<AllocaInst>(value))
     {
       auto alloca_inst = dynamic_cast<AllocaInst *>(value);
-      if (alloca_inst->Const())
+      if (alloca_inst->Const() && const_indices)
       {
         if (alloca_inst->isInt())
           value = ConstantValue::get(alloca_inst->getInt(indices));
