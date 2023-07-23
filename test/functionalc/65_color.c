@@ -1,45 +1,66 @@
-const int maxn = 18;
-const int mod = 1000000007;
-int dp[maxn][maxn][maxn][maxn][maxn][7];
+/*
+ * @Description:
+ * @Author: 王清哲
+ * @Date: 2023-07-23 11:55:52
+ * @LastEditTime: 2023-07-23 19:39:06
+ * @LastEditors: 王清哲
+ */
+// const int 18 = 18;
+// const int 1000000007 = 1000000007;
+int dp[18][18][18][18][18][7];
 int list[200];
 
-int equal(int a, int b) {
+int equal(int a, int b)
+{
     if (a == b)
         return 1;
     return 0;
 }
 
-int dfs(int a, int b, int c, int d, int e, int last){
-    if(dp[a][b][c][d][e][last] != -1)
+int dfs(int a, int b, int c, int d, int e, int last)
+{
+    if (dp[a][b][c][d][e][last] != -1)
         return dp[a][b][c][d][e][last];
-    if(a + b + c + d + e == 0)
+    if (a + b + c + d + e == 0)
         return 1;
     int ans = 0;
-    if (a) ans = (ans + (a - equal(last, 2)) * dfs(a - 1, b, c, d, e, 1)) % mod;
-    if (b) ans = (ans + (b - equal(last, 3)) * dfs(a + 1, b - 1, c, d, e, 2)) % mod;
-    if (c) ans = (ans + (c - equal(last, 4)) * dfs(a, b + 1, c - 1, d, e, 3)) % mod;
-    if (d) ans = (ans + (d - equal(last, 5)) * dfs(a, b, c + 1, d - 1, e, 4)) % mod;
-    if (e) ans = (ans + e * dfs(a, b, c, d + 1, e - 1, 5)) % mod;
-    dp[a][b][c][d][e][last] = ans % mod;
+    if (a)
+        ans = (ans + (a - equal(last, 2)) * dfs(a - 1, b, c, d, e, 1)) % 1000000007;
+    if (b)
+        ans = (ans + (b - equal(last, 3)) * dfs(a + 1, b - 1, c, d, e, 2)) % 1000000007;
+    if (c)
+        ans = (ans + (c - equal(last, 4)) * dfs(a, b + 1, c - 1, d, e, 3)) % 1000000007;
+    if (d)
+        ans = (ans + (d - equal(last, 5)) * dfs(a, b, c + 1, d - 1, e, 4)) % 1000000007;
+    if (e)
+        ans = (ans + e * dfs(a, b, c, d + 1, e - 1, 5)) % 1000000007;
+    dp[a][b][c][d][e][last] = ans % 1000000007;
     return dp[a][b][c][d][e][last];
 }
 
 int cns[20];
- 
-int main(){
+
+int main()
+{
     int n = getint();
-    int i = 0; 
-    while (i < maxn) {
+    int i = 0;
+    while (i < 18)
+    {
         int j = 0;
-        while(j < maxn) {
+        while (j < 18)
+        {
             int k = 0;
-            while(k < maxn) {
+            while (k < 18)
+            {
                 int l = 0;
-                while (l < maxn) {
+                while (l < 18)
+                {
                     int m = 0;
-                    while (m < maxn) {
+                    while (m < 18)
+                    {
                         int h = 0;
-                        while (h < 7) {
+                        while (h < 7)
+                        {
                             dp[i][j][k][l][m][h] = -1;
                             h = h + 1;
                         }
@@ -53,9 +74,10 @@ int main(){
         }
         i = i + 1;
     }
-    
+
     i = 0;
-    while (i < n) {
+    while (i < n)
+    {
         list[i] = getint();
         cns[list[i]] = cns[list[i]] + 1;
         i = i + 1;

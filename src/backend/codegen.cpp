@@ -43,7 +43,9 @@ namespace backend
             if (libfunc.find(func->getName()) == libfunc.end())
                 textCode += function_gen(func) + endl;
         }
-        code += (dataCode + immcode + textCode + endl);
+        code += dataCode + immcode + textCode + endl;
+        code += ".ident \"GCC: (Arm GNU Toolchain 12.2.Rel1 (Build arm-12.24)) 12.2.1 20221205\"" + endl;
+        code += ".section	.note.GNU-stack,\"\",%progbits" + endl;
         return code;
     }
 
@@ -1273,7 +1275,7 @@ namespace backend
                     else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
                     {
                         if (imm < 256)
-                            code += space + "str\ts0, [fp, #" + to_string(pos) + "]" + endl;
+                            code += space + "vstr\ts0, [fp, #" + to_string(pos) + "]" + endl;
                         else
                         {
                             code += space + "sub\tr1, fp, #" + to_string(imm / 256 * 256) + endl;
@@ -1431,6 +1433,7 @@ namespace backend
             // 数组下标均为常数
             if (flag == false)
             {
+                int imm = pos;
                 // 存入常数
                 if (isa<ConstantValue>(value))
                 {
@@ -1439,7 +1442,27 @@ namespace backend
                         int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
                         code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
                         code += space + "movt\tr3, #" + to_string((constant_value >> 16) & 0xffff) + endl;
-                        code += space + "str\tr3, [r10, #" + to_string(pos) + "]" + endl;
+                        if (imm < 256)
+                            code += space + "str\tr3, [r10, #" + to_string(pos) + "]" + endl;
+                        else if (imm < 65536)
+                        {
+                            code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
+                            if (imm % 256 != 0)
+                                code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
+                            code += space + "str\tr3, [r10]" + endl;
+                        }
+                        else
+                        {
+                            code += space + "add\tr10, r10, #" + to_string(imm / 4096 * 4096) + endl;
+                            if (imm % 4096 != 0)
+                            {
+                                imm = imm % 4096;
+                                code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
+                                if (imm % 256)
+                                    code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
+                            }
+                            code += space + "str\tr3, [r10]" + endl;
+                        }
                     }
                     else if (value->isFloat())
                     {
@@ -1448,24 +1471,72 @@ namespace backend
                         std::memcpy(&dec, &constant_value, sizeof(dec));
                         code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
                         code += space + "movt\tr3, #" + to_string((dec >> 16) & 0xffff) + endl;
-                        code += space + "str\tr3, [r10, #" + to_string(pos) + "]\t@ float" + endl;
+                        if (imm < 256)
+                            code += space + "str\tr3, [r10, #" + to_string(pos) + "]" + endl;
+                        else
+                        {
+                            code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
+                            if (imm % 256 != 0)
+                                code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
+                            code += space + "str\tr3, [r10]\t@ float" + endl;
+                        }
                     }
                 }
                 // 存入函数返回值
                 else if (isa<CallInst>(value))
                 {
                     if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
-                        code += space + "str\tr0, [r10, #" + to_string(pos) + "]" + endl;
+                    {
+                        if (imm < 256)
+                            code += space + "str\tr0, [r10, #" + to_string(pos) + "]" + endl;
+                        else
+                        {
+                            code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
+                            if (imm % 256 != 0)
+                                code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
+                            code += space + "str\tr0, [r10]" + endl;
+                        }
+                    }
                     else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
-                        code += space + "vstr.32\ts0, [r10, #" + to_string(pos) + "]" + endl;
+                    {
+                        if (imm < 256)
+                            code += space + "vstr.32\ts0, [r10, #" + to_string(pos) + "]" + endl;
+                        else
+                        {
+                            code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
+                            if (imm % 256 != 0)
+                                code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
+                            code += space + "vstr.32\ts0, [r10]" + endl;
+                        }
+                    }
                 }
                 // 存入其他值
                 else
                 {
                     if (value->getType()->isInt())
-                        code += space + "str\tr" + value->getName() + ", [r10, #" + to_string(pos) + "]" + endl;
+                    {
+                        if (imm < 256)
+                            code += space + "str\tr" + value->getName() + ", [r10, #" + to_string(pos) + "]" + endl;
+                        else
+                        {
+                            code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
+                            if (imm % 256 != 0)
+                                code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
+                            code += space + "str\tr" + value->getName() + ", [r10]" + endl;
+                        }
+                    }
                     else if (value->getType()->isFloat())
-                        code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r10, #" + to_string(pos) + "]" + endl;
+                    {
+                        if (imm < 256)
+                            code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r10, #" + to_string(pos) + "]" + endl;
+                        else
+                        {
+                            code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
+                            if (imm % 256 != 0)
+                                code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
+                            code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r10]" + endl;
+                        }
+                    }
                 }
             }
             // 数组下标含有变量
@@ -1865,7 +1936,15 @@ namespace backend
                             code += space + "movw\tr10, #" + to_string(full_num[dim] & 0x0000FFFF) + endl;
                             code += space + "movt\tr10, #" + to_string((full_num[dim--] >> 16) & 0xffff) + endl;
                             code += space + "mul\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", r10" + endl;
-                            code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(offset_array) + endl;
+                            int imm = offset_array;
+                            if (imm < 256)
+                                code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(offset_array) + endl;
+                            else
+                            {
+                                code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(imm / 256 * 256) + endl;
+                                if (imm % 256 != 0)
+                                    code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(imm % 256) + endl;
+                            }
                             flag = true;
                         }
                         else
@@ -1910,15 +1989,15 @@ namespace backend
             int NumDims = global_value->getNumDims();
             pos = 0;
             // 获取全局数组(首)地址
-            code += space + "movw\tr10, #:lower16:" + pointer->getName() + endl;
-            code += space + "movt\tr10, #:upper16:" + pointer->getName() + endl;
+            code += space + "movw\tr" + to_string(reg_num) + ", #:lower16:" + pointer->getName() + endl;
+            code += space + "movt\tr" + to_string(reg_num) + ", #:upper16:" + pointer->getName() + endl;
             // 全局标量
             if (NumDims == 0)
             {
                 if (type->isInt())
-                    code += space + "ldr\tr" + to_string(reg_num) + ", [r10]" + endl;
+                    code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
                 else if (type->isFloat())
-                    code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r10]" + endl;
+                    code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
             }
             // 全局数组
             else if (NumDims > 0)
@@ -1952,23 +2031,56 @@ namespace backend
                 if (flag == false)
                 {
                     pos += offset_array * 4;
+                    int imm = pos;
                     // load出数组的一个元素
                     if (NumIndices == NumDims)
                     {
                         if (type->isInt())
-                            code += space + "ldr\tr" + to_string(reg_num) + ", [r10, #" + to_string(pos) + "]" + endl;
+                        {
+                            if (imm < 256)
+                                code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(pos) + "]" + endl;
+                            else if (imm < 65536)
+                            {
+                                code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 256 * 256) + endl;
+                                if (imm % 256 != 0)
+                                    code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
+                                code += "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                            }
+                            else
+                            {
+                                code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 4096 * 4096) + endl;
+                                if (imm % 4096 != 0)
+                                {
+                                    imm = imm % 4096;
+                                    code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 256 * 256) + endl;
+                                    if (imm % 256 != 0)
+                                        code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
+                                }
+                                code += "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                            }
+                        }
                         else if (type->isFloat())
-                            code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r10, #" + to_string(pos) + "]" + endl;
+                        {
+                            if (imm < 256)
+                                code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(pos) + "]" + endl;
+                            else
+                            {
+                                code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 256 * 256) + endl;
+                                if (imm % 256 != 0)
+                                    code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
+                                code += "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                            }
+                        }
                     }
                     // load出一个(子)数组,求出其首地址
                     else if (NumIndices < NumDims)
                     {
                         int imm = pos;
                         if (imm < 256)
-                            code += space + "add\tr" + to_string(reg_num) + ", r10, #" + to_string(pos) + endl;
+                            code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(pos) + endl;
                         else
                         {
-                            code += space + "add\tr" + to_string(reg_num) + ", r10, #" + to_string(imm / 256 * 256) + endl;
+                            code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 256 * 256) + endl;
                             if (imm % 256 != 0)
                                 code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
                         }
@@ -1999,7 +2111,7 @@ namespace backend
                         }
                     }
                     code += space + "lsl\tr" + first_var->getName() + ", r" + first_var->getName() + ", #2" + endl;
-                    code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r10" + endl;
+                    code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r" + to_string(reg_num) + endl;
                     // load出数组的一个元素
                     if (NumIndices == NumDims)
                     {
@@ -2026,8 +2138,19 @@ namespace backend
             // 参数标量
             if (NumDims == 0)
             {
+                int imm = -pos;
                 if (type->isInt())
-                    code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                {
+                    if (imm < 256)
+                        code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                    else
+                    {
+                        code += space + "sub\tr" + to_string(reg_num) + ", fp, #" + to_string(imm / 256 * 256) + endl;
+                        if (imm % 256 != 0)
+                            code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
+                        code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                    }
+                }
                 else if (type->isFloat())
                     code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
             }

@@ -407,7 +407,7 @@ fi
 echo $source_file
 ./build/bin/sysyc ./test/functionalc/$source_file 1 > ./test/ir.txt
 # generate assemble code
-arm-none-linux-gnueabihf-gcc -marm -O0 -S ./test/functionalc/$source_file -o ./test/ref.S
+arm-none-linux-gnueabihf-gcc -marm -O0 -Wno-implicit -S ./test/functionalc/$source_file -o ./test/ref.S
 ./build/bin/sysyc ./test/functionalc/$source_file > ./test/mine.S
 # generate executable file
 arm-none-linux-gnueabihf-gcc -marm ./test/ref.S -o ./test/ref.out -L. -lsysy -static
