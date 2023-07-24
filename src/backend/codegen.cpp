@@ -44,8 +44,7 @@ namespace backend
                 textCode += function_gen(func) + endl;
         }
         code += dataCode + immcode + textCode + endl;
-        code += ".ident \"GCC: (Arm GNU Toolchain 12.2.Rel1 (Build arm-12.24)) 12.2.1 20221205\"" + endl;
-        code += ".section	.note.GNU-stack,\"\",%progbits" + endl;
+        code += space + ".section	.note.GNU-stack,\"\",%progbits" + endl;
         return code;
     }
 
@@ -786,7 +785,7 @@ namespace backend
         auto lhs = bInst->getLhs();
         auto rhs = bInst->getRhs();
         bool lconst = false, rconst = false;
-        int rvalue;
+        int rvalue = 0;
         int instrname = stoi(bInst->getName());
         if (isa<ConstantValue>(lhs))
         {
