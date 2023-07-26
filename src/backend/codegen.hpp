@@ -130,20 +130,43 @@ namespace backend
             R8 = 8,
             R9 = 9,
             R10 = 10,
-            RNONE = 1024,
-            RANY = 2048,
+            S0 = 11,
+            S1 = 12,
+            S2 = 13,
+            S3 = 14,
+            S4 = 15,
+            S5 = 16,
+            S6 = 17,
+            S7 = 18,
+            S8 = 19,
+            S9 = 20,
+            S10 = 21,
+            S11 = 22,
+            S12 = 23,
+            S13 = 24,
+            S14 = 25,
+            S15 = 26,
+            NONE = 1024,
+            ANY = 2048,
         };
         static string toString(RegId reg)
         {
-            if (reg == RNONE)
-                return "RNONE";
-            if (reg == RANY)
-                return "RANY";
-            return "r" + to_string(reg);
+            if (reg == NONE)
+                return "NONE";
+            if (reg == ANY)
+                return "ANY";
+            if (reg >= 0 && reg <= 10)
+                return "r" + to_string(reg);
+            int sreg = reg;
+            sreg -= 11;
+            return "s" + to_string(sreg);
         }
-        static const int R = 9; // 通用寄存器个数:r0-r8
-        // 当前空闲的寄存器池
+        static const int R = 9;  // 通用R寄存器个数:r0-r8
+        static const int S = 14; // 通用S寄存器个数:s0-s13
+        // 当前空闲的r寄存器池
         priority_queue<RegId, vector<RegId>, std::greater<RegId>> reg_pool;
+        // 当前空闲的s寄存器池
+        priority_queue<RegId, vector<RegId>, std::greater<RegId>> sreg_pool;
         // 将所有通用寄存器设为空闲状态
         void ResetRegPool()
         {
@@ -156,17 +179,44 @@ namespace backend
             reg_pool.push(R6);
             reg_pool.push(R7);
             reg_pool.push(R8);
+            sreg_pool.push(S0);
+            sreg_pool.push(S1);
+            sreg_pool.push(S2);
+            sreg_pool.push(S3);
+            sreg_pool.push(S4);
+            sreg_pool.push(S5);
+            sreg_pool.push(S6);
+            sreg_pool.push(S7);
+            sreg_pool.push(S8);
+            sreg_pool.push(S9);
+            sreg_pool.push(S10);
+            sreg_pool.push(S11);
+            sreg_pool.push(S12);
+            sreg_pool.push(S13);
         }
-        // 从寄存器池中获取一个空闲寄存器
+        // 从r寄存器池中获取一个空闲r寄存器
         RegId GetFreeReg()
         {
             RegId free_reg = reg_pool.top();
             reg_pool.pop();
             return free_reg;
         }
+        // 从s寄存器池中获取一个空闲s寄存器
+        RegId GetFreesReg()
+        {
+            RegId free_reg = sreg_pool.top();
+            sreg_pool.pop();
+            return free_reg;
+        }
+        // 将一个r寄存器释放
         void AddFreeReg(RegId reg)
         {
             reg_pool.push(reg);
+        }
+        // 将一个s寄存器释放
+        void AddFreesReg(RegId reg)
+        {
+            sreg_pool.push(reg);
         }
     };
 
@@ -249,6 +299,8 @@ namespace backend
         {
             bool operator()(Instruction *const &a, Instruction *const &b) const
             {
+                if (a->GetEnd() == b->GetEnd())
+                    return a->GetStart() < b->GetStart();
                 return a->GetEnd() < b->GetEnd();
             }
         };
@@ -308,7 +360,11 @@ namespace backend
                 {
                     // active.erase(interval);
                     expired_intervals++;
-                    regm.AddFreeReg(Register[interval]);
+                    RegId freereg = Register[interval];
+                    if (freereg >= RegManager::R0 && freereg <= RegManager::R10)
+                        regm.AddFreeReg(freereg);
+                    else if (freereg >= RegManager::S0 && freereg <= RegManager::S15)
+                        regm.AddFreesReg(freereg);
                 }
             }
             for (int i = 0; i < expired_intervals; i++)
@@ -326,6 +382,7 @@ namespace backend
             if (spill->GetEnd() >= i->GetEnd())
             {
                 Register[i] = Register[spill];
+                Register[spill] = RegManager::NONE;
                 spill->setLocation(top_offset);
                 top_offset -= 4;
                 active.erase(spill);
@@ -334,6 +391,7 @@ namespace backend
             // 溢出i
             else
             {
+                Register[i] = RegManager::NONE;
                 i->setLocation(top_offset);
                 top_offset -= 4;
             }

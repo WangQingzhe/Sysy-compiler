@@ -220,7 +220,7 @@ namespace backend
                     // value->setStart(instr_num);
                     value->setEnd(instr_num);
                 }
-                else if (instr.get()->isBinary())
+                else if (instr->isBinary())
                 {
                     auto binary_inst = dynamic_cast<BinaryInst *>(instr.get());
                     auto lhs = binary_inst->getLhs();
@@ -231,7 +231,7 @@ namespace backend
                     // if (!isa<ConstantValue>(rhs))
                     rhs->setEnd(instr_num);
                 }
-                else if (instr.get()->isUnary())
+                else if (instr->isUnary())
                 {
                     auto unary_inst = dynamic_cast<UnaryInst *>(instr.get());
                     auto value = unary_inst->getOperand();
@@ -241,12 +241,30 @@ namespace backend
                 instr_num++;
             }
         }
-        // 第二遍扫描,使用线性扫描算法进行寄存器分配
+        // 第二遍扫描,使用线性扫描算法对r寄存器进行分配
         for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
         {
             auto bb = iter->get();
             for (auto &instr : bb->getInstructions())
             {
+                if (instr->getType()->isFloat())
+                {
+                    if (!isa<LoadInst>(instr.get()))
+                        continue;
+                    auto ldinst = dynamic_cast<LoadInst *>(instr.get());
+                    auto pointer = ldinst->getPointer();
+                    int numdims = 0;
+                    if (isa<GlobalValue>(pointer))
+                        numdims = dynamic_cast<GlobalValue *>(pointer)->getNumDims();
+                    else if (isa<Argument>(pointer))
+                        numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
+                    else if (isa<AllocaInst>(pointer))
+                        numdims = dynamic_cast<AllocaInst *>(pointer)->getNumDims();
+                    if (ldinst->getNumIndices() == numdims)
+                        continue;
+                    else
+                        ; // 若load出一个float数组,仍然按照int处理
+                }
                 auto instrType = instr->getKind();
                 // 只考虑能产生新变量的指令,这样就相当于从小到大遍历所有变量
                 if (instrType == Value::Kind::kCall || instrType == Value::Kind::kLoad || instr.get()->isBinary() || instr.get()->isUnary())
@@ -259,11 +277,39 @@ namespace backend
                         Register[instr.get()] = regm.GetFreeReg();
                         active.insert(instr.get());
                     }
-                    // code += regm.toString(Register[instr.get()]) + endl;
+                    // code += "%" + instr->getName() + regm.toString(Register[instr.get()]) + endl;
                 }
             }
         }
-        // 第三遍扫描,开辟局部变量的栈空间
+        // 第三遍扫描,使用线性扫描算法对s寄存器进行分配
+        active.clear();
+        for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
+        {
+            auto bb = iter->get();
+            for (auto &instr : bb->getInstructions())
+            {
+                if (instr->getType()->isInt())
+                    continue;
+                // 对于load一个float数组变量,已经为其分配了一个r寄存器,不能再分配s寄存器
+                else if (Register.find(instr.get()) != Register.end())
+                    continue;
+                auto instrType = instr->getKind();
+                // 只考虑能产生新变量的指令,这样就相当于从小到大遍历所有变量
+                if (instrType == Value::Kind::kCall || instrType == Value::Kind::kLoad || instr.get()->isBinary() || instr.get()->isUnary())
+                {
+                    ExpireOldIntervals(instr.get());
+                    if (active.size() == RegManager::S)
+                        SpillAtIntervals(instr.get());
+                    else
+                    {
+                        Register[instr.get()] = regm.GetFreesReg();
+                        active.insert(instr.get());
+                    }
+                    // code += "%" + instr->getName() + regm.toString(Register[instr.get()]) + endl;
+                }
+            }
+        }
+        // 第四遍扫描,开辟局部变量的栈空间
         for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
         {
             auto bb = iter->get();
@@ -328,7 +374,7 @@ namespace backend
             if (max_param > 4)
                 top_offset -= (max_param - 4) * 4;
         }
-        // 第四遍扫描,生成汇编代码
+        // 第五遍扫描,生成汇编代码
         string bbCode;
         for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
         {
@@ -1229,7 +1275,7 @@ namespace backend
                 code += space + "vstr\td18, [r3, #" + to_string(i * 8 - 4) + "]" + endl;
             }
         }
-        dstRegId = RegManager::RNONE;
+        dstRegId = RegManager::NONE;
         return {dstRegId, code};
     }
     string CodeGen::storeInst_gen(StoreInst *stInst)
@@ -2705,7 +2751,7 @@ namespace backend
     {
         string code;
         string unkName = instr->getName();
-        RegManager::RegId dstRegId = RegManager::RNONE;
+        RegManager::RegId dstRegId = RegManager::NONE;
         auto instrType = instr->getKind();
         pair<RegId, string> tmp;
         switch (instrType)
@@ -2725,7 +2771,7 @@ namespace backend
         {
             BinaryInst *bInst = dynamic_cast<BinaryInst *>(instr);
             // registers are used only for instruction operation, consider use which register (any one that is free for use)
-            tmp = binaryFloatInst_gen(bInst, RegManager::RANY);
+            tmp = binaryFloatInst_gen(bInst, RegManager::ANY);
             code += tmp.second;
             dstRegId = tmp.first;
             break;
@@ -2744,7 +2790,7 @@ namespace backend
         {
             BinaryInst *bInst = dynamic_cast<BinaryInst *>(instr);
             // registers are used only for instruction operation, consider use which register (any one that is free for use)
-            tmp = binaryInst_gen(bInst, RegManager::RANY);
+            tmp = binaryInst_gen(bInst, RegManager::ANY);
             code += tmp.second;
             dstRegId = tmp.first;
             break;
@@ -2752,7 +2798,7 @@ namespace backend
         case Instruction::kLoad:
         {
             LoadInst *ldInst = dynamic_cast<LoadInst *>(instr);
-            tmp = loadInst_gen(ldInst, RegManager::RANY);
+            tmp = loadInst_gen(ldInst, RegManager::ANY);
             // code += M_emitComment("load inst");
             code += tmp.second;
             dstRegId = tmp.first;
@@ -2769,7 +2815,7 @@ namespace backend
         case Instruction::kAlloca:
         {
             AllocaInst *aInst = dynamic_cast<AllocaInst *>(instr);
-            tmp = allocaInst_gen(aInst, RegManager::RANY);
+            tmp = allocaInst_gen(aInst, RegManager::ANY);
             // code += M_emitComment("alloca inst");
             code += tmp.second;
             dstRegId = tmp.first;
@@ -2786,7 +2832,7 @@ namespace backend
         case Instruction::kCall:
         {
             CallInst *cInst = dynamic_cast<CallInst *>(instr);
-            auto tmp = callInst_gen(cInst, RegManager::RANY);
+            auto tmp = callInst_gen(cInst, RegManager::ANY);
             code += tmp.second;
             dstRegId = tmp.first;
             if (dstRegId == RegManager::R0)
@@ -2814,7 +2860,7 @@ namespace backend
         case Instruction::kItoF:
         {
             UnaryInst *uInst = dynamic_cast<UnaryInst *>(instr);
-            tmp = unaryInst_gen(uInst, RegManager::RANY);
+            tmp = unaryInst_gen(uInst, RegManager::ANY);
             // code += "unary instr\n";
             code += tmp.second;
             dstRegId = tmp.first;
