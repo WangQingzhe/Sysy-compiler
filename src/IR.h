@@ -264,6 +264,9 @@ namespace sysy
     Type *type;
     std::string name;
     std::list<Use *> uses;
+    int startpoint = 0;
+    int endpoint = 0;
+    int location = 0;
 
   protected:
     Value(Kind kind, Type *type, const std::string &name = "")
@@ -289,6 +292,12 @@ namespace sysy
     void replaceAllUsesWith(Value *value);
     void removeUse(Use *use) { uses.remove(use); }
     bool isConstant() const;
+    void setStart(int start) { startpoint = start; }
+    void setEnd(int end) { endpoint = end; }
+    int GetStart() const { return startpoint; }
+    int GetEnd() const { return endpoint; }
+    void setLocation(int offset) { location = offset; }
+    int GetLocation() const { return location; }
 
   public:
     virtual void print(std::ostream &os) const {};

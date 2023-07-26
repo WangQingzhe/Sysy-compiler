@@ -16,7 +16,6 @@ namespace backend
         string code;
         string dataCode;
         string textCode;
-        string immcode;
         // clear last module's label record
         clearModuleRecord(module);
         code += space + ".arch armv7ve " + endl;
@@ -41,9 +40,9 @@ namespace backend
                 continue;
             // generate asmcode for each function
             if (libfunc.find(func->getName()) == libfunc.end())
-                textCode += function_gen(func) + endl;
+                textCode += function_gen(func);
         }
-        code += dataCode + immcode + textCode + endl;
+        code += dataCode + textCode;
         code += space + ".section	.note.GNU-stack,\"\",%progbits" + endl;
         return code;
     }
@@ -177,21 +176,6 @@ namespace backend
             code += space + "pop\t{fp}" + endl;
         }
         code += space + "bx\tlr" + endl;
-        string immcode;
-        if (imms.size())
-            immcode += imms_name + ":" + endl;
-        for (auto imm : imms)
-        {
-            double Dimm = imm;
-            long long num;
-            int num1, num2;
-            memcpy(&num, &Dimm, sizeof(Dimm));
-            num1 = (num & 0x00000000FFFFFFFF);
-            num2 = (num >> 32) & 0xFFFFFFFF;
-            immcode += space + ".word\t" + to_string(num1) + endl;
-            immcode += space + ".word\t" + to_string(num2) + endl;
-        }
-        code += immcode;
         return code;
     }
 
@@ -199,8 +183,87 @@ namespace backend
     {
         string code;
         clearFunctionRecord(func);
-        // 第一遍扫描
+        // 第一遍扫描,设置每个变量的活跃区间
+        int instr_num = 0;
         auto bbs = func->getBasicBlocks();
+        for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
+        {
+            auto bb = iter->get();
+            for (auto &instr : bb->getInstructions())
+            {
+                auto instrType = instr->getKind();
+                if (instrType == Value::Kind::kCall)
+                {
+                    auto call_inst = dynamic_cast<CallInst *>(instr.get());
+                    call_inst->setStart(instr_num);
+                    auto args = call_inst->getArguments();
+                    for (auto arg : args)
+                    {
+                        // if (isa<ConstantValue>(arg))
+                        //     arg->setStart(instr_num);
+                        arg->setEnd(instr_num);
+                    }
+                }
+                else if (instrType == Value::Kind::kAlloca)
+                {
+                }
+                else if (instrType == Value::Kind::kLoad)
+                {
+                    auto load_inst = dynamic_cast<LoadInst *>(instr.get());
+                    load_inst->setStart(instr_num);
+                }
+                else if (instrType == Value::Kind::kStore)
+                {
+                    auto store_inst = dynamic_cast<StoreInst *>(instr.get());
+                    auto value = store_inst->getValue();
+                    // if (isa<ConstantValue>(value))
+                    // value->setStart(instr_num);
+                    value->setEnd(instr_num);
+                }
+                else if (instr.get()->isBinary())
+                {
+                    auto binary_inst = dynamic_cast<BinaryInst *>(instr.get());
+                    auto lhs = binary_inst->getLhs();
+                    auto rhs = binary_inst->getRhs();
+                    binary_inst->setStart(instr_num);
+                    // if (!isa<ConstantValue>(lhs))
+                    lhs->setEnd(instr_num);
+                    // if (!isa<ConstantValue>(rhs))
+                    rhs->setEnd(instr_num);
+                }
+                else if (instr.get()->isUnary())
+                {
+                    auto unary_inst = dynamic_cast<UnaryInst *>(instr.get());
+                    auto value = unary_inst->getOperand();
+                    unary_inst->setStart(instr_num);
+                    value->setEnd(instr_num);
+                }
+                instr_num++;
+            }
+        }
+        // 第二遍扫描,使用线性扫描算法进行寄存器分配
+        for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
+        {
+            auto bb = iter->get();
+            for (auto &instr : bb->getInstructions())
+            {
+                auto instrType = instr->getKind();
+                // 只考虑能产生新变量的指令,这样就相当于从小到大遍历所有变量
+                if (instrType == Value::Kind::kCall || instrType == Value::Kind::kLoad || instr.get()->isBinary() || instr.get()->isUnary())
+                {
+                    ExpireOldIntervals(instr.get());
+                    if (active.size() == RegManager::R)
+                        SpillAtIntervals(instr.get());
+                    else
+                    {
+                        Register[instr.get()] = regm.GetFreeReg();
+                        active.insert(instr.get());
+                    }
+                    // code += regm.toString(Register[instr.get()]) + endl;
+                }
+            }
+        }
+        // 第三遍扫描,开辟局部变量的栈空间
         for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
         {
             auto bb = iter->get();
@@ -211,8 +274,9 @@ namespace backend
                 if (instrType == Value::Kind::kCall)
                 {
                     haveCall = true;
-                    int args_size = dynamic_cast<CallInst *>(instr.get())->getArguments().size();
-                    int protect_cnt = dynamic_cast<CallInst *>(instr.get())->ProtectCnt();
+                    auto alloca_inst = dynamic_cast<CallInst *>(instr.get());
+                    int args_size = alloca_inst->getArguments().size();
+                    int protect_cnt = alloca_inst->ProtectCnt();
                     max_param = args_size > max_param ? args_size : max_param;
                     max_protect = protect_cnt > max_protect ? protect_cnt : max_protect;
                 }
@@ -264,7 +328,7 @@ namespace backend
             if (max_param > 4)
                 top_offset -= (max_param - 4) * 4;
         }
-        // 第二遍扫描,生成汇编代码
+        // 第四遍扫描,生成汇编代码
         string bbCode;
         for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
         {
@@ -299,11 +363,12 @@ namespace backend
      * RegId : binaryInst_gen returns RegId as its destination operand
      * code  : asmcode generated by binaryInst_gen
      */
-
     pair<RegId, string> CodeGen::binaryInst_gen(BinaryInst *bInst, RegId dstRegId)
     {
         string code;
         string lname, rname;
+        dstRegId = Register[bInst];
+        RegId lRegId, rRegId;
         int instrname = stoi(bInst->getName());
         auto lhs = bInst->getLhs();
         auto rhs = bInst->getRhs();
@@ -316,7 +381,10 @@ namespace backend
             lconst = true;
         }
         else
+        {
             lname = "r" + lhs->getName();
+            lRegId = Register[dynamic_cast<Instruction *>(lhs)];
+        }
         if (isa<ConstantValue>(rhs))
         {
             rname = "#" + to_string(dynamic_cast<ConstantValue *>(rhs)->getInt());
@@ -326,29 +394,22 @@ namespace backend
         else if (isa<CallInst>(rhs) && !lconst)
         {
             rname = "r" + rhs->getName();
+            rRegId = Register[dynamic_cast<Instruction *>(rhs)];
             code += space + "ldr\tr" + lhs->getName() + ", [fp, #" + to_string(protect_reg_offset) + "]" + endl;
         }
         else
+        {
             rname = "r" + rhs->getName();
+            rRegId = Register[dynamic_cast<Instruction *>(rhs)];
+        }
         auto res = bInst->getName();
         if (bInst->getKind() == Instruction::kAdd)
         {
-            if (lconst && rconst)
-            {
-                int val = dynamic_cast<ConstantValue *>(lhs)->getInt() + dynamic_cast<ConstantValue *>(rhs)->getInt();
-                if (val >= 0)
-                    code += space + "mov\tr" + res + ", #" + to_string(val) + endl;
-                else
-                {
-                    code += space + "mov\tr" + res + ", #" + to_string(-val) + endl;
-                    code += space + "mvn\tr" + res + ", #1" + endl;
-                }
-            }
-            else if (lconst)
+            if (lconst)
             {
                 if (l_val <= 0xffff && l_val >= 0)
                 {
-                    code += space + "mov\tr" + res + ", " + lname + endl;
+                    code += emitInst_nosrcR_1DstR("mov", regm.toString(dstRegId), l_val);
                     code += space + "add\tr" + res + ", r" + res + ", " + rname + endl;
                 }
                 else
@@ -373,7 +434,8 @@ namespace backend
                 }
             }
             else
-                code += space + "add\tr" + res + ", " + lname + ", " + rname + endl;
+                // code += space + "add\tr" + res + ", " + lname + ", " + rname + endl;
+                code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
         }
         else if (bInst->getKind() == Instruction::kSub)
         {
@@ -1287,10 +1349,12 @@ namespace backend
                 // 存入其他值
                 else
                 {
+                    RegId srcRegId = Register[dynamic_cast<Instruction *>(value)];
                     if (value->getType()->isInt())
                     {
                         if (imm < 256)
-                            code += space + "str\tr" + value->getName() + ", [fp, #" + to_string(pos) + "]" + endl;
+                            // code += space + "str\tr" + value->getName() + ", [fp, #" + to_string(pos) + "]" + endl;
+                            code += emitInst_mem("str", regm.toString(srcRegId), "fp", pos);
                         else
                         {
                             int addr_reg = (1 + std::stoi(value->getName())) % 11;
@@ -1804,7 +1868,8 @@ namespace backend
     {
         string code;
         // dst register
-        int reg_num = dstRegId == RegManager::RANY ? stoi(ldInst->getName()) : dstRegId;
+        dstRegId = Register[ldInst];
+        int reg_num = dstRegId == stoi(ldInst->getName());
         // variable to be loaded
         auto pointer = ldInst->getPointer();
         auto type = pointer->getType()->as<PointerType>()->getBaseType();
@@ -1824,13 +1889,13 @@ namespace backend
                 if (type->isInt())
                 {
                     if (imm < 256)
-                        code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                        code += emitInst_mem("ldr", regm.toString(dstRegId), "fp", pos);
                     else
                     {
-                        code += space + "sub\tr" + to_string(reg_num) + ", fp ,#" + to_string(imm / 256 * 256) + endl;
+                        code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), "fp", imm / 256 * 256);
                         if (imm % 256 != 0)
-                            code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
-                        code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                            code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), regm.toString(dstRegId), imm % 256);
+                        code += emitInst_mem("ldr", regm.toString(dstRegId), regm.toString(dstRegId));
                     }
                 }
                 else if (type->isFloat())
@@ -2872,9 +2937,21 @@ namespace backend
     string CodeGen::literalPoolsCode_gen(Function *func)
     {
         string code;
-        /**
-         *code in here
-         */
+        string immcode;
+        if (imms.size())
+            immcode += imms_name + ":" + endl;
+        for (auto imm : imms)
+        {
+            double Dimm = imm;
+            long long num;
+            int num1, num2;
+            memcpy(&num, &Dimm, sizeof(Dimm));
+            num1 = (num & 0x00000000FFFFFFFF);
+            num2 = (num >> 32) & 0xFFFFFFFF;
+            immcode += space + ".word\t" + to_string(num1) + endl;
+            immcode += space + ".word\t" + to_string(num2) + endl;
+        }
+        code += immcode;
         return code;
     }
 

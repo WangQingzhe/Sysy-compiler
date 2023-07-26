@@ -27,11 +27,14 @@
 #include <IR.h>
 #include <vector>
 #include <sstream>
+#include <queue>
+#include <functional>
 
 using namespace sysy;
 using std::find;
 using std::map;
 using std::pair;
+using std::priority_queue;
 using std::set;
 using std::string;
 using std::to_string;
@@ -78,20 +81,41 @@ namespace backend
     }
     //
     static string
-    emitInst_1srcR_noDstR(string name, string srcReg)
+    emitInst_mem(string name, string reg, string base, int offset = 0)
     {
-        return space + name + " " + srcReg + endl;
+        string inst = space + name + "\t" + reg + ", [" + base;
+        if (offset == 0)
+            inst += "]" + endl;
+        else
+            inst += ", #" + to_string(offset) + "]" + endl;
+        return inst;
     }
     static string
-    emitInst_2srcR_1dstR(string name, string srcReg0, string srcReg1, string dstReg)
+    emitInst_nosrcR_1DstR(string name, string dstReg, int imm = 0)
     {
-        return space + name + " " + dstReg + ", " +
-               srcReg0 + ", " + srcReg1 + endl;
+        return space + name + "\t" + dstReg + ", #" + to_string(imm) + endl;
+    }
+    static string
+    emitInst_1srcR_1DstR(string name, string dstReg, string srcReg, int imm = 0)
+    {
+        string inst = space + name + "\t" + dstReg + ", " + srcReg;
+        if (imm == 0)
+            inst += endl;
+        else
+            inst += ", #" + to_string(imm) + endl;
+        return inst;
+    }
+    static string
+    emitInst_2srcR_1dstR(string name, string dstReg, string srcReg0, string srcReg1)
+    {
+        return space + name + "\t" + dstReg + ", " + srcReg0 + ", " + srcReg1 + endl;
     }
     //
     class RegManager
     {
     public:
+        // 默认构造函数
+        RegManager() {}
         //{0,1,2,3,4,5,6,7,8,9,10};
         enum RegId : unsigned
         {
@@ -116,6 +140,33 @@ namespace backend
             if (reg == RANY)
                 return "RANY";
             return "r" + to_string(reg);
+        }
+        static const int R = 9; // 通用寄存器个数:r0-r8
+        // 当前空闲的寄存器池
+        priority_queue<RegId, vector<RegId>, std::greater<RegId>> reg_pool;
+        // 将所有通用寄存器设为空闲状态
+        void ResetRegPool()
+        {
+            reg_pool.push(R0);
+            reg_pool.push(R1);
+            reg_pool.push(R2);
+            reg_pool.push(R3);
+            reg_pool.push(R4);
+            reg_pool.push(R5);
+            reg_pool.push(R6);
+            reg_pool.push(R7);
+            reg_pool.push(R8);
+        }
+        // 从寄存器池中获取一个空闲寄存器
+        RegId GetFreeReg()
+        {
+            RegId free_reg = reg_pool.top();
+            reg_pool.pop();
+            return free_reg;
+        }
+        void AddFreeReg(RegId reg)
+        {
+            reg_pool.push(reg);
         }
     };
 
@@ -167,7 +218,7 @@ namespace backend
         Module *module;
         Function *curFunc;
         BasicBlock *curBB;
-        //
+        // 寄存器管理
         RegManager regm;
         // globalValue
         bool loadGlobalValByMOVWT = true;
@@ -183,6 +234,7 @@ namespace backend
         // label manager
         map<BasicBlock *, string> bb_labels;
         uint64_t label_no = 0;
+
         int top_offset = -8;
         int above_offset = 4;
         int temp_offset = 0;
@@ -193,6 +245,15 @@ namespace backend
         vector<double> imms;
         string imms_name;
         bool haveCall = false;
+        struct cmp
+        {
+            bool operator()(Instruction *const &a, Instruction *const &b) const
+            {
+                return a->GetEnd() < b->GetEnd();
+            }
+        };
+        set<Instruction *, cmp> active;
+        map<Instruction *, RegId> Register;
         set<string> libfunc = {"getint", "getch", "getfloat", "getarray", "getfarray", "putint", "putch", "putfloat", "putarray", "putfarray", "starttime", "stoptime", "putf"};
 
     public:
@@ -235,7 +296,49 @@ namespace backend
              */
             return code;
         }
-        // function
+        // 线性扫描:释放已到期区间
+        void ExpireOldIntervals(Instruction *i)
+        {
+            int expired_intervals = 0;
+            for (auto interval : active)
+            {
+                if (interval->GetEnd() > i->GetStart())
+                    return;
+                else
+                {
+                    // active.erase(interval);
+                    expired_intervals++;
+                    regm.AddFreeReg(Register[interval]);
+                }
+            }
+            for (int i = 0; i < expired_intervals; i++)
+            {
+                auto iter = active.begin();
+                active.erase(*iter);
+            }
+        }
+        // 线性扫描:区间溢出
+        void SpillAtIntervals(Instruction *i)
+        {
+            auto iter = active.end();
+            auto spill = *(--iter);
+            // 溢出spill
+            if (spill->GetEnd() >= i->GetEnd())
+            {
+                Register[i] = Register[spill];
+                spill->setLocation(top_offset);
+                top_offset -= 4;
+                active.erase(spill);
+                active.insert(i);
+            }
+            // 溢出i
+            else
+            {
+                i->setLocation(top_offset);
+                top_offset -= 4;
+            }
+        }
+        // 清空函数记录
         void clearFunctionRecord(Function *func)
         {
             localVarStOffset.clear();
@@ -252,6 +355,9 @@ namespace backend
             imm_offset = 0;
             imms.clear();
             imms_name = "IMM_" + func->getName();
+            active.clear();
+            regm.ResetRegPool();
+            Register.clear();
             //
             stOffsetAcc = 0;
         }
