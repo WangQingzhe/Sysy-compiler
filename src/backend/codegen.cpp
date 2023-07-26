@@ -607,13 +607,13 @@ namespace backend
                 if (l_val <= 0xffff & l_val >= 0)
                 {
                     code += space + "mov\tr9, " + lname + endl;
-                    code += emitInst_2srcR_1dstR("mul", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
+                    code += emitInst_2srcR_1dstR("sdiv", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
                 }
                 else
                 {
                     code += space + "movw\tr9" + ", #" + to_string(unsigned(l_val & 0xffff)) + endl;
                     code += space + "movt\tr9" + ", #" + to_string(unsigned((l_val >> 16) & 0xffff)) + endl;
-                    code += emitInst_2srcR_1dstR("mul", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
+                    code += emitInst_2srcR_1dstR("sdiv", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
                 }
             }
             else if (rconst)
