@@ -455,28 +455,33 @@ namespace backend
             {
                 if (l_val <= 0xffff && l_val >= 0)
                 {
-                    code += emitInst_nosrcR_1DstR("mov", regm.toString(dstRegId), l_val);
-                    code += space + "add\tr" + res + ", r" + res + ", " + rname + endl;
+                    // add lconst r9 is used when mov immidiate number
+                    code += space + "mov\tr9, " + lname + endl;
+                    code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
+                    // code += space + "add\tr" + res + ", r" + res + ", " + rname + endl;
                 }
                 else
                 {
-                    code += space + "movw\tr" + res + ", #" + to_string(unsigned(l_val & 0xffff)) + endl;
-                    code += space + "movt\tr" + res + ", #" + to_string(unsigned((l_val >> 16) & 0xffff)) + endl;
-                    code += space + "add\tr" + res + ", r" + res + ", " + rname + endl;
+                    // add lconst r9 is used when mov immidiate number
+                    code += space + "movw\tr9" + ", #" + to_string(unsigned(l_val & 0xffff)) + endl;
+                    code += space + "movt\tr9" + ", #" + to_string(unsigned((l_val >> 16) & 0xffff)) + endl;
+                    code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
+                    // code += space + "add\tr" + res + ", r" + res + ", " + rname + endl;
                 }
             }
             else if (rconst)
             {
                 if (r_val <= 0xffff && r_val >= 0)
                 {
-                    code += space + "mov\tr" + res + ", " + rname + endl;
-                    code += space + "add\tr" + res + ", r" + res + ", " + lname + endl;
+                    code += space + "mov\tr9, " + rname + endl;
+                    code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), regm.toString(lRegId), "r9");
+                    // code += space + "add\tr" + res + ", r" + res + ", " + lname + endl;
                 }
                 else
                 {
-                    code += space + "movw\tr" + res + ", #" + to_string(unsigned(r_val & 0xffff)) + endl;
-                    code += space + "movt\tr" + res + ", #" + to_string(unsigned((r_val >> 16) & 0xffff)) + endl;
-                    code += space + "add\tr" + res + ", r" + res + ", " + lname + endl;
+                    code += space + "movw\tr9" + ", #" + to_string(unsigned(r_val & 0xffff)) + endl;
+                    code += space + "movt\tr9" + ", #" + to_string(unsigned((r_val >> 16) & 0xffff)) + endl;
+                    code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), regm.toString(lRegId), "r9");
                 }
             }
             else
@@ -500,32 +505,32 @@ namespace backend
             {
                 if (l_val <= 0xffff & l_val >= 0)
                 {
-                    code += space + "mov\tr" + res + ", " + lname + endl;
-                    code += space + "sub\tr" + res + ", r" + res + ", " + rname + endl;
+                    code += space + "mov\tr9, " + lname + endl;
+                    code += emitInst_2srcR_1dstR("sub", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
                 }
                 else
                 {
-                    code += space + "movw\tr" + res + ", #" + to_string(l_val & 0xffff) + endl;
-                    code += space + "movt\tr" + res + ", #" + to_string((l_val >> 16) & 0xffff) + endl;
-                    code += space + "sub\tr" + res + ", r" + res + ", " + rname + endl;
+                    code += space + "movw\tr9" + ", #" + to_string(unsigned(l_val & 0xffff)) + endl;
+                    code += space + "movt\tr9" + ", #" + to_string(unsigned((l_val >> 16) & 0xffff)) + endl;
+                    code += emitInst_2srcR_1dstR("sub", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
                 }
             }
             else if (rconst)
             {
                 if (r_val <= 0xffff && r_val >= 0)
                 {
-                    code += space + "mov\tr" + res + ", " + rname + endl;
-                    code += space + "sub\tr" + res + ", " + lname + ", r" + res + endl;
+                    code += space + "mov\tr9, " + rname + endl;
+                    code += emitInst_2srcR_1dstR("sub", regm.toString(dstRegId), regm.toString(lRegId), "r9");
                 }
                 else
                 {
-                    code += space + "movw\tr" + res + ", #" + to_string(unsigned(r_val & 0xffff)) + endl;
-                    code += space + "movt\tr" + res + ", #" + to_string(unsigned((r_val >> 16) & 0xffff)) + endl;
-                    code += space + "sub\tr" + res + ", " + lname + ", r" + res + endl;
+                    code += space + "movw\tr9" + ", #" + to_string(unsigned(r_val & 0xffff)) + endl;
+                    code += space + "movt\tr9" + ", #" + to_string(unsigned((r_val >> 16) & 0xffff)) + endl;
+                    code += emitInst_2srcR_1dstR("sub", regm.toString(dstRegId), regm.toString(lRegId), "r9");
                 }
             }
             else
-                code += space + "sub\tr" + res + ", " + lname + ", " + rname + endl;
+                code += emitInst_2srcR_1dstR("sub", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
         }
         else if (bInst->getKind() == Instruction::kMul)
         {
@@ -542,34 +547,34 @@ namespace backend
             }
             else if (lconst)
             {
-                if (l_val <= 0xffff && l_val >= 0)
+                if (l_val <= 0xffff & l_val >= 0)
                 {
-                    code += space + "mov\tr" + res + ", " + lname + endl;
-                    code += space + "mul\tr" + res + ", r" + res + ", " + rname + endl;
+                    code += space + "mov\tr9, " + lname + endl;
+                    code += emitInst_2srcR_1dstR("mul", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
                 }
                 else
                 {
-                    code += space + "movw\tr" + res + ", #" + to_string(unsigned(l_val & 0xffff)) + endl;
-                    code += space + "movt\tr" + res + ", #" + to_string(unsigned((l_val >> 16) & 0xffff)) + endl;
-                    code += space + "mul\tr" + res + ", r" + res + ", " + rname + endl;
+                    code += space + "movw\tr9" + ", #" + to_string(unsigned(l_val & 0xffff)) + endl;
+                    code += space + "movt\tr9" + ", #" + to_string(unsigned((l_val >> 16) & 0xffff)) + endl;
+                    code += emitInst_2srcR_1dstR("mul", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
                 }
             }
             else if (rconst)
             {
                 if (r_val <= 0xffff && r_val >= 0)
                 {
-                    code += space + "mov\tr" + res + ", " + rname + endl;
-                    code += space + "mul\tr" + res + ", " + lname + ", r" + res + endl;
+                    code += space + "mov\tr9, " + rname + endl;
+                    code += emitInst_2srcR_1dstR("mul", regm.toString(dstRegId), regm.toString(lRegId), "r9");
                 }
                 else
                 {
-                    code += space + "movw\tr" + res + ", #" + to_string(unsigned(r_val & 0xffff)) + endl;
-                    code += space + "movt\tr" + res + ", #" + to_string(unsigned((r_val >> 16) & 0xffff)) + endl;
-                    code += space + "mul\tr" + res + ", " + lname + ", r" + res + endl;
+                    code += space + "movw\tr9" + ", #" + to_string(unsigned(r_val & 0xffff)) + endl;
+                    code += space + "movt\tr9" + ", #" + to_string(unsigned((r_val >> 16) & 0xffff)) + endl;
+                    code += emitInst_2srcR_1dstR("mul", regm.toString(dstRegId), regm.toString(lRegId), "r9");
                 }
             }
             else
-                code += space + "mul\tr" + res + ", " + lname + ", " + rname + endl;
+                code += emitInst_2srcR_1dstR("mul", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
         }
         else if (bInst->getKind() == Instruction::kDiv)
         {
@@ -595,18 +600,20 @@ namespace backend
                         a//CONSTANT <=> [a *(r+1)] >> 32;
                     ###
             */
+
+            // r9 and r10 is used
             if (lconst)
             {
-                if (l_val <= 0xffff && l_val >= 0)
+                if (l_val <= 0xffff & l_val >= 0)
                 {
-                    code += space + "mov\tr" + res + ", " + lname + endl;
-                    code += space + "sdiv\tr" + res + ", r" + res + ", " + rname + endl;
+                    code += space + "mov\tr9, " + lname + endl;
+                    code += emitInst_2srcR_1dstR("mul", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
                 }
                 else
                 {
-                    code += space + "movw\tr" + res + ", #" + to_string(unsigned(l_val & 0xffff)) + endl;
-                    code += space + "movt\tr" + res + ", #" + to_string(unsigned((l_val >> 16) & 0xffff)) + endl;
-                    code += space + "sdiv\tr" + res + ", r" + res + ", " + rname + endl;
+                    code += space + "movw\tr9" + ", #" + to_string(unsigned(l_val & 0xffff)) + endl;
+                    code += space + "movt\tr9" + ", #" + to_string(unsigned((l_val >> 16) & 0xffff)) + endl;
+                    code += emitInst_2srcR_1dstR("mul", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
                 }
             }
             else if (rconst)
@@ -632,40 +639,57 @@ namespace backend
                         b++;
                         rval = rval >> 1;
                     }
-                    code += space + "asr\tr" + res + ", " + lname + ", #" + to_string(b) + endl;
+                    code += emitInst_2srcR_1dstR("asr", regm.toString(dstRegId), regm.toString(lRegId), "#" + to_string(b));
+                    // code += space + "asr\tr" + res + ", " + lname + ", #" + to_string(b) + endl;
                     if (negflag)
                     {
-                        code += space + "mvn\tr" + res + ", r" + res + endl;
-                        code += space + "add\tr" + res + ", r" + res + ", #1" + endl;
+                        code += emitInst_1srcR_1DstR("mvn", regm.toString(dstRegId), regm.toString(dstRegId));
+                        code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), regm.toString(dstRegId), "#1");
+                        // code += space + "mvn\tr" + res + ", r" + res + endl;
+                        // code += space + "add\tr" + res + ", r" + res + ", #1" + endl;
                     }
                 }
                 else
                 {
                     long Power32 = 0x100000000;
                     int r = Power32 / C + 1;
-                    code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(unsigned(r & 0xffff)) + endl;
-                    code += space + "movt\tr" + to_string(instrname) + ", #" + to_string(unsigned((r >> 16) & 0xFFFF)) + endl;
-                    code += space + "smull\tr" + to_string(instrname) + ", r" + to_string(instrname + 1) + ", r" + to_string(instrname) + ", " + lname + endl;
-                    code += space + "asr\tr" + to_string(instrname) + ", " + lname + ", #31" + endl;
-                    code += space + "sub\tr" + to_string(instrname) + ", r" + to_string(instrname + 1) + ", r" + to_string(instrname) + endl;
+                    code += space + "movw\tr9" + ", #" + to_string(unsigned(r & 0xffff)) + endl;
+                    code += space + "movt\tr9" + ", #" + to_string(unsigned((r >> 16) & 0xFFFF)) + endl;
+                    code += space + "smull\tr9" + ", r10" + ", r9" + ", " + regm.toString(lRegId) + endl;
+                    code += space + "asr\tr9" + ", " + regm.toString(lRegId) + ", #31" + endl;
+                    code += space + "sub\t" + regm.toString(dstRegId) + ", r10" + ", r9" + endl;
                     if (negflag)
                     {
-                        code += space + "mvn\tr" + to_string(instrname) + ", r" + to_string(instrname) + endl;
-                        code += space + "add\tr" + to_string(instrname) + ", r" + to_string(instrname) + ", #1" + endl;
+                        code += emitInst_1srcR_1DstR("mvn", regm.toString(dstRegId), regm.toString(dstRegId));
+                        code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), regm.toString(dstRegId), "#1");
+                        // code += space + "mvn\tr" + to_string(instrname) + ", r" + to_string(instrname) + endl;
+                        // code += space + "add\tr" + to_string(instrname) + ", r" + to_string(instrname) + ", #1" + endl;
                     }
                 }
             }
             else
-                code += space + "sdiv\tr" + res + ", " + lname + ", " + rname + endl;
+                code += emitInst_2srcR_1dstR("sdiv", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
+            // code += space + "sdiv\tr" + res + ", " + lname + ", " + rname + endl;
         }
         else if (bInst->getKind() == Instruction::kRem)
+        // r9 and r10 is used
         {
             if (lconst)
             {
-                code += space + "mov\tr" + to_string(instrname + 1) + ", " + lname + endl;
-                code += space + "sdiv\tr" + res + ", r" + to_string(instrname + 1) + ", " + rname + endl;
-                code += space + "mul\tr" + res + ", r" + to_string(instrname) + ", " + rname + endl;
-                code += space + "sub\tr" + res + ", r" + to_string(instrname + 1) + ", r" + res + endl;
+                if (l_val <= 0xffff && l_val >= 0)
+                    code += emitInst_1srcR_1DstR("mov", "r9", lname);
+                else
+                {
+                    code += emitInst_1srcR_1DstR("movw", "r9", to_string(l_val & 0xffff));
+                    code += emitInst_1srcR_1DstR("movt", "r9", to_string((l_val >> 16) & 0xffff));
+                }
+                code += emitInst_2srcR_1dstR("sdiv", "r10", "r9", regm.toString(rRegId));
+                code += emitInst_2srcR_1dstR("mul", regm.toString(dstRegId), "r10", regm.toString(rRegId));
+                code += emitInst_2srcR_1dstR("sub", regm.toString(dstRegId), "r9", regm.toString(dstRegId));
+                // code += space + "mov\tr" + to_string(instrname + 1) + ", " + lname + endl;
+                // code += space + "sdiv\tr" + res + ", r" + to_string(instrname + 1) + ", " + rname + endl;
+                // code += space + "mul\tr" + res + ", r" + to_string(instrname) + ", " + rname + endl;
+                // code += space + "sub\tr" + res + ", r" + to_string(instrname + 1) + ", r" + res + endl;
             }
             else if (rconst)
             {
@@ -688,197 +712,296 @@ namespace backend
                     int C = rvalue;
                     long Power32 = 0x100000000;
                     int r = Power32 / C + 1;
-                    code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(int(r & 0xffff)) + endl;
-                    code += space + "movt\tr" + to_string(instrname) + ", #" + to_string(int((r >> 16) & 0xFFFF)) + endl;
-                    code += space + "smull\tr" + to_string(instrname) + ", r" + to_string(instrname + 1) + ", r" + to_string(instrname) + ", " + lname + endl;
-                    code += space + "asr\tr" + to_string(instrname) + ", " + lname + ", #31" + endl;
-                    code += space + "sub\tr" + to_string(instrname) + ", r" + to_string(instrname + 1) + ", r" + to_string(instrname) + endl;
-                    code += space + "movw\tr" + to_string(instrname + 1) + ", #" + to_string(rvalue & 0xffff) + endl;
-                    code += space + "movt\tr" + to_string(instrname + 1) + ", #" + to_string(((rvalue >> 16) & 0xffff)) + endl;
-                    code += space + "mul\tr" + to_string(instrname + 1) + ", r" + to_string(instrname) + ", r" + to_string(instrname + 1) + endl;
-                    code += space + "sub\tr" + res + ", " + lname + ", r" + to_string(instrname + 1) + endl;
+                    if (r > 0 && r <= 0xffff)
+                        code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(r));
+                    else
+                    {
+                        code += space + "movw\t" + "r9" + ", #" + to_string(int(r & 0xffff)) + endl;
+                        code += space + "movt\t" + "r9" + ", #" + to_string(int((r >> 16) & 0xFFFF)) + endl;
+                    }
+                    code += space + "smull\t" + "r9" + ", r10" + ", r9" + ", " + regm.toString(lRegId) + endl;
+                    code += space + "asr\t" + "r9" + ", " + regm.toString(lRegId) + ", #31" + endl;
+                    code += space + "sub\t" + "r9" + ", r10" + " ,r9" + endl;
+                    if (rvalue >= 0 && rvalue <= 0xffff)
+                        code += emitInst_1srcR_1DstR("mov", "r10", "#" + to_string(rvalue));
+                    else
+                    {
+                        code += space + "movw\t" + "r10" + ", #" + to_string(rvalue & 0xffff) + endl;
+                        code += space + "movt\t" + "r10" + ", #" + to_string(((rvalue >> 16) & 0xffff)) + endl;
+                    }
+                    code += space + "mul\t" + "r10" + ", r9" + ", r10" + endl;
+                    code += space + "sub\t" + regm.toString(dstRegId) + ", " + regm.toString(lRegId) + ", r10" + endl;
                 }
             }
             else
             {
-                code += space + "sdiv\tr" + res + ", " + lname + ", " + rname + endl;
-                code += space + "mul\t" + rname + ", r" + res + ", " + rname + endl;
-                code += space + "sub\tr" + res + ", " + lname + ", " + rname + endl;
+                code += emitInst_2srcR_1dstR("sdiv", "r9", regm.toString(lRegId), regm.toString(rRegId));
+                code += emitInst_2srcR_1dstR("mul", regm.toString(rRegId), "r9", regm.toString(rRegId));
+                code += emitInst_2srcR_1dstR("sub", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
+                // code += space + "sdiv\tr" + res + ", " + lname + ", " + rname + endl;
+                // code += space + "mul\t" + rname + ", r" + res + ", " + rname + endl;
+                // code += space + "sub\tr" + res + ", " + lname + ", " + rname + endl;
             }
         }
         else if (lconst && rconst)
         {
             if (bInst->getKind() == Instruction::kICmpEQ)
             {
-                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string((l_val == r_val) ? 1 : 0) + endl;
+                code += space + "mov\t" + regm.toString(dstRegId) + ", #" + to_string((l_val == r_val) ? 1 : 0) + endl;
             }
             else if (bInst->getKind() == Instruction::kICmpGE)
             {
-                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string((l_val >= r_val) ? 1 : 0) + endl;
+                code += space + "mov\t" + regm.toString(dstRegId) + ", #" + to_string((l_val >= r_val) ? 1 : 0) + endl;
             }
             else if (bInst->getKind() == Instruction::kICmpGT)
             {
-                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string((l_val > r_val) ? 1 : 0) + endl;
+                code += space + "mov\t" + regm.toString(dstRegId) + ", #" + to_string((l_val > r_val) ? 1 : 0) + endl;
             }
             else if (bInst->getKind() == Instruction::kICmpLE)
             {
-                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string((l_val <= r_val) ? 1 : 0) + endl;
+                code += space + "mov\t" + regm.toString(dstRegId) + ", #" + to_string((l_val <= r_val) ? 1 : 0) + endl;
             }
             else if (bInst->getKind() == Instruction::kICmpLT)
             {
-                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string((l_val < r_val) ? 1 : 0) + endl;
+                code += space + "mov\t" + regm.toString(dstRegId) + ", #" + to_string((l_val < r_val) ? 1 : 0) + endl;
             }
             else if (bInst->getKind() == Instruction::kICmpNE)
             {
-                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string((l_val != r_val) ? 1 : 0) + endl;
+                code += space + "mov\t" + regm.toString(dstRegId) + ", #" + to_string((l_val != r_val) ? 1 : 0) + endl;
             }
         }
         else if (bInst->getKind() == Instruction::kICmpEQ)
         {
             if (lconst)
-            {
-                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
-                code += space + "cmp\tr" + to_string(instrname) + ", " + rname + endl;
+            { // r9 is used to store left immidiate number
+                if (l_val >= 0 && l_val < 0xffff)
+                {
+                    code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(l_val));
+                }
+                else
+                {
+                    code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(l_val & 0xffff));
+                    code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((l_val >> 16) & 0xffff));
+                }
+                // code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
+                code += space + "cmp\tr9, " + regm.toString(rRegId) + endl;
             }
             else if (rconst)
             {
                 if (r_val > 0 && r_val < 0xff)
                 {
-                    code += space + "cmp\t" + lname + ", " + rname + endl;
+                    code += space + "cmp\t" + regm.toString(lRegId) + ", " + rname + endl;
                 }
                 else
                 {
-                    code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(r_val & 0xffff) + endl;
-                    code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((r_val >> 16) & 0xffff) + endl;
-                    code += space + "cmp\t" + lname + ", r" + to_string(instrname) + endl;
+                    if (r_val > 0 && r_val < 0xffff)
+                        code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(r_val));
+                    else
+                    {
+                        code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(r_val & 0xffff));
+                        code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((r_val >> 16) & 0xffff));
+                    }
+                    code += space + "cmp\t" + regm.toString(lRegId) + ", r9" + endl;
                 }
             }
             else
-                code += space + "cmp\t" + lname + ", " + rname + endl;
+            {
+                code += space + "cmp\t" + regm.toString(lRegId) + ", " + regm.toString(rRegId) + endl;
+            }
         }
         else if (bInst->getKind() == Instruction::kICmpGE)
         {
             if (lconst)
-            {
-                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
-                code += space + "cmp\tr" + to_string(instrname) + ", " + rname + endl;
+            { // r9 is used to store left immidiate number
+                if (l_val >= 0 && l_val < 0xffff)
+                {
+                    code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(l_val));
+                }
+                else
+                {
+                    code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(l_val & 0xffff));
+                    code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((l_val >> 16) & 0xffff));
+                }
+                // code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
+                code += space + "cmp\tr9, " + regm.toString(rRegId) + endl;
             }
             else if (rconst)
             {
                 if (r_val > 0 && r_val < 0xff)
                 {
-                    code += space + "cmp\t" + lname + ", " + rname + endl;
+                    code += space + "cmp\t" + regm.toString(lRegId) + ", " + rname + endl;
                 }
                 else
                 {
-                    code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(r_val & 0xffff) + endl;
-                    code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((r_val >> 16) & 0xffff) + endl;
-                    code += space + "cmp\t" + lname + ", r" + to_string(instrname) + endl;
+                    if (r_val > 0 && r_val < 0xffff)
+                        code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(r_val));
+                    else
+                    {
+                        code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(r_val & 0xffff));
+                        code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((r_val >> 16) & 0xffff));
+                    }
+                    code += space + "cmp\t" + regm.toString(lRegId) + ", r9" + endl;
                 }
             }
             else
-                code += space + "cmp\t" + lname + ", " + rname + endl;
+                code += space + "cmp\t" + regm.toString(lRegId) + ", " + regm.toString(rRegId) + endl;
         }
         else if (bInst->getKind() == Instruction::kICmpGT)
         {
             if (lconst)
-            {
-                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
-                code += space + "cmp\tr" + to_string(instrname) + ", " + rname + endl;
+            { // r9 is used to store left immidiate number
+                if (l_val >= 0 && l_val < 0xffff)
+                {
+                    code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(l_val));
+                }
+                else
+                {
+                    code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(l_val & 0xffff));
+                    code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((l_val >> 16) & 0xffff));
+                }
+                // code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
+                code += space + "cmp\tr9, " + regm.toString(rRegId) + endl;
             }
             else if (rconst)
             {
                 if (r_val > 0 && r_val < 0xff)
                 {
-                    code += space + "cmp\t" + lname + ", " + rname + endl;
+                    code += space + "cmp\t" + regm.toString(lRegId) + ", " + rname + endl;
                 }
                 else
                 {
-                    code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(r_val & 0xffff) + endl;
-                    code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((r_val >> 16) & 0xffff) + endl;
-                    code += space + "cmp\t" + lname + ", r" + to_string(instrname) + endl;
+                    if (r_val > 0 && r_val < 0xffff)
+                        code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(r_val));
+                    else
+                    {
+                        code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(r_val & 0xffff));
+                        code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((r_val >> 16) & 0xffff));
+                    }
+                    code += space + "cmp\t" + regm.toString(lRegId) + ", r9" + endl;
                 }
             }
             else
-                code += space + "cmp\t" + lname + ", " + rname + endl;
+                code += space + "cmp\t" + regm.toString(lRegId) + ", " + regm.toString(rRegId) + endl;
         }
         else if (bInst->getKind() == Instruction::kICmpLE)
         {
             if (lconst)
-            {
-                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
-                code += space + "cmp\tr" + to_string(instrname) + ", " + rname + endl;
+            { // r9 is used to store left immidiate number
+                if (l_val >= 0 && l_val < 0xffff)
+                {
+                    code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(l_val));
+                }
+                else
+                {
+                    code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(l_val & 0xffff));
+                    code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((l_val >> 16) & 0xffff));
+                }
+                // code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
+                code += space + "cmp\tr9, " + regm.toString(rRegId) + endl;
             }
             else if (rconst)
             {
                 if (r_val > 0 && r_val < 0xff)
                 {
-                    code += space + "cmp\t" + lname + ", " + rname + endl;
+                    code += space + "cmp\t" + regm.toString(lRegId) + ", " + rname + endl;
                 }
                 else
                 {
-                    code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(r_val & 0xffff) + endl;
-                    code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((r_val >> 16) & 0xffff) + endl;
-                    code += space + "cmp\t" + lname + ", r" + to_string(instrname) + endl;
+                    if (r_val > 0 && r_val < 0xffff)
+                        code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(r_val));
+                    else
+                    {
+                        code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(r_val & 0xffff));
+                        code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((r_val >> 16) & 0xffff));
+                    }
+                    code += space + "cmp\t" + regm.toString(lRegId) + ", r9" + endl;
                 }
             }
             else
-                code += space + "cmp\t" + lname + ", " + rname + endl;
+                code += space + "cmp\t" + regm.toString(lRegId) + ", " + regm.toString(rRegId) + endl;
         }
         else if (bInst->getKind() == Instruction::kICmpLT)
         {
             if (lconst)
-            {
-                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
-                code += space + "cmp\tr" + to_string(instrname) + ", " + rname + endl;
+            { // r9 is used to store left immidiate number
+                if (l_val >= 0 && l_val < 0xffff)
+                {
+                    code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(l_val));
+                }
+                else
+                {
+                    code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(l_val & 0xffff));
+                    code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((l_val >> 16) & 0xffff));
+                }
+                // code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
+                code += space + "cmp\tr9, " + regm.toString(rRegId) + endl;
             }
             else if (rconst)
             {
                 if (r_val > 0 && r_val < 0xff)
                 {
-                    code += space + "cmp\t" + lname + ", " + rname + endl;
+                    code += space + "cmp\t" + regm.toString(lRegId) + ", " + rname + endl;
                 }
                 else
                 {
-                    code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(r_val & 0xffff) + endl;
-                    code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((r_val >> 16) & 0xffff) + endl;
-                    code += space + "cmp\t" + lname + ", r" + to_string(instrname) + endl;
+                    if (r_val > 0 && r_val < 0xffff)
+                        code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(r_val));
+                    else
+                    {
+                        code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(r_val & 0xffff));
+                        code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((r_val >> 16) & 0xffff));
+                    }
+                    code += space + "cmp\t" + regm.toString(lRegId) + ", r9" + endl;
                 }
             }
             else
-                code += space + "cmp\t" + lname + ", " + rname + endl;
+                code += space + "cmp\t" + regm.toString(lRegId) + ", " + regm.toString(rRegId) + endl;
         }
         else if (bInst->getKind() == Instruction::kICmpNE)
         {
             if (lconst)
-            {
-                code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
-                code += space + "cmp\tr" + to_string(instrname) + ", " + rname + endl;
-            }
-            else if (rconst)
-            {
-                if (r_val > 0 && r_val < 0xffff)
+            { // r9 is used to store left immidiate number
+                if (l_val >= 0 && l_val < 0xffff)
                 {
-                    code += space + "cmp\t" + lname + ", " + rname + endl;
+                    code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(l_val));
                 }
                 else
                 {
-                    code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(r_val & 0xffff) + endl;
-                    code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((r_val >> 16) & 0xffff) + endl;
-                    code += space + "cmp\t" + lname + ", r" + to_string(instrname) + endl;
+                    code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(l_val & 0xffff));
+                    code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((l_val >> 16) & 0xffff));
+                }
+                // code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
+                code += space + "cmp\tr9, " + regm.toString(rRegId) + endl;
+            }
+            else if (rconst)
+            {
+                if (r_val > 0 && r_val < 0xff)
+                {
+                    code += space + "cmp\t" + regm.toString(lRegId) + ", " + rname + endl;
+                }
+                else
+                {
+                    if (r_val > 0 && r_val < 0xffff)
+                        code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(r_val));
+                    else
+                    {
+                        code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(r_val & 0xffff));
+                        code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((r_val >> 16) & 0xffff));
+                    }
+                    code += space + "cmp\t" + regm.toString(lRegId) + ", r9" + endl;
                 }
             }
             else
-                code += space + "cmp\t" + lname + ", " + rname + endl;
+                code += space + "cmp\t" + regm.toString(lRegId) + ", " + regm.toString(rRegId) + endl;
         }
         int protect_offset = bInst->ProtectOffset();
         int pass_offset = bInst->PassOffset();
         // 如果该指令需要被保护
         if (protect_offset >= 0)
-            code += space + "str\tr" + res + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+            code += space + "str\t" + regm.toString(dstRegId) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
         // 如果该指令需要立即传参(即为第4个之后的参数)
         if (pass_offset >= 0)
-            code += space + "str\tr" + res + ", [sp, #" + to_string(pass_offset) + "]" + endl;
+            code += space + "str\t" + regm.toString(dstRegId) + ", [sp, #" + to_string(pass_offset) + "]" + endl;
         return {dstRegId, code};
     }
 
