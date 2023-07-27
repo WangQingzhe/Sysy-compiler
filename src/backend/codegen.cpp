@@ -104,6 +104,7 @@ namespace backend
             code += space + "add\tfp, sp, #0" + endl;
         }
         // 开辟栈空间
+        top_offset -= 4 * max_protect;
         int imm = -(top_offset + 4);
         if (imm > 255)
         {
@@ -267,8 +268,11 @@ namespace backend
                 }
                 auto instrType = instr->getKind();
                 // 只考虑能产生新变量的指令,这样就相当于从小到大遍历所有变量
-                if (instrType == Value::Kind::kCall || instrType == Value::Kind::kLoad || instr.get()->isBinary() || instr.get()->isUnary())
+                if ((instrType == Value::Kind::kCall && !instr->getType()->isVoid()) || instrType == Value::Kind::kLoad || instr.get()->isBinary() || instr.get()->isUnary())
                 {
+                    // code += "%" + instr->getName() + "start:" + to_string(instr->GetStart()) + endl;
+                    // for (auto interval : active)
+                    //     code += "%" + interval->getName() + "end:" + to_string(interval->GetEnd()) + endl;
                     ExpireOldIntervals(instr.get());
                     if (active.size() == RegManager::R)
                         SpillAtIntervals(instr.get());
@@ -295,7 +299,7 @@ namespace backend
                     continue;
                 auto instrType = instr->getKind();
                 // 只考虑能产生新变量的指令,这样就相当于从小到大遍历所有变量
-                if (instrType == Value::Kind::kCall || instrType == Value::Kind::kLoad || instr.get()->isBinary() || instr.get()->isUnary())
+                if ((instrType == Value::Kind::kCall && !instr->getType()->isVoid()) || instrType == Value::Kind::kLoad || instr.get()->isBinary() || instr.get()->isUnary())
                 {
                     ExpireOldIntervals(instr.get());
                     if (active.size() == RegManager::S)
@@ -322,9 +326,9 @@ namespace backend
                     haveCall = true;
                     auto alloca_inst = dynamic_cast<CallInst *>(instr.get());
                     int args_size = alloca_inst->getArguments().size();
-                    int protect_cnt = alloca_inst->ProtectCnt();
+                    // int protect_cnt = alloca_inst->ProtectCnt();
                     max_param = args_size > max_param ? args_size : max_param;
-                    max_protect = protect_cnt > max_protect ? protect_cnt : max_protect;
+                    // max_protect = protect_cnt > max_protect ? protect_cnt : max_protect;
                 }
                 // 为局部变量开辟栈空间
                 else if (instrType == Value::Kind::kAlloca)
@@ -365,11 +369,11 @@ namespace backend
                 arg_num++;
             }
             // 中间变量
-            temp_offset = top_offset;
-            top_offset -= 4;
+            // temp_offset = top_offset;
+            // top_offset -= 4;
             // 寄存器保护
             protect_reg_offset = top_offset;
-            top_offset -= 4 * max_protect;
+            // top_offset -= 4 * max_protect;
             // 传递的实参
             if (max_param > 4)
                 top_offset -= (max_param - 4) * 4;
@@ -994,14 +998,22 @@ namespace backend
             else
                 code += space + "cmp\t" + regm.toString(lRegId) + ", " + regm.toString(rRegId) + endl;
         }
-        int protect_offset = bInst->ProtectOffset();
-        int pass_offset = bInst->PassOffset();
-        // 如果该指令需要被保护
-        if (protect_offset >= 0)
-            code += space + "str\t" + regm.toString(dstRegId) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
-        // 如果该指令需要立即传参(即为第4个之后的参数)
-        if (pass_offset >= 0)
-            code += space + "str\t" + regm.toString(dstRegId) + ", [sp, #" + to_string(pass_offset) + "]" + endl;
+        // 更新RVALUE,AVALUE
+        if (!lconst && lhs->GetEnd() <= bInst->GetStart())
+        {
+            RVALUE[Register[dynamic_cast<Instruction *>(lhs)]] = nullptr;
+            auto iter = AVALUE.find(dynamic_cast<Instruction *>(lhs));
+            AVALUE.erase(iter);
+        }
+        if (!rconst && rhs->GetEnd() <= bInst->GetEnd())
+        {
+            RVALUE[Register[dynamic_cast<Instruction *>(rhs)]] = nullptr;
+            auto iter = AVALUE.find(dynamic_cast<Instruction *>(rhs));
+            if (iter != AVALUE.end())
+                AVALUE.erase(iter);
+        }
+        AVALUE[bInst].reg_num = dstRegId;
+        RVALUE[dstRegId] = bInst;
         return {dstRegId, code};
     }
 
@@ -2031,6 +2043,12 @@ namespace backend
                 }
             }
         }
+        if (!isa<ConstantValue>(value) && value->GetEnd() <= stInst->GetStart())
+        {
+            RVALUE[Register[dynamic_cast<Instruction *>(value)]] = nullptr;
+            auto iter = AVALUE.find(dynamic_cast<Instruction *>(value));
+            AVALUE.erase(iter);
+        }
         return code;
     }
     pair<RegId, string> CodeGen::loadInst_gen(LoadInst *ldInst, RegId dstRegId)
@@ -2504,48 +2522,9 @@ namespace backend
                 }
             }
         }
-
-        // 判断是否要被保护/直接存入传参栈中
-        int protect_offset = ldInst->ProtectOffset();
-        int pass_offset = ldInst->PassOffset();
-        if (ldInst->getType()->isInt())
-        {
-            // 如果该指令需要被保护
-            if (protect_offset >= 0)
-                code += space + "str\tr" + ldInst->getName() + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
-            // 如果该指令需要立即传参(即为第4个之后的参数)
-            if (pass_offset >= 0)
-                code += space + "str\tr" + ldInst->getName() + ", [sp, #" + to_string(pass_offset) + "]" + endl;
-        }
-        else if (ldInst->getType()->isFloat())
-        {
-            int numdims = 0;
-            if (isa<GlobalValue>(pointer))
-                numdims = dynamic_cast<GlobalValue *>(pointer)->getNumDims();
-            else if (isa<AllocaInst>(pointer))
-                numdims = dynamic_cast<AllocaInst *>(pointer)->getNumDims();
-            else if (isa<Argument>(pointer))
-                numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
-            // 若load出的是一个float数组,其首地址仍用r寄存器
-            if (ldInst->getNumIndices() < numdims)
-            {
-                // 如果该指令需要被保护
-                if (protect_offset >= 0)
-                    code += space + "str\tr" + ldInst->getName() + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
-                // 如果该指令需要立即传参(即为第4个之后的参数)
-                if (pass_offset >= 0)
-                    code += space + "str\tr" + ldInst->getName() + ", [sp, #" + to_string(pass_offset) + "]" + endl;
-            }
-            else
-            {
-                // 如果该指令需要被保护
-                if (protect_offset >= 0)
-                    code += space + "vstr\ts" + ldInst->getName() + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
-                // 如果该指令需要立即传参(即为第4个之后的参数)
-                if (pass_offset >= 0)
-                    code += space + "vstr\ts" + ldInst->getName() + ", [sp, #" + to_string(pass_offset) + "]" + endl;
-            }
-        }
+        // 更新RVALUE,AVALUE
+        AVALUE[ldInst].reg_num = dstRegId;
+        RVALUE[dstRegId] = ldInst;
         return {dstRegId, code};
     }
 
@@ -2723,150 +2702,345 @@ namespace backend
     CodeGen::callInst_gen(CallInst *callInst, RegId dstRegId)
     {
         string code;
-        auto callee_fuc = callInst->getCallee();
-        auto args = callInst->getArguments();
-        RegId dst_reg = RegManager::R0;
-        int arg_num = 0;
-        int para_offset = 0;
+        auto callee_fuc = callInst->getCallee(); // 被调用函数
+
+        auto args = callInst->getArguments(); // 所有参数
+        if (!callInst->getType()->isVoid())
+            dstRegId = Register[callInst]; // 函数返回值(若有)的寄存器
+        unsigned int_num = 0;              // 记录当前是第几个int类型的参数
+        unsigned float_num = 0;            // 记录当前是第几个float类型的参数
+        int para_offset = 0;               // 记录通过栈传递的参数的栈偏移
+        int protect_offset = 0;            // 记录当前保护变量相对第一个保护变量的栈偏移
+        int protect_cnt = 0;               // 记录函数需要保护的变量个数
+        set<Instruction *> protect_value;  // 记录所有需要释放的被保护变量
+
+        // 1.保护R0-R3,S0-S3并传递参数
         for (auto arg : args)
         {
-            arg_num++;
-            if (arg_num > 4)
+            // if (arg_num > 4)
+            // {
+            //     if (arg->getType()->isInt())
+            //     {
+            //         if (isa<ConstantValue>(arg))
+            //         {
+            //             code += space + "mov\tr4, #" + to_string(dynamic_cast<ConstantValue *>(arg)->getInt()) + endl;
+            //             code += space + "str\tr4, [sp, #" + to_string(para_offset) + "]" + endl;
+            //         }
+            //         // else
+            //         //     code += space + "str\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
+            //     }
+            //     else if (arg->getType()->isFloat())
+            //     {
+            //         if (isa<ConstantValue>(arg))
+            //         {
+            //             float Fvalue = dynamic_cast<ConstantValue *>(arg)->getFloat();
+            //             int mid;
+            //             memcpy(&mid, &Fvalue, sizeof(Fvalue));
+            //             code += space + "movw\tr4, #" + to_string(mid & 0xffff) + endl;
+            //             code += space + "movt\tr4, #" + to_string((mid >> 16) & 0xffff) + endl;
+            //             code += space + "vmov\ts4, " + "r4" + endl;
+            //             code += space + "vstr\ts4, [sp, #" + to_string(para_offset) + "]" + endl;
+            //         }
+            //         // else if (isa<LoadInst>(arg))
+            //         // {
+            //         //     auto ld_inst = dynamic_cast<LoadInst *>(arg);
+            //         //     auto pointer = ld_inst->getPointer();
+            //         //     int numdims = 0;
+            //         //     if (isa<GlobalValue>(pointer))
+            //         //         numdims = dynamic_cast<GlobalValue *>(pointer)->getNumDims();
+            //         //     else if (isa<AllocaInst>(pointer))
+            //         //         numdims = dynamic_cast<AllocaInst *>(pointer)->getNumDims();
+            //         //     else if (isa<Argument>(pointer))
+            //         //         numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
+            //         //     if (ld_inst->getNumIndices() < numdims)
+            //         //         code += space + "str\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
+            //         //     else
+            //         //         code += space + "vstr\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
+            //         // }
+            //         // else
+            //         //     code += space + "vstr\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
+            //     }
+            //     para_offset += 4;
+            //     continue;
+            // }
+            // string src_name;
+            bool LoadArray = false;
+            // float数组仍然用R寄存器传参
+            if (isa<LoadInst>(arg))
             {
-                if (arg->getType()->isInt())
-                {
-                    if (isa<ConstantValue>(arg))
-                    {
-                        code += space + "mov\tr4, #" + to_string(dynamic_cast<ConstantValue *>(arg)->getInt()) + endl;
-                        code += space + "str\tr4, [sp, #" + to_string(para_offset) + "]" + endl;
-                    }
-                    // else
-                    //     code += space + "str\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
-                }
-                else if (arg->getType()->isFloat())
-                {
-                    if (isa<ConstantValue>(arg))
-                    {
-                        float Fvalue = dynamic_cast<ConstantValue *>(arg)->getFloat();
-                        int mid;
-                        memcpy(&mid, &Fvalue, sizeof(Fvalue));
-                        code += space + "movw\tr4, #" + to_string(mid & 0xffff) + endl;
-                        code += space + "movt\tr4, #" + to_string((mid >> 16) & 0xffff) + endl;
-                        code += space + "vmov\ts4, " + "r4" + endl;
-                        code += space + "vstr\ts4, [sp, #" + to_string(para_offset) + "]" + endl;
-                    }
-                    // else if (isa<LoadInst>(arg))
-                    // {
-                    //     auto ld_inst = dynamic_cast<LoadInst *>(arg);
-                    //     auto pointer = ld_inst->getPointer();
-                    //     int numdims = 0;
-                    //     if (isa<GlobalValue>(pointer))
-                    //         numdims = dynamic_cast<GlobalValue *>(pointer)->getNumDims();
-                    //     else if (isa<AllocaInst>(pointer))
-                    //         numdims = dynamic_cast<AllocaInst *>(pointer)->getNumDims();
-                    //     else if (isa<Argument>(pointer))
-                    //         numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
-                    //     if (ld_inst->getNumIndices() < numdims)
-                    //         code += space + "str\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
-                    //     else
-                    //         code += space + "vstr\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
-                    // }
-                    // else
-                    //     code += space + "vstr\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
-                }
-                para_offset += 4;
-                continue;
+                auto ld_inst = dynamic_cast<LoadInst *>(arg);
+                auto pointer = ld_inst->getPointer();
+                int numdims = 0;
+                if (isa<GlobalValue>(pointer))
+                    numdims = dynamic_cast<GlobalValue *>(pointer)->getNumDims();
+                else if (isa<AllocaInst>(pointer))
+                    numdims = dynamic_cast<AllocaInst *>(pointer)->getNumDims();
+                else if (isa<Argument>(pointer))
+                    numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
+                if (ld_inst->getNumIndices() < numdims)
+                    LoadArray = true;
+                else
+                    LoadArray = false;
             }
-            // int src_reg = stoi(arg->getName()) + 4;
-            string src_name;
-            if (arg->getType()->isInt())
+            if (arg->getType()->isInt() || LoadArray)
             {
+                if (int_num >= 4)
+                {
+                    // 若参数为常数
+                    if (isa<ConstantValue>(arg))
+                    {
+                        int imm = dynamic_cast<ConstantValue *>(arg)->getInt();
+                        code += emitInst_nosrcR_1DstR("mov", "r9", imm);
+                        code += emitInst_mem("str", "r9", "sp", para_offset);
+                    }
+                    // 若参数为变量
+                    else
+                    {
+                        auto value = dynamic_cast<Instruction *>(arg);
+                        // 若变量溢出
+                        // 若变量未溢出,但被保护在栈上
+                        if (AVALUE[value].reg_num == RegManager::NONE)
+                        {
+                            code += emitInst_mem("ldr", "r9", "fp", AVALUE[value].stack_offset);
+                            code += emitInst_mem("str", "r9", "sp", para_offset);
+                        }
+                        // 若变量在寄存器中
+                        else
+                        {
+                            code += emitInst_mem("str", regm.toString(AVALUE[value].reg_num), "sp", para_offset);
+                        }
+                    }
+                    para_offset += 4;
+                    continue;
+                }
+                // 保护原来存在R0-R3的变量
+                RegId reg_num = regm.ConvertToR(int_num);
+                if (RVALUE.find(reg_num) != RVALUE.end() && RVALUE[reg_num])
+                {
+                    protect_cnt++;
+                    auto protect_value = RVALUE[reg_num];
+                    code += emitInst_mem("str", regm.toString(reg_num), "fp", protect_reg_offset + protect_offset);
+                    AVALUE[protect_value].reg_num = RegManager::NONE;
+                    AVALUE[protect_value].stack_offset = protect_reg_offset + protect_offset;
+                    protect_offset -= 4;
+                }
+                // 将参数传到R0-R3
+                // 若参数为常数
                 if (isa<ConstantValue>(arg))
-                    src_name = "#" + to_string(dynamic_cast<ConstantValue *>(arg)->getInt());
+                {
+                    int imm = dynamic_cast<ConstantValue *>(arg)->getInt();
+                    code += emitInst_nosrcR_1DstR("mov", regm.toString(reg_num), imm);
+                    // src_name = "#" + to_string(dynamic_cast<ConstantValue *>(arg)->getInt());
+                }
+                // 若参数为变量
                 else
                 {
-                    src_name = "r" + arg->getName();
-                    int protect_offset = dynamic_cast<Instruction *>(arg)->ProtectOffset();
-                    if (protect_offset >= 0)
-                        code += space + "ldr\t" + src_name + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+                    auto value = dynamic_cast<Instruction *>(arg);
+                    // 若变量溢出
+                    // 若变量未溢出但在保护区
+                    if (AVALUE[value].reg_num == RegManager::NONE)
+                    {
+                        code += emitInst_mem("ldr", regm.toString(reg_num), "fp", AVALUE[value].stack_offset);
+                    }
+                    // 若变量在寄存器中
+                    else
+                    {
+                        code += emitInst_1srcR_1DstR("mov", regm.toString(reg_num), regm.toString(AVALUE[value].reg_num));
+                    }
                 }
-                code += space + "mov\tr" + to_string(arg_num - 1) + ", " + src_name + endl;
+                int_num++;
             }
             else if (arg->getType()->isFloat())
             {
-                if (isa<ConstantValue>(arg))
+                if (float_num >= 4)
                 {
-                    float value = dynamic_cast<ConstantValue *>(arg)->getDouble();
-                    unsigned int dec;
-                    memcpy(&dec, &value, sizeof(float));
-                    code += space + "movw\tr4, #" + to_string(dec & 0xffff) + endl;
-                    code += space + "movt\tr4, #" + to_string((dec >> 16) & 0xffff) + endl;
-                    code += space + "vmov\ts" + to_string(arg_num - 1) + ", r4" + endl;
-                }
-                else if (isa<LoadInst>(arg))
-                {
-                    auto ld_inst = dynamic_cast<LoadInst *>(arg);
-                    auto pointer = ld_inst->getPointer();
-                    int numdims = 0;
-                    if (isa<GlobalValue>(pointer))
-                        numdims = dynamic_cast<GlobalValue *>(pointer)->getNumDims();
-                    else if (isa<AllocaInst>(pointer))
-                        numdims = dynamic_cast<AllocaInst *>(pointer)->getNumDims();
-                    else if (isa<Argument>(pointer))
-                        numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
-                    int protect_offset = dynamic_cast<Instruction *>(arg)->ProtectOffset();
-                    if (ld_inst->getNumIndices() < numdims)
+                    // 若参数为常数
+                    if (isa<ConstantValue>(arg))
                     {
-                        src_name = "r" + arg->getName();
-                        if (protect_offset >= 0)
-                            code += space + "ldr\t" + src_name + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
-                        code += space + "mov\tr" + to_string(arg_num - 1) + ", " + src_name + endl;
+                        float imm = dynamic_cast<ConstantValue *>(arg)->getFloat();
+                        unsigned dec;
+                        memcpy(&dec, &imm, sizeof(float));
+                        code += emitInst_nosrcR_1DstR("movw", "r9", (dec & 0xffff));
+                        code += emitInst_nosrcR_1DstR("movt", "r9", ((dec >> 16) & 0xffff));
+                        code += emitInst_mem("str", "r9", "sp", para_offset);
+                        // code += space + "movw\tr4, #" + to_string(mid & 0xffff) + endl;
+                        // code += space + "movt\tr4, #" + to_string((mid >> 16) & 0xffff) + endl;
+                        // code += space + "vmov\ts4, " + "r4" + endl;
+                        // code += space + "vstr\ts4, [sp, #" + to_string(para_offset) + "]" + endl;
                     }
+                    // 若参数为变量
                     else
                     {
-                        if (protect_offset >= 0)
-                            code += space + "vldr.32\ts" + to_string(15 - std::stoi(arg->getName())) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
-                        code += space + "vmov.f32\ts" + to_string(arg_num - 1) + ", " + "s" + to_string(15 - std::stoi(arg->getName())) + endl;
+                        auto value = dynamic_cast<Instruction *>(arg);
+                        // 若变量溢出
+                        // 若变量未溢出,但被保护在栈上
+                        if (AVALUE[value].reg_num == RegManager::NONE)
+                        {
+                            code += emitInst_mem("vldr.32", "s14", "fp", AVALUE[value].stack_offset);
+                            code += emitInst_mem("vstr", "s14", "sp", para_offset);
+                        }
+                        // 若变量在寄存器中
+                        else
+                        {
+                            code += emitInst_mem("vstr", regm.toString(AVALUE[value].reg_num), "sp", para_offset);
+                        }
                     }
+                    para_offset += 4;
+                    continue;
                 }
+                // 保护原来存在S0-S3的变量
+                RegId reg_num = regm.ConvertToS(float_num);
+                if (RVALUE.find(reg_num) != RVALUE.end() && RVALUE[reg_num])
+                {
+                    protect_cnt++;
+                    auto protect_value = RVALUE[reg_num];
+                    code += emitInst_mem("vstr", regm.toString(reg_num), "fp", protect_reg_offset + protect_offset);
+                    AVALUE[protect_value].reg_num = RegManager::NONE;
+                    AVALUE[protect_value].stack_offset = protect_reg_offset + protect_offset;
+                    protect_offset -= 4;
+                }
+                // 将参数传到S0-S3
+                // 若参数为常数
+                if (isa<ConstantValue>(arg))
+                {
+                    float imm = dynamic_cast<ConstantValue *>(arg)->getDouble();
+                    unsigned int dec;
+                    memcpy(&dec, &imm, sizeof(float));
+                    code += emitInst_nosrcR_1DstR("movw", "r9", (dec & 0xffff));
+                    code += emitInst_nosrcR_1DstR("movt", "r9", ((dec >> 16) & 0xffff));
+                    code += emitInst_1srcR_1DstR("vmov", regm.toString(reg_num), "r9");
+                    // code += space + "movw\tr4, #" + to_string(dec & 0xffff) + endl;
+                    // code += space + "movt\tr4, #" + to_string((dec >> 16) & 0xffff) + endl;
+                    // code += space + "vmov\ts" + to_string(arg_num - 1) + ", r4" + endl;
+                }
+                // 若参数为变量
                 else
                 {
-                    int protect_offset = dynamic_cast<Instruction *>(arg)->ProtectOffset();
-                    if (protect_offset >= 0)
-                        code += space + "vldr.32\ts" + to_string(15 - std::stoi(arg->getName())) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
-                    code += space + "vmov.f32\ts" + to_string(arg_num - 1) + ", " + "s" + to_string(15 - std::stoi(arg->getName())) + endl;
+                    auto value = dynamic_cast<Instruction *>(arg);
+                    // 若变量未溢出,但被保护在栈上
+                    if (AVALUE[value].reg_num == RegManager::NONE)
+                    {
+                        code += emitInst_mem("vldr.32", regm.toString(reg_num), "fp", AVALUE[value].stack_offset);
+                    }
+                    // 若变量在寄存器中
+                    else
+                    {
+                        code += emitInst_1srcR_1DstR("vmov.f32", regm.toString(reg_num), regm.toString(AVALUE[value].reg_num));
+                    }
+                    // int protect_offset = dynamic_cast<Instruction *>(arg)->ProtectOffset();
+                    // if (protect_offset >= 0)
+                    //     code += space + "vldr.32\ts" + to_string(15 - std::stoi(arg->getName())) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+                    // code += space + "vmov.f32\ts" + to_string(arg_num - 1) + ", " + "s" + to_string(15 - std::stoi(arg->getName())) + endl;
+                }
+                float_num++;
+            }
+        }
+        // 2.保护其他活跃变量
+        auto bbs = curFunc->getBasicBlocks();
+        bool PreValue = true; // 判断活跃区间的起点是否在call指令之前
+        for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
+        {
+            auto bb = iter->get();
+            for (auto &instr : bb->getInstructions())
+            {
+                if (instr->GetStart() >= callInst->GetStart())
+                {
+                    PreValue = false;
+                    break;
+                }
+                auto instrType = instr->getKind();
+                // 只考虑能产生新变量的指令,这样就相当于从小到大遍历所有变量
+                if ((instrType == Value::Kind::kCall && !instr->getType()->isVoid()) || instrType == Value::Kind::kLoad || instr->isBinary() || instr->isUnary())
+                {
+                    // code += "%" + instr->getName() + "end:" + to_string(instr->GetEnd()) + endl;
+                    // code += "%" + callInst->getName() + "start:" + to_string(callInst->GetStart()) + endl;
+                    // 若区间在call指令后不再活跃,不用保护
+                    if (instr->GetEnd() <= callInst->GetStart())
+                        continue;
+                    // 若区间溢出,不用保护
+                    if (Register[instr.get()] == RegManager::R0)
+                        continue;
+                    protect_value.insert(instr.get());
+                    // 若区间已经被保护,不用重复保护
+                    if (AVALUE[instr.get()].reg_num == RegManager::NONE)
+                        continue;
+                    // 若区间在call指令后仍然活跃,需要保护
+                    if (instr->getType()->isInt())
+                        code += emitInst_mem("str", regm.toString(AVALUE[instr.get()].reg_num), "fp", protect_reg_offset + protect_offset);
+                    else
+                        code += emitInst_mem("vstr", regm.toString(AVALUE[instr.get()].reg_num), "fp", protect_reg_offset + protect_offset);
+                    AVALUE[instr.get()].reg_num = RegManager::NONE;
+                    AVALUE[instr.get()].stack_offset = protect_reg_offset + protect_offset;
+                    protect_offset -= 4;
+                    protect_cnt++;
                 }
             }
-            // code += space + "mov\tr" + to_string(arg_num - 1) + ", r" + src + endl;
+            if (!PreValue)
+                break;
         }
+        max_protect = max_protect > protect_cnt ? max_protect : protect_cnt;
+        // 3.执行函数调用
         code += space + "bl\t" + callee_fuc->getName() + endl;
+        RVALUE.clear();
+        // 4.传递返回值(若有)
         if (callInst->getType()->isInt())
-        {
-            int protect_offset = callInst->ProtectOffset();
-            int pass_offset = callInst->PassOffset();
-            // 如果函数返回值需要被保护
-            if (protect_offset >= 0)
-                code += space + "str\tr0, [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
-            // 如果函数返回值需要立即传参(即为第4个之后的参数)
-            else if (pass_offset >= 0)
-                code += space + "str\tr0, [sp, #" + to_string(pass_offset) + "]" + endl;
-            // 否则将返回值mov到相应寄存器
-            else
-                code += space + "mov\tr" + callInst->getName() + ", r0" + endl;
-        }
+            code += emitInst_1srcR_1DstR("mov", regm.toString(dstRegId), "r0");
         else if (callInst->getType()->isFloat())
+            code += emitInst_1srcR_1DstR("vmov", regm.toString(dstRegId), "s0");
+
+        // if (callInst->getType()->isInt())
+        // {
+        //     int protect_offset = callInst->ProtectOffset();
+        //     int pass_offset = callInst->PassOffset();
+        //     // 如果函数返回值需要被保护
+        //     if (protect_offset >= 0)
+        //         code += space + "str\tr0, [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+        //     // 如果函数返回值需要立即传参(即为第4个之后的参数)
+        //     else if (pass_offset >= 0)
+        //         code += space + "str\tr0, [sp, #" + to_string(pass_offset) + "]" + endl;
+        //     // 否则将返回值mov到相应寄存器
+        //     else
+        //         code += space + "mov\tr" + callInst->getName() + ", r0" + endl;
+        // }
+        // else if (callInst->getType()->isFloat())
+        // {
+        //     int protect_offset = callInst->ProtectOffset();
+        //     int pass_offset = callInst->PassOffset();
+        //     // 如果函数返回值需要被保护
+        //     if (protect_offset >= 0)
+        //         code += space + "vstr\ts0, [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+        //     // 如果函数返回值需要立即传参(即为第4个之后的参数)
+        //     else if (pass_offset >= 0)
+        //         code += space + "vstr\ts0, [sp, #" + to_string(pass_offset) + "]" + endl;
+        //     // 否则将返回值mov到相应寄存器
+        //     else
+        //         code += space + "vmov\ts" + to_string(15 - stoi(callInst->getName())) + ", s0" + endl;
+        // }
+
+        // 5.将保护区释放回变量的寄存器
+        for (auto value : protect_value)
         {
-            int protect_offset = callInst->ProtectOffset();
-            int pass_offset = callInst->PassOffset();
-            // 如果函数返回值需要被保护
-            if (protect_offset >= 0)
-                code += space + "vstr\ts0, [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
-            // 如果函数返回值需要立即传参(即为第4个之后的参数)
-            else if (pass_offset >= 0)
-                code += space + "vstr\ts0, [sp, #" + to_string(pass_offset) + "]" + endl;
-            // 否则将返回值mov到相应寄存器
-            else
-                code += space + "vmov\ts" + to_string(15 - stoi(callInst->getName())) + ", s0" + endl;
+            if (value->getType()->isInt())
+                emitInst_mem("ldr", regm.toString(Register[value]), "fp", AVALUE[value].stack_offset);
+            else if (value->getType()->isFloat())
+                emitInst_mem("vldr.32", regm.toString(Register[value]), "fp", AVALUE[value].stack_offset);
+            AVALUE[value].reg_num = Register[value];
+            RVALUE[Register[value]] = value;
+        }
+        // 6.更新RVALUE,AVALUE
+        for (auto arg : args)
+        {
+            if (isa<ConstantValue>(arg))
+                continue;
+            auto value = dynamic_cast<Instruction *>(arg);
+            // 若变量不再活跃,将其AVALUE删除
+            if ((value->GetEnd() == callInst->GetStart()) && (AVALUE.find(value) != AVALUE.end()))
+                AVALUE.erase(AVALUE.find(value));
+        }
+        if (!callInst->getType()->isVoid())
+        {
+            AVALUE[callInst].reg_num = dstRegId;
+            RVALUE[dstRegId] = callInst;
         }
         return {dstRegId, code};
     }
