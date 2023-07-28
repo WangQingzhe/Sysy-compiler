@@ -170,29 +170,33 @@ namespace backend
         // 将所有通用寄存器设为空闲状态
         void ResetRegPool()
         {
-            reg_pool.push(R0);
-            reg_pool.push(R1);
-            reg_pool.push(R2);
-            reg_pool.push(R3);
-            reg_pool.push(R4);
-            reg_pool.push(R5);
-            reg_pool.push(R6);
-            reg_pool.push(R7);
-            reg_pool.push(R8);
-            sreg_pool.push(S0);
-            sreg_pool.push(S1);
-            sreg_pool.push(S2);
-            sreg_pool.push(S3);
-            sreg_pool.push(S4);
-            sreg_pool.push(S5);
-            sreg_pool.push(S6);
-            sreg_pool.push(S7);
-            sreg_pool.push(S8);
-            sreg_pool.push(S9);
-            sreg_pool.push(S10);
-            sreg_pool.push(S11);
-            sreg_pool.push(S12);
-            sreg_pool.push(S13);
+            while (!reg_pool.empty())
+                reg_pool.pop();
+            while (!sreg_pool.empty())
+                sreg_pool.pop();
+            reg_pool.emplace(R0);
+            reg_pool.emplace(R1);
+            reg_pool.emplace(R2);
+            reg_pool.emplace(R3);
+            reg_pool.emplace(R4);
+            reg_pool.emplace(R5);
+            reg_pool.emplace(R6);
+            reg_pool.emplace(R7);
+            reg_pool.emplace(R8);
+            sreg_pool.emplace(S0);
+            sreg_pool.emplace(S1);
+            sreg_pool.emplace(S2);
+            sreg_pool.emplace(S3);
+            sreg_pool.emplace(S4);
+            sreg_pool.emplace(S5);
+            sreg_pool.emplace(S6);
+            sreg_pool.emplace(S7);
+            sreg_pool.emplace(S8);
+            sreg_pool.emplace(S9);
+            sreg_pool.emplace(S10);
+            sreg_pool.emplace(S11);
+            sreg_pool.emplace(S12);
+            sreg_pool.emplace(S13);
         }
         // 从r寄存器池中获取一个空闲r寄存器
         RegId GetFreeReg()
@@ -217,6 +221,70 @@ namespace backend
         void AddFreesReg(RegId reg)
         {
             sreg_pool.push(reg);
+        }
+        // 将数字转化为R寄存器
+        RegId ConvertToR(unsigned reg_num)
+        {
+            if (reg_num == 0)
+                return R0;
+            else if (reg_num == 1)
+                return R1;
+            else if (reg_num == 2)
+                return R2;
+            else if (reg_num == 3)
+                return R3;
+            else if (reg_num == 4)
+                return R4;
+            else if (reg_num == 5)
+                return R5;
+            else if (reg_num == 6)
+                return R6;
+            else if (reg_num == 7)
+                return R7;
+            else if (reg_num == 8)
+                return R8;
+            else if (reg_num == 9)
+                return R9;
+            else if (reg_num == 10)
+                return R10;
+            return NONE;
+        }
+        // 将数字转化为S寄存器
+        RegId ConvertToS(unsigned reg_num)
+        {
+            if (reg_num == 0)
+                return S0;
+            else if (reg_num == 1)
+                return S1;
+            else if (reg_num == 2)
+                return S2;
+            else if (reg_num == 3)
+                return S3;
+            else if (reg_num == 4)
+                return S4;
+            else if (reg_num == 5)
+                return S5;
+            else if (reg_num == 6)
+                return S6;
+            else if (reg_num == 7)
+                return S7;
+            else if (reg_num == 8)
+                return S8;
+            else if (reg_num == 9)
+                return S9;
+            else if (reg_num == 10)
+                return S10;
+            else if (reg_num == 11)
+                return S11;
+            else if (reg_num == 12)
+                return S12;
+            else if (reg_num == 13)
+                return S13;
+            else if (reg_num == 14)
+                return S14;
+            else if (reg_num == 15)
+                return S15;
+            return NONE;
         }
     };
 
@@ -276,8 +344,8 @@ namespace backend
         vector<BasicBlock *> linear_bb;
         int bb_no = 0;
         // function params, return value and localVar
-        map<Argument *, int> paramsStOffset;
-        map<Instruction *, int> localVarStOffset;
+        map<Argument *, int> paramsStOffset;      // 记录函数接收的形参的栈偏移
+        map<Instruction *, int> localVarStOffset; // 记录函数局部变量的栈偏移
         set<GlobalValue *> globalval;
         int retValueStOffset = 0;
         size_t stOffsetAcc = 0;
@@ -285,16 +353,16 @@ namespace backend
         map<BasicBlock *, string> bb_labels;
         uint64_t label_no = 0;
 
-        int top_offset = -8;
-        int above_offset = 4;
-        int temp_offset = 0;
-        int protect_reg_offset = 0;
-        int max_param = 0;
-        int max_protect = 1;
-        int imm_offset = 0;
-        vector<double> imms;
-        string imms_name;
-        bool haveCall = false;
+        int top_offset = -8;        // 记录当前栈顶的偏移
+        int above_offset = 4;       // 记录通过栈传递的参数的栈偏移
+        int temp_offset = 0;        // 记录中间变量的栈偏移
+        int protect_reg_offset = 0; // 记录保护区第一个元素的栈偏移
+        int max_param = 0;          // 记录函数中所有函数调用的参数最多个数
+        int max_protect = 0;        // 记录函数需要保护的变量的最多个数
+        int imm_offset = 0;         // 记录当前引用的静态区立即数在静态区的偏移量
+        vector<double> imms;        // 记录函数引用的所有静态区立即数
+        string imms_name;           // 记录函数静态区立即数的标号名
+        bool haveCall = false;      // 函数是否有子函数调用
         struct cmp
         {
             bool operator()(Instruction *const &a, Instruction *const &b) const
@@ -304,8 +372,16 @@ namespace backend
                 return a->GetEnd() < b->GetEnd();
             }
         };
-        set<Instruction *, cmp> active;
-        map<Instruction *, RegId> Register;
+        set<Instruction *, cmp> active;     // 记录当前活跃变量
+        map<Instruction *, RegId> Register; // 记录为每个变量分配的寄存器
+        map<RegId, Instruction *> RVALUE;   // 记录当前每个寄存器存储的变量
+        struct value_info
+        {
+            bool InReg = false;
+            RegId reg_num = RegManager::NONE; // 变量当前所在的寄存器
+            int stack_offset = 0;             // 变量当前所在位置的栈偏移
+        };
+        map<Instruction *, value_info> AVALUE; // 记录当前每个变量的信息
         set<string> libfunc = {"getint", "getch", "getfloat", "getarray", "getfarray", "putint", "putch", "putfloat", "putarray", "putfarray", "starttime", "stoptime", "putf"};
 
     public:
@@ -349,13 +425,13 @@ namespace backend
             return code;
         }
         // 线性扫描:释放已到期区间
-        void ExpireOldIntervals(Instruction *i)
+        int ExpireOldIntervals(Instruction *i)
         {
             int expired_intervals = 0;
             for (auto interval : active)
             {
                 if (interval->GetEnd() > i->GetStart())
-                    return;
+                    break;
                 else
                 {
                     // active.erase(interval);
@@ -370,8 +446,9 @@ namespace backend
             for (int i = 0; i < expired_intervals; i++)
             {
                 auto iter = active.begin();
-                active.erase(*iter);
+                active.erase(iter);
             }
+            return expired_intervals;
         }
         // 线性扫描:区间溢出
         void SpillAtIntervals(Instruction *i)
@@ -403,10 +480,11 @@ namespace backend
             paramsStOffset.clear();
             retValueStOffset = 0;
             bb_labels.clear();
+            curFunc = func;
             haveCall = false;
             top_offset = -8;
             above_offset = 4;
-            max_protect = 1;
+            max_protect = 0;
             max_param = 0;
             temp_offset = 0;
             protect_reg_offset = 0;
@@ -416,6 +494,8 @@ namespace backend
             active.clear();
             regm.ResetRegPool();
             Register.clear();
+            RVALUE.clear();
+            AVALUE.clear();
             //
             stOffsetAcc = 0;
         }
