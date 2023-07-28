@@ -110,6 +110,10 @@ namespace backend
     {
         return space + name + "\t" + dstReg + ", " + srcReg0 + ", " + srcReg1 + endl;
     }
+    emitInst_2srcR(string name, string srcReg0, string srcReg1)
+    {
+        return space + name + "\t" + srcReg0 + ", " + srcReg1 + endl;
+    }
     //
     class RegManager
     {

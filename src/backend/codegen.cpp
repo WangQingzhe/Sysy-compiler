@@ -472,9 +472,22 @@ namespace backend
                 if (l_val <= 0xffff && l_val >= 0)
                 {
                     // add lconst r9 is used when mov immidiate number
-                    code += space + "mov\tr9, " + lname + endl;
-                    code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
                     // code += space + "add\tr" + res + ", r" + res + ", " + rname + endl;
+                    code += space + "mov\tr9, " + lname + endl;
+                    if (rRegId != RegManager::NONE && dstRegId != RegManager::NONE)
+                        code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
+                    else if (dstRegId != RegManager::NONE)
+                    {
+                        code += emitInst_mem("ldr", "r10", "fp", rhs->GetLocation());
+                        code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), "r9", "r10");
+                    }
+                    else
+                    {
+                        code += emitInst_mem("ldr", "r10", "fp", rhs->GetLocation());
+                        code += emitInst_2srcR_1dstR("add", "r9", "r9", "r10");
+                        code += emitInst_mem("str", "r9", "fp", bInst->GetLocation());
+                        AVALUE[bInst].stack_offset = bInst->GetLocation();
+                    }
                 }
                 else
                 {
@@ -501,8 +514,17 @@ namespace backend
                 }
             }
             else
-                // code += space + "add\tr" + res + ", " + lname + ", " + rname + endl;
-                code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
+            // "[fp - " + to_string(bInst->GetLocation()) + "]"
+            // code += space + "add\tr" + res + ", " + lname + ", " + rname + endl;
+            {
+                if (rRegId != RegManager::NONE && dstRegId != RegManager::NONE && lRegId != RegManager::NONE)
+                    code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
+                else if (dstRegId != RegManager::NONE && rRegId != RegManager::NONE)
+                {
+                    code += emitInst_mem("ldr", "r9", "fp", lhs->GetLocation());
+                    code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), "r9", regm.toString(rRegId));
+                }
+            }
         }
         else if (bInst->getKind() == Instruction::kSub)
         {
@@ -1017,15 +1039,18 @@ namespace backend
             auto iter = AVALUE.find(dynamic_cast<Instruction *>(lhs));
             AVALUE.erase(iter);
         }
-        if (!rconst && rhs->GetEnd() <= bInst->GetEnd())
+        if (!rconst && rhs->GetEnd() <= bInst->GetStart())
         {
             RVALUE[Register[dynamic_cast<Instruction *>(rhs)]] = nullptr;
             auto iter = AVALUE.find(dynamic_cast<Instruction *>(rhs));
             if (iter != AVALUE.end())
                 AVALUE.erase(iter);
         }
-        AVALUE[bInst].reg_num = dstRegId;
-        RVALUE[dstRegId] = bInst;
+        if (dstRegId != RegManager::NONE)
+        {
+            AVALUE[bInst].reg_num = dstRegId;
+            RVALUE[dstRegId] = bInst;
+        }
         return {dstRegId, code};
     }
 
@@ -1039,20 +1064,28 @@ namespace backend
         string lname, rname;
         auto lhs = bInst->getLhs();
         auto rhs = bInst->getRhs();
+        dstRegId = Register[bInst];
+        RegId lRegId, rRegId;
         bool lconst = false, rconst = false;
         int rvalue = 0;
+        int lvalue = 0;
         int instrname = stoi(bInst->getName());
         if (isa<ConstantValue>(lhs))
         {
             // float val = dynamic_cast<ConstantValue *>(lhs)->getFloat();
             float val = dynamic_cast<ConstantValue *>(lhs)->getDouble();
+            memcpy(&lvalue, &val, sizeof(val));
             // unsigned int num;
             // memcpy(&num, &val, sizeof(val));
             lname = "#" + to_string(val);
             lconst = true;
         }
         else
+        {
             lname = "s" + to_string(15 - stoi(lhs->getName()));
+            lRegId = Register[dynamic_cast<Instruction *>(lhs)];
+        }
+
         if (isa<ConstantValue>(rhs))
         {
             // float val = dynamic_cast<ConstantValue *>(rhs)->getFloat();
@@ -1070,7 +1103,10 @@ namespace backend
             code += space + "vldr.32\ts" + lhs->getName() + ", [fp, #" + to_string(protect_reg_offset) + "]" + endl;
         }
         else
+        {
+            rRegId = Register[dynamic_cast<Instruction *>(rhs)];
             rname = "s" + to_string(15 - std::stoi(rhs->getName()));
+        }
         auto res = to_string(15 - std::stoi(bInst->getName()));
         // 各种指令分开处理
         if (bInst->getKind() == Instruction::kFAdd)
@@ -1079,212 +1115,273 @@ namespace backend
             {
                 double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
                 // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
-                std::string dname = to_string(16 + std::stoi(rhs->getName()));
-                std::string immname = to_string(16 + std::stoi(bInst->getName()));
-                code += space + "vcvt.f64.f32\td" + dname + ", " + rname + endl;
-                code += space + "vldr.64\td" + immname + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                // std::string dname = to_string(16 + std::stoi(rhs->getName()));
+                // std::string immname = to_string(16 + std::stoi(bInst->getName()));
+                code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(rRegId) + endl;
+                code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_l);
-                code += space + "vadd.f64\td" + immname + ", d" + immname + ", d" + dname + endl;
-                code += space + "vcvt.f32.f64\ts" + to_string(15 - std::stoi(bInst->getName())) + ", d" + immname + endl;
+                code += space + "vadd.f64\td17" + ", d16" + ", d17" + endl;
+                code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
             }
             else if (rconst)
             {
                 double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
-                std::string dname = to_string(16 + std::stoi(lhs->getName()));
-                std::string immname = to_string(16 + std::stoi(bInst->getName()));
-                code += space + "vcvt.f64.f32\td" + dname + ", " + lname + endl;
-                code += space + "vldr.64\td" + immname + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                // std::string dname = to_string(16 + std::stoi(lhs->getName()));
+                // std::string immname = to_string(16 + std::stoi(bInst->getName()));
+                code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(lRegId) + endl;
+                code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_r);
-                code += space + "vadd.f64\td" + immname + ", d" + immname + ", d" + dname + endl;
-                code += space + "vcvt.f32.f64\ts" + to_string(15 - std::stoi(bInst->getName())) + ", d" + immname + endl;
+                code += space + "vadd.f64\td17" + ", d16" + ", d17" + endl;
+                code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
             }
             else
-                code += space + "vadd.f32\ts" + res + ", " + lname + ", " + rname + endl;
+                code += emitInst_2srcR_1dstR("vadd.f32", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
+            // code += space + "vadd.f32\ts" + res + ", " + lname + ", " + rname + endl;
         }
         else if (bInst->getKind() == Instruction::kFSub)
         {
             if (lconst)
             {
                 double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
-                std::string dname = to_string(16 + std::stoi(rhs->getName()));
-                std::string immname = to_string(16 + std::stoi(bInst->getName()));
-                code += space + "vcvt.f64.f32\td" + dname + ", " + rname + endl;
-                code += space + "vldr.64\td" + immname + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
+                // std::string dname = to_string(16 + std::stoi(rhs->getName()));
+                // std::string immname = to_string(16 + std::stoi(bInst->getName()));
+                code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(rRegId) + endl;
+                code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
-
                 imms.push_back(val_l);
-                code += space + "vsub.f64\td" + immname + ", d" + immname + ", d" + dname + endl;
-                code += space + "vcvt.f32.f64\ts" + to_string(15 - std::stoi(bInst->getName())) + ", d" + immname + endl;
+                code += space + "vsub.f64\td17" + ", d16" + ", d17" + endl;
+                code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
             }
             else if (rconst)
             {
                 double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
-                std::string dname = to_string(16 + std::stoi(lhs->getName()));
-                std::string immname = to_string(16 + std::stoi(bInst->getName()));
-                code += space + "vcvt.f64.f32\td" + dname + ", " + lname + endl;
-                code += space + "vldr.64\td" + immname + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                // std::string dname = to_string(16 + std::stoi(lhs->getName()));
+                // std::string immname = to_string(16 + std::stoi(bInst->getName()));
+                code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(lRegId) + endl;
+                code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_r);
-                code += space + "vsub.f64\td" + dname + ", d" + dname + ", d" + immname + endl;
-                code += space + "vcvt.f32.f64\ts" + to_string(15 - std::stoi(bInst->getName())) + ", d" + dname + endl;
+                code += space + "vsub.f64\td17" + ", d16" + ", d17" + endl;
+                code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
             }
             else
-                code += space + "vsub.f32\ts" + res + ", " + lname + ", " + rname + endl;
+                code += emitInst_2srcR_1dstR("vsub.f32", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
         }
         else if (bInst->getKind() == Instruction::kFMul)
         {
             if (lconst)
             {
                 double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
-                std::string dname = to_string(16 + std::stoi(rhs->getName()));
-                std::string immname = to_string(16 + std::stoi(bInst->getName()));
-                code += space + "vcvt.f64.f32\td" + dname + ", " + rname + endl;
-                code += space + "vldr.64\td" + immname + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
+                // std::string dname = to_string(16 + std::stoi(rhs->getName()));
+                // std::string immname = to_string(16 + std::stoi(bInst->getName()));
+                code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(rRegId) + endl;
+                code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_l);
-                code += space + "vmul.f64\td" + immname + ", d" + immname + ", d" + dname + endl;
-                code += space + "vcvt.f32.f64\ts" + to_string(15 - std::stoi(bInst->getName())) + ", d" + immname + endl;
+                code += space + "vmul.f64\td17" + ", d16" + ", d17" + endl;
+                code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
             }
             else if (rconst)
             {
                 double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
-                std::string dname = to_string(16 + std::stoi(lhs->getName()));
-                std::string immname = to_string(16 + std::stoi(bInst->getName()));
-                code += space + "vcvt.f64.f32\td" + dname + ", " + lname + endl;
-                code += space + "vldr.64\td" + immname + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                // std::string dname = to_string(16 + std::stoi(lhs->getName()));
+                // std::string immname = to_string(16 + std::stoi(bInst->getName()));
+                code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(lRegId) + endl;
+                code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_r);
-                code += space + "vmul.f64\td" + immname + ", d" + immname + ", d" + dname + endl;
-                code += space + "vcvt.f32.f64\ts" + to_string(15 - std::stoi(bInst->getName())) + ", d" + immname + endl;
+                code += space + "vmul.f64\td17" + ", d16" + ", d17" + endl;
+                code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
             }
             else
-                code += space + "vmul.f32\ts" + res + ", " + lname + ", " + rname + endl;
+                code += emitInst_2srcR_1dstR("vmul.f32", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
         }
         else if (bInst->getKind() == Instruction::kFDiv)
         {
             if (lconst)
             {
                 double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
-                std::string dname = to_string(16 + std::stoi(rhs->getName()));
-                std::string immname = to_string(16 + std::stoi(bInst->getName()));
-                code += space + "vcvt.f64.f32\td" + dname + ", " + rname + endl;
-                code += space + "vldr.64\td" + immname + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
+                // std::string dname = to_string(16 + std::stoi(rhs->getName()));
+                // std::string immname = to_string(16 + std::stoi(bInst->getName()));
+                code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(rRegId) + endl;
+                code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_l);
-                code += space + "vdiv.f64\td" + immname + ", d" + immname + ", d" + dname + endl;
-                code += space + "vcvt.f32.f64\ts" + to_string(15 - std::stoi(bInst->getName())) + ", d" + immname + endl;
+                code += space + "vdiv.f64\td17" + ", d16" + ", d17" + endl;
+                code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
             }
             else if (rconst)
             {
                 double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
-                std::string dname = to_string(16 + std::stoi(lhs->getName()));
-                std::string immname = to_string(16 + std::stoi(bInst->getName()));
-                code += space + "vcvt.f64.f32\td" + dname + ", " + lname + endl;
-                code += space + "vldr.64\td" + immname + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                // std::string dname = to_string(16 + std::stoi(lhs->getName()));
+                // std::string immname = to_string(16 + std::stoi(bInst->getName()));
+                code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(lRegId) + endl;
+                code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_r);
-                code += space + "vdiv.f64\td" + immname + ", d" + dname + ", d" + immname + endl;
-                code += space + "vcvt.f32.f64\ts" + to_string(15 - std::stoi(bInst->getName())) + ", d" + immname + endl;
+                code += space + "vdiv.f64\td17" + ", d16" + ", d17" + endl;
+                code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
             }
             else
-                code += space + "vdiv.f32\ts" + res + ", " + lname + ", " + rname + endl;
+                code += emitInst_2srcR_1dstR("vdiv.f32", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
         }
         else if (lconst && rconst)
             return {dstRegId, code};
         else if (bInst->getKind() == Instruction::kFCmpEQ)
         {
-            if (rconst)
+            if (lconst)
             {
-                string immname = to_string(15 - instrname);
-                code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(rvalue & 0xffff) + endl;
-                code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((rvalue >> 16) & 0xffff) + endl;
-                code += space + "vmov\ts" + immname + ", r" + to_string(instrname) + endl;
-                code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
+                code += space + "movw\tr9" + ", #" + to_string(lvalue & 0xffff) + endl;
+                code += space + "movt\tr9" + ", #" + to_string((lvalue >> 16) & 0xffff) + endl;
+                code += emitInst_1srcR_1DstR("vmov", "s14", "r9");
+                code += emitInst_2srcR("vcmpe.f32", "s14", regm.toString(rRegId));
+            }
+            else if (rconst)
+            {
+                // string immname = to_string(15 - instrname);
+                code += space + "movw\tr9" + ", #" + to_string(rvalue & 0xffff) + endl;
+                code += space + "movt\tr9" + ", #" + to_string((rvalue >> 16) & 0xffff) + endl;
+                code += emitInst_1srcR_1DstR("vmov", "s14", "r9");
+                code += emitInst_2srcR("vcmpe.f32", regm.toString(lRegId), "s14");
+                // code += space + "vmov\ts" + immname + ", r" + to_string(instrname) + endl;
+                // code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
             }
             else
-                code += space + "vcmpe.f32\t" + lname + ", " + rname + endl;
+                code += emitInst_2srcR("vcmpe.f32", regm.toString(lRegId), regm.toString(rRegId));
             code += space + "vmrs\tAPSR_nzcv, FPSCR" + endl;
         }
         else if (bInst->getKind() == Instruction::kFCmpGE)
         {
-            if (rconst)
+            if (lconst)
             {
-                string immname = to_string(15 - instrname);
-                code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(rvalue & 0xffff) + endl;
-                code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((rvalue >> 16) & 0xffff) + endl;
-                code += space + "vmov\ts" + immname + ", r" + to_string(instrname) + endl;
-                code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
+                code += space + "movw\tr9" + ", #" + to_string(lvalue & 0xffff) + endl;
+                code += space + "movt\tr9" + ", #" + to_string((lvalue >> 16) & 0xffff) + endl;
+                code += emitInst_1srcR_1DstR("vmov", "s14", "r9");
+                code += emitInst_2srcR("vcmpe.f32", "s14", regm.toString(rRegId));
+            }
+            else if (rconst)
+            {
+                // string immname = to_string(15 - instrname);
+                code += space + "movw\tr9" + ", #" + to_string(rvalue & 0xffff) + endl;
+                code += space + "movt\tr9" + ", #" + to_string((rvalue >> 16) & 0xffff) + endl;
+                code += emitInst_1srcR_1DstR("vmov", "s14", "r9");
+                code += emitInst_2srcR("vcmpe.f32", regm.toString(lRegId), "s14");
+                // code += space + "vmov\ts" + immname + ", r" + to_string(instrname) + endl;
+                // code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
             }
             else
-                code += space + "vcmpe.f32\t" + lname + ", " + rname + endl;
+                code += emitInst_2srcR("vcmpe.f32", regm.toString(lRegId), regm.toString(rRegId));
             code += space + "vmrs\tAPSR_nzcv, FPSCR" + endl;
         }
         else if (bInst->getKind() == Instruction::kFCmpGT)
         {
-            if (rconst)
+            if (lconst)
             {
-                string immname = to_string(15 - instrname);
-                code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(rvalue & 0xffff) + endl;
-                code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((rvalue >> 16) & 0xffff) + endl;
-                code += space + "vmov\ts" + immname + ", r" + to_string(instrname) + endl;
-                code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
+                code += space + "movw\tr9" + ", #" + to_string(lvalue & 0xffff) + endl;
+                code += space + "movt\tr9" + ", #" + to_string((lvalue >> 16) & 0xffff) + endl;
+                code += emitInst_1srcR_1DstR("vmov", "s14", "r9");
+                code += emitInst_2srcR("vcmpe.f32", "s14", regm.toString(rRegId));
+            }
+            else if (rconst)
+            {
+                code += space + "movw\tr9" + ", #" + to_string(rvalue & 0xffff) + endl;
+                code += space + "movt\tr9" + ", #" + to_string((rvalue >> 16) & 0xffff) + endl;
+                code += emitInst_1srcR_1DstR("vmov", "s14", "r9");
+                code += emitInst_2srcR("vcmpe.f32", regm.toString(lRegId), "s14");
             }
             else
-                code += space + "vcmpe.f32\t" + lname + ", " + rname + endl;
+                code += emitInst_2srcR("vcmpe.f32", regm.toString(lRegId), regm.toString(rRegId));
             code += space + "vmrs\tAPSR_nzcv, FPSCR" + endl;
         }
         else if (bInst->getKind() == Instruction::kFCmpLE)
         {
-            if (rconst)
+            if (lconst)
             {
-                string immname = to_string(15 - instrname);
-                code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(rvalue & 0xffff) + endl;
-                code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((rvalue >> 16) & 0xffff) + endl;
-                code += space + "vmov\ts" + immname + ", r" + to_string(instrname) + endl;
-                code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
+                code += space + "movw\tr9" + ", #" + to_string(lvalue & 0xffff) + endl;
+                code += space + "movt\tr9" + ", #" + to_string((lvalue >> 16) & 0xffff) + endl;
+                code += emitInst_1srcR_1DstR("vmov", "s14", "r9");
+                code += emitInst_2srcR("vcmpe.f32", "s14", regm.toString(rRegId));
+            }
+            else if (rconst)
+            {
+                code += space + "movw\tr9" + ", #" + to_string(rvalue & 0xffff) + endl;
+                code += space + "movt\tr9" + ", #" + to_string((rvalue >> 16) & 0xffff) + endl;
+                code += emitInst_1srcR_1DstR("vmov", "s14", "r9");
+                code += emitInst_2srcR("vcmpe.f32", regm.toString(lRegId), "s14");
             }
             else
-                code += space + "vcmpe.f32\t" + lname + ", " + rname + endl;
+                code += emitInst_2srcR("vcmpe.f32", regm.toString(lRegId), regm.toString(rRegId));
             code += space + "vmrs\tAPSR_nzcv, FPSCR" + endl;
         }
         else if (bInst->getKind() == Instruction::kFCmpLT)
         {
-            if (rconst)
+            if (lconst)
             {
-                string immname = to_string(15 - instrname);
-                code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(rvalue & 0xffff) + endl;
-                code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((rvalue >> 16) & 0xffff) + endl;
-                code += space + "vmov\ts" + immname + ", r" + to_string(instrname) + endl;
-                code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
+                code += space + "movw\tr9" + ", #" + to_string(lvalue & 0xffff) + endl;
+                code += space + "movt\tr9" + ", #" + to_string((lvalue >> 16) & 0xffff) + endl;
+                code += emitInst_1srcR_1DstR("vmov", "s14", "r9");
+                code += emitInst_2srcR("vcmpe.f32", "s14", regm.toString(rRegId));
+            }
+            else if (rconst)
+            {
+                code += space + "movw\tr9" + ", #" + to_string(rvalue & 0xffff) + endl;
+                code += space + "movt\tr9" + ", #" + to_string((rvalue >> 16) & 0xffff) + endl;
+                code += emitInst_1srcR_1DstR("vmov", "s14", "r9");
+                code += emitInst_2srcR("vcmpe.f32", regm.toString(lRegId), "s14");
             }
             else
-                code += space + "vcmpe.f32\t" + lname + ", " + rname + endl;
+                code += emitInst_2srcR("vcmpe.f32", regm.toString(lRegId), regm.toString(rRegId));
             code += space + "vmrs\tAPSR_nzcv, FPSCR" + endl;
         }
         else if (bInst->getKind() == Instruction::kFCmpNE)
         {
-            if (rconst)
+            if (lconst)
             {
-                string immname = to_string(15 - instrname);
-                code += space + "movw\tr" + to_string(instrname) + ", #" + to_string(rvalue & 0xffff) + endl;
-                code += space + "movt\tr" + to_string(instrname) + ", #" + to_string((rvalue >> 16) & 0xffff) + endl;
-                code += space + "vmov\ts" + immname + ", r" + to_string(instrname) + endl;
-                code += space + "vcmpe.f32\t" + lname + ", s" + immname + endl;
+                code += space + "movw\tr9" + ", #" + to_string(lvalue & 0xffff) + endl;
+                code += space + "movt\tr9" + ", #" + to_string((lvalue >> 16) & 0xffff) + endl;
+                code += emitInst_1srcR_1DstR("vmov", "s14", "r9");
+                code += emitInst_2srcR("vcmpe.f32", "s14", regm.toString(rRegId));
+            }
+            else if (rconst)
+            {
+                code += space + "movw\tr9" + ", #" + to_string(rvalue & 0xffff) + endl;
+                code += space + "movt\tr9" + ", #" + to_string((rvalue >> 16) & 0xffff) + endl;
+                code += emitInst_1srcR_1DstR("vmov", "s14", "r9");
+                code += emitInst_2srcR("vcmpe.f32", regm.toString(lRegId), "s14");
             }
             else
-                code += space + "vcmpe.f32\t" + lname + ", " + rname + endl;
+                code += emitInst_2srcR("vcmpe.f32", regm.toString(lRegId), regm.toString(rRegId));
             code += space + "vmrs\tAPSR_nzcv, FPSCR" + endl;
         }
         int protect_offset = bInst->ProtectOffset();
         int pass_offset = bInst->PassOffset();
         // 如果该指令需要被保护
         if (protect_offset >= 0)
-            code += space + "vstr\tr" + res + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+            code += space + "vst\t" + regm.toString(dstRegId) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
         // 如果该指令需要立即传参(即为第4个之后的参数)
         if (pass_offset >= 0)
-            code += space + "vstr\tr" + res + ", [sp, #" + to_string(pass_offset) + "]" + endl;
+            code += space + "vst\t" + regm.toString(dstRegId) + ", [sp, #" + to_string(pass_offset) + "]" + endl;
+        // update RVALUE and AVALUE
+        if (!lconst && lhs->GetEnd() <= bInst->GetStart())
+        {
+            RVALUE[Register[dynamic_cast<Instruction *>(lhs)]] = nullptr;
+            auto iter = AVALUE.find(dynamic_cast<Instruction *>(lhs));
+            AVALUE.erase(iter);
+        }
+        if (!rconst && rhs->GetEnd() <= bInst->GetStart())
+        {
+            RVALUE[Register[dynamic_cast<Instruction *>(rhs)]] = nullptr;
+            auto iter = AVALUE.find(dynamic_cast<Instruction *>(rhs));
+            if (iter != AVALUE.end())
+                AVALUE.erase(iter);
+        }
+        AVALUE[bInst].reg_num = dstRegId;
+        RVALUE[dstRegId] = bInst;
         return {dstRegId, code};
     }
 
@@ -1295,70 +1392,84 @@ namespace backend
          *code in here
          */
         auto val = uInst->getOperand();
+        dstRegId = Register[uInst];
         string val_name;
         if (uInst->getKind() == Instruction::kNeg)
         {
             if (isa<ConstantValue>(val))
             {
                 val_name = to_string(dynamic_cast<ConstantValue *>(val)->getInt());
-                code += space + "mov\tr" + uInst->getName() + ", #" + val_name + endl;
-                code += space + "mvn\tr" + uInst->getName() + ", #1" + endl;
+                code += space + "mov\t" + regm.toString(dstRegId) + ", #" + val_name + endl;
+                code += space + "mvn\t" + regm.toString(dstRegId) + ", #1" + endl;
             }
             else
             {
-                val_name = "r" + val->getName();
-                code += space + "rsb\tr" + uInst->getName() + ", " + val_name + ", #0" + endl;
+                RegId srcreg = Register[dynamic_cast<Instruction *>(val)];
+                val_name = regm.toString(srcreg);
+                code += space + "rsb\t" + regm.toString(dstRegId) + ", " + val_name + ", #0" + endl;
             }
             int protect_offset = uInst->ProtectOffset();
             int pass_offset = uInst->PassOffset();
             // 如果该指令需要被保护
             if (protect_offset >= 0)
-                code += space + "str\tr" + uInst->getName() + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+                code += space + "str\t" + regm.toString(dstRegId) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
             // 如果该指令需要立即传参(即为第4个之后的参数)
             if (pass_offset >= 0)
-                code += space + "str\tr" + uInst->getName() + ", [sp, #" + to_string(pass_offset) + "]" + endl;
+                code += space + "str\t" + regm.toString(dstRegId) + ", [sp, #" + to_string(pass_offset) + "]" + endl;
         }
         else if (uInst->getKind() == Instruction::kFNeg)
         {
-            val_name = "s" + to_string(15 - std::stoi(val->getName()));
-            code += space + "vneg.f32\ts" + to_string(15 - std::stoi(uInst->getName())) + ", " + val_name + endl;
+            RegId srcreg = Register[dynamic_cast<Instruction *>(val)];
+            // val_name = regm.toString(srcreg);
+            val_name = regm.toString(srcreg);
+            code += emitInst_1srcR_1DstR("vneg.f32", regm.toString(dstRegId), regm.toString(srcreg));
+            // code += space + "vneg.f32\ts" + to_string(15 - int(dstRegId)) + ", " + val_name + endl;
             int protect_offset = uInst->ProtectOffset();
             int pass_offset = uInst->PassOffset();
             // 如果该指令需要被保护
             if (protect_offset >= 0)
-                code += space + "vstr\ts" + to_string(15 - std::stoi(uInst->getName())) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+                code += space + "vstr\t" + regm.toString(dstRegId) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
             // 如果该指令需要立即传参(即为第4个之后的参数)
             if (pass_offset >= 0)
-                code += space + "vstr\ts" + to_string(15 - std::stoi(uInst->getName())) + ", [sp, #" + to_string(pass_offset) + "]" + endl;
+                code += space + "vstr\t" + regm.toString(dstRegId) + ", [sp, #" + to_string(pass_offset) + "]" + endl;
         }
         else if (uInst->getKind() == Instruction::kFtoI)
         {
-            val_name = "s" + to_string(15 - std::stoi(val->getName()));
-            code += space + "vcvt.s32.f32\ts" + to_string(15 - std::stoi(uInst->getName())) + "," + val_name + endl;
-            code += space + "vmov\tr" + uInst->getName() + ", s" + to_string(15 - std::stoi(uInst->getName())) + endl;
+            RegId srcreg = Register[dynamic_cast<Instruction *>(val)];
+            val_name = regm.toString(srcreg);
+            code += space + "vcvt.s32.f32\t" + val_name + " ," + val_name + endl;
+            code += space + "vmov\t" + regm.toString(dstRegId) + ", " + val_name + endl;
             int protect_offset = uInst->ProtectOffset();
             int pass_offset = uInst->PassOffset();
             // 如果该指令需要被保护
             if (protect_offset >= 0)
-                code += space + "str\tr" + uInst->getName() + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+                code += space + "str\tr" + regm.toString(dstRegId) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
             // 如果该指令需要立即传参(即为第4个之后的参数)
             if (pass_offset >= 0)
-                code += space + "str\tr" + uInst->getName() + ", [sp, #" + to_string(pass_offset) + "]" + endl;
+                code += space + "str\tr" + regm.toString(dstRegId) + ", [sp, #" + to_string(pass_offset) + "]" + endl;
         }
         else if (uInst->getKind() == Instruction::kItoF)
         {
-            val_name = "s" + to_string(15 - std::stoi(val->getName()));
-            code += space + "vmov\t" + val_name + ", r" + val->getName() + endl;
-            code += space + "vcvt.f32.s32\ts" + to_string(15 - std::stoi(uInst->getName())) + "," + val_name + endl;
+            RegId srcreg = Register[dynamic_cast<Instruction *>(val)];
+            code += space + "vmov\t" + regm.toString(dstRegId) + ", " + regm.toString(srcreg) + endl;
+            code += space + "vcvt.f32.s32\t" + regm.toString(dstRegId) + ", " + regm.toString(dstRegId) + endl;
             int protect_offset = uInst->ProtectOffset();
             int pass_offset = uInst->PassOffset();
             // 如果该指令需要被保护
             if (protect_offset >= 0)
-                code += space + "vstr\ts" + to_string(15 - std::stoi(uInst->getName())) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
+                code += space + "vstr\t" + regm.toString(dstRegId) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
             // 如果该指令需要立即传参(即为第4个之后的参数)
             if (pass_offset >= 0)
-                code += space + "vstr\ts" + to_string(15 - std::stoi(uInst->getName())) + ", [sp, #" + to_string(pass_offset) + endl;
+                code += space + "vstr\t" + regm.toString(dstRegId) + ", [sp, #" + to_string(pass_offset) + endl;
         }
+        if (!isa<ConstantValue>(val) && val->GetEnd() <= uInst->GetStart())
+        {
+            RVALUE[Register[dynamic_cast<Instruction *>(val)]] = nullptr;
+            auto iter = AVALUE.find(dynamic_cast<Instruction *>(val));
+            AVALUE.erase(iter);
+        }
+        AVALUE[uInst].reg_num = dstRegId;
+        RVALUE[dstRegId] = uInst;
         return {dstRegId, code};
     }
     pair<RegId, string>
