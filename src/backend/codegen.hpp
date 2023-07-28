@@ -358,7 +358,7 @@ namespace backend
         int temp_offset = 0;        // 记录中间变量的栈偏移
         int protect_reg_offset = 0; // 记录保护区第一个元素的栈偏移
         int max_param = 0;          // 记录函数中所有函数调用的参数最多个数
-        int max_protect = 0;        // 记录函数需要保护的变量的最多个数
+        int max_protect = 1;        // 记录函数需要保护的变量的最多个数
         int imm_offset = 0;         // 记录当前引用的静态区立即数在静态区的偏移量
         vector<double> imms;        // 记录函数引用的所有静态区立即数
         string imms_name;           // 记录函数静态区立即数的标号名
@@ -484,7 +484,7 @@ namespace backend
             haveCall = false;
             top_offset = -8;
             above_offset = 4;
-            max_protect = 0;
+            max_protect = 1;
             max_param = 0;
             temp_offset = 0;
             protect_reg_offset = 0;

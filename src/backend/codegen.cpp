@@ -212,6 +212,12 @@ namespace backend
                 {
                     auto load_inst = dynamic_cast<LoadInst *>(instr.get());
                     load_inst->setStart(instr_num);
+                    for (auto indice : load_inst->getIndices())
+                    {
+                        if (isa<ConstantValue>(indice))
+                            continue;
+                        indice->setEnd(instr_num);
+                    }
                 }
                 else if (instrType == Value::Kind::kStore)
                 {
@@ -220,6 +226,12 @@ namespace backend
                     // if (isa<ConstantValue>(value))
                     // value->setStart(instr_num);
                     value->setEnd(instr_num);
+                    for (auto indice : store_inst->getIndices())
+                    {
+                        if (isa<ConstantValue>(indice))
+                            continue;
+                        indice->setEnd(instr_num);
+                    }
                 }
                 else if (instr->isBinary())
                 {
@@ -2060,8 +2072,16 @@ namespace backend
         // variable to be loaded
         auto pointer = ldInst->getPointer();
         auto type = pointer->getType()->as<PointerType>()->getBaseType();
+        if (dstRegId == RegManager::NONE)
+        {
+            if (type->isInt())
+                dstRegId = RegManager::R9;
+            else if (type->isFloat())
+                dstRegId = RegManager::S14;
+        }
         int pos;                                  // variable's position in the stack
         int NumIndices = ldInst->getNumIndices(); // numindices denotes dimensions of pointer
+
         // if pointer is a localvariable
         if (localVarStOffset.find(dynamic_cast<Instruction *>(pointer)) != localVarStOffset.end())
         {
@@ -2088,13 +2108,18 @@ namespace backend
                 else if (type->isFloat())
                 {
                     if (imm < 256)
-                        code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                        // code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                        code += emitInst_mem("vldr.32", regm.toString(dstRegId), "fp", pos);
                     else
                     {
-                        code += space + "sub\tr" + to_string(reg_num) + ", fp ,#" + to_string(imm / 256 * 256) + endl;
+                        code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
                         if (imm % 256 != 0)
-                            code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
-                        code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                            code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                        code += emitInst_mem("vldr.32", regm.toString(dstRegId), "r9");
+                        // code += space + "sub\tr" + to_string(reg_num) + ", fp ,#" + to_string(imm / 256 * 256) + endl;
+                        // if (imm % 256 != 0)
+                        //     code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
+                        // code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
                     }
                 }
             }
@@ -2137,45 +2162,80 @@ namespace backend
                         if (type->isInt())
                         {
                             if (imm < 256)
-                                code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                                // code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                                code += emitInst_mem("ldr", regm.toString(dstRegId), "fp", pos);
                             else
                             {
-                                code += space + "sub\tr" + to_string(reg_num) + ", fp ,#" + to_string(imm / 256 * 256) + endl;
+                                code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), "fp", imm / 256 * 256);
                                 if (imm % 256 != 0)
-                                    code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
-                                code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                                    code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), regm.toString(dstRegId), imm % 256);
+                                code += emitInst_mem("ldr", regm.toString(dstRegId), regm.toString(dstRegId));
+                                // code += space + "sub\tr" + to_string(reg_num) + ", fp ,#" + to_string(imm / 256 * 256) + endl;
+                                // if (imm % 256 != 0)
+                                //     code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
+                                // code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
                             }
                         }
                         else if (type->isFloat())
                         {
                             if (imm < 256)
-                                code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                                code += emitInst_mem("vldr.32", regm.toString(dstRegId), "fp", pos);
                             else
                             {
-                                code += space + "sub\tr" + to_string(reg_num) + ", fp ,#" + to_string(imm / 256 * 256) + endl;
+                                code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
                                 if (imm % 256 != 0)
-                                    code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
-                                code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                                    code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                                code += emitInst_mem("vldr.32", regm.toString(dstRegId), "r9");
                             }
+                            // if (imm < 256)
+                            //     code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                            // else
+                            // {
+                            //     code += space + "sub\tr" + to_string(reg_num) + ", fp ,#" + to_string(imm / 256 * 256) + endl;
+                            //     if (imm % 256 != 0)
+                            //         code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
+                            //     code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                            // }
                         }
                     }
                     // load出一个(子)数组,求出其首地址
                     else if (NumIndices < NumDims)
                     {
+                        if (dstRegId == RegManager::S14)
+                            dstRegId = RegManager::R9;
                         int imm = -pos;
                         if (imm < 256)
-                            code += space + "sub\tr" + to_string(reg_num) + ", fp, #" + to_string(-pos) + endl;
+                            code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), "fp", imm);
                         else
                         {
-                            code += space + "sub\tr" + to_string(reg_num) + ", fp, #" + to_string(imm / 256 * 256) + endl;
+                            code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), "fp", imm / 256 * 256);
                             if (imm % 256 != 0)
-                                code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
+                                code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), regm.toString(dstRegId), imm % 256);
                         }
+                        // if (imm < 256)
+                        //     code += space + "sub\tr" + to_string(reg_num) + ", fp, #" + to_string(-pos) + endl;
+                        // else
+                        // {
+                        //     code += space + "sub\tr" + to_string(reg_num) + ", fp, #" + to_string(imm / 256 * 256) + endl;
+                        //     if (imm % 256 != 0)
+                        //         code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
+                        // }
                     }
                 }
                 // 数组下标含有变量
                 else
                 {
+                    if (NumIndices < NumDims && dstRegId == RegManager::S14)
+                        dstRegId = RegManager::R9;
+                    // 借用R8作为地址寄存器,将存在R8的变量保护起来
+                    Instruction *protect_value = nullptr;
+                    if (RVALUE.find(RegManager::R8) != RVALUE.end())
+                        protect_value = RVALUE[RegManager::R8];
+                    if (protect_value)
+                    {
+                        AVALUE[protect_value].reg_num = RegManager::NONE;
+                        AVALUE[protect_value].stack_offset = protect_reg_offset;
+                    }
                     dim = NumDims - 1;
                     flag = false;
                     for (auto iter = ldInst->getIndices().begin(); iter != ldInst->getIndices().end(); iter++)
@@ -2184,50 +2244,106 @@ namespace backend
                             dim--;
                         else if (flag == false)
                         {
-                            code += space + "movw\tr10, #" + to_string(full_num[dim] & 0x0000FFFF) + endl;
-                            code += space + "movt\tr10, #" + to_string((full_num[dim--] >> 16) & 0xffff) + endl;
-                            code += space + "mul\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", r10" + endl;
-                            int imm = offset_array;
-                            if (imm < 256)
-                                code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(offset_array) + endl;
-                            else
+                            code += emitInst_nosrcR_1DstR("mov", "r8", offset_array);
+                            auto value = dynamic_cast<Instruction *>(*iter);
+                            code += emitInst_nosrcR_1DstR("movw", "r10", (full_num[dim] & 0x0000FFFF));
+                            code += emitInst_nosrcR_1DstR("movt", "r10", ((full_num[dim] >> 16) & 0xFFFF));
+                            dim--;
+                            if (AVALUE[value].reg_num == RegManager::NONE)
                             {
-                                code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(imm / 256 * 256) + endl;
-                                if (imm % 256 != 0)
-                                    code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(imm % 256) + endl;
+                                code += emitInst_mem("ldr", "r9", "fp", AVALUE[value].stack_offset);
+                                code += space + "mla\tr8, r9, r10, r8" + endl;
                             }
+                            else
+                                code += space + "mla\tr8, " + regm.toString(AVALUE[value].reg_num) + ", r10, r8" + endl;
                             flag = true;
+                            // code += space + "movw\tr10, #" + to_string(full_num[dim] & 0x0000FFFF) + endl;
+                            // code += space + "movt\tr10, #" + to_string((full_num[dim--] >> 16) & 0xffff) + endl;
+                            // code += space + "mul\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", r10" + endl;
+                            // int imm = offset_array;
+                            // if (imm < 256)
+                            //     code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(offset_array) + endl;
+                            // else
+                            // {
+                            //     code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(imm / 256 * 256) + endl;
+                            //     if (imm % 256 != 0)
+                            //         code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(imm % 256) + endl;
+                            // }
+                            // flag = true;
                         }
                         else
                         {
-                            code += space + "movw\tr10, #" + to_string(full_num[dim] & 0x0000FFFF) + endl;
-                            code += space + "movt\tr10, #" + to_string((full_num[dim--] >> 16) & 0xffff) + endl;
-                            code += space + "mla\tr" + first_var->getName() + ", r" + (*iter)->getName() + ", r10, r" + first_var->getName() + endl;
+                            auto value = dynamic_cast<Instruction *>(*iter);
+                            code += emitInst_nosrcR_1DstR("movw", "r10", (full_num[dim] & 0x0000FFFF));
+                            code += emitInst_nosrcR_1DstR("movt", "r10", ((full_num[dim] >> 16) & 0xFFFF));
+                            dim--;
+                            if (AVALUE[value].reg_num == RegManager::NONE)
+                            {
+                                code += emitInst_mem("ldr", "r9", "fp", AVALUE[value].stack_offset);
+                                code += space + "mla\tr8, r9, r10, r8" + endl;
+                            }
+                            else
+                                code += space + "mla, r8, " + regm.toString(AVALUE[value].reg_num) + ", r10, r8" + endl;
+                            //     code += space + "movw\tr10, #" + to_string(full_num[dim] & 0x0000FFFF) + endl;
+                            //     code += space + "movt\tr10, #" + to_string((full_num[dim--] >> 16) & 0xffff) + endl;
+                            //     code += space + "mla\tr" + first_var->getName() + ", r" + (*iter)->getName() + ", r10, r" + first_var->getName() + endl;
                         }
                     }
-                    code += space + "lsl\tr" + first_var->getName() + ", r" + first_var->getName() + ", #2" + endl;
+                    code += emitInst_1srcR_1DstR("lsl", "r8", "r8", 2);
                     int imm = -pos;
                     if (imm < 256)
-                        code += space + "sub\tr" + first_var->getName() + ", r" + first_var->getName() + ", #" + to_string(-pos) + endl;
+                        code += emitInst_1srcR_1DstR("sub", "r8", "r8", imm);
                     else
                     {
-                        code += space + "sub\tr" + first_var->getName() + ", r" + first_var->getName() + ", #" + to_string(imm / 256 * 256) + endl;
+                        code += emitInst_1srcR_1DstR("sub", "r8", "r8", imm / 256 * 256);
                         if (imm % 256 != 0)
-                            code += space + "sub\tr" + first_var->getName() + ", r" + first_var->getName() + ", #" + to_string(imm % 256) + endl;
+                            code += emitInst_1srcR_1DstR("sub", "r8", "r8", imm % 256);
                     }
-                    code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", fp" + endl;
+                    code += emitInst_2srcR_1dstR("add", "r8", "r8", "fp");
+                    // code += space + "lsl\tr" + first_var->getName() + ", r" + first_var->getName() + ", #2" + endl;
+                    // int imm = -pos;
+                    // if (imm < 256)
+                    //     code += space + "sub\tr" + first_var->getName() + ", r" + first_var->getName() + ", #" + to_string(-pos) + endl;
+                    // else
+                    // {
+                    //     code += space + "sub\tr" + first_var->getName() + ", r" + first_var->getName() + ", #" + to_string(imm / 256 * 256) + endl;
+                    //     if (imm % 256 != 0)
+                    //         code += space + "sub\tr" + first_var->getName() + ", r" + first_var->getName() + ", #" + to_string(imm % 256) + endl;
+                    // }
+                    // code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", fp" + endl;
+
                     // load出数组的一个元素
                     if (NumIndices == NumDims)
                     {
                         if (type->isInt())
-                            code += space + "ldr\tr" + to_string(reg_num) + ", [r" + first_var->getName() + "]" + endl;
+                            code += emitInst_mem("ldr", regm.toString(dstRegId), "r8");
+                        // code += space + "ldr\tr" + to_string(reg_num) + ", [r" + first_var->getName() + "]" + endl;
                         else if (type->isFloat())
-                            code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + first_var->getName() + "]" + endl;
+                            code += emitInst_mem("vldr.32", regm.toString(dstRegId), "r8");
+                        // code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + first_var->getName() + "]" + endl;
                     }
                     // load出一个(子)数组,求出其首地址
                     else if (NumIndices < NumDims)
                     {
-                        code += space + "mov\tr" + to_string(reg_num) + ", r" + first_var->getName() + endl;
+                        code += emitInst_1srcR_1DstR("mov", regm.toString(dstRegId), "r8");
+                        // code += space + "mov\tr" + to_string(reg_num) + ", r" + first_var->getName() + endl;
+                    }
+                    // 恢复R8对应的变量,仅当其在load指令后还活跃
+                    if (protect_value && protect_value->GetEnd() > ldInst->GetStart())
+                    {
+                        AVALUE[protect_value].reg_num = RegManager::R8;
+                    }
+                    // 更新RVALUE,AVALUE
+                    for (auto indice : ldInst->getIndices())
+                    {
+                        if (!isa<ConstantValue>(indice) && indice->GetEnd() <= ldInst->GetStart())
+                        {
+                            auto value = dynamic_cast<Instruction *>(indice);
+                            RVALUE[Register[value]] = nullptr;
+                            auto iter = AVALUE.find(value);
+                            if (iter != AVALUE.end())
+                                AVALUE.erase(iter);
+                        }
                     }
                 }
             }
@@ -2393,17 +2509,33 @@ namespace backend
                 if (type->isInt())
                 {
                     if (imm < 256)
-                        code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                        // code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                        code += emitInst_mem("ldr", regm.toString(dstRegId), "fp", pos);
                     else
                     {
-                        code += space + "sub\tr" + to_string(reg_num) + ", fp, #" + to_string(imm / 256 * 256) + endl;
+                        code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), "fp", imm / 256 * 256);
                         if (imm % 256 != 0)
-                            code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
-                        code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                            code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), regm.toString(dstRegId), imm % 256);
+                        code += emitInst_mem("ldr", regm.toString(dstRegId), regm.toString(dstRegId));
+                        // code += space + "sub\tr" + to_string(reg_num) + ", fp, #" + to_string(imm / 256 * 256) + endl;
+                        // if (imm % 256 != 0)
+                        //     code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
+                        // code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
                     }
                 }
                 else if (type->isFloat())
-                    code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                {
+                    if (imm < 256)
+                        // code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                        code += emitInst_mem("vldr.32", regm.toString(dstRegId), "fp", pos);
+                    else
+                    {
+                        code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                        if (imm % 256 != 0)
+                            code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                        code += emitInst_mem("vldr.32", regm.toString(dstRegId), "r9");
+                    }
+                }
             }
             // 参数数组
             else if (NumDims > 0)
@@ -2523,6 +2655,11 @@ namespace backend
             }
         }
         // 更新RVALUE,AVALUE
+        if (dstRegId == RegManager::R9 || dstRegId == RegManager::S14)
+        {
+            dstRegId = RegManager::NONE;
+            AVALUE[ldInst].stack_offset = ldInst->GetLocation();
+        }
         AVALUE[ldInst].reg_num = dstRegId;
         RVALUE[dstRegId] = ldInst;
         return {dstRegId, code};
@@ -2548,22 +2685,37 @@ namespace backend
                 float val1;
                 val1 = dynamic_cast<ConstantValue *>(retval)->getDouble();
                 memcpy(&num1, &val1, sizeof(val1));
-                code += space + "movw\tr3, #" + to_string(num1 & 0x0000FFFF) + endl;
-                code += space + "movt\tr3, #" + to_string((num1 >> 16) & 0xffff) + endl;
-                code += space + "vmov\ts15, r3" + endl;
-                code += space + "vmov.f32\ts0, s15" + endl;
+                code += space + "movw\tr9, #" + to_string(num1 & 0x0000FFFF) + endl;
+                code += space + "movt\tr9, #" + to_string((num1 >> 16) & 0xffff) + endl;
+                code += space + "vmov\ts0, r9" + endl;
+                // code += space + "vmov.f32\ts0, s15" + endl;
             }
         }
-        else if (isa<CallInst>(retval))
-            ;
+        // else if (isa<CallInst>(retval))
+        //     ;
         else if (retval)
         {
-            if (retval->getKind() == Instruction::kFtoI)
-                code += space + "vmov\tr0,s" + to_string(15 - stoi(retval->getName())) + endl;
-            else if (retval->getType()->isInt())
-                code += space + "mov\tr0, r" + retval->getName() + endl;
-            else if (retval->getType()->isFloat())
-                code += space + "vmov.f32\ts0, s" + to_string(15 - stoi(retval->getName())) + endl;
+            auto value = dynamic_cast<Instruction *>(retval);
+            if (value->getType()->isInt())
+            {
+                if (Register[value] == RegManager::NONE)
+                    code += emitInst_mem("ldr", "r0", "fp", AVALUE[value].stack_offset);
+                else
+                    code += emitInst_1srcR_1DstR("mov", "r0", regm.toString(AVALUE[value].reg_num));
+            }
+            else if (value->getType()->isFloat())
+            {
+                if (Register[value] == RegManager::NONE)
+                    code += emitInst_mem("vldr.32", "s0", "fp", AVALUE[value].stack_offset);
+                else
+                    code += emitInst_1srcR_1DstR("vmov", "s0", regm.toString(AVALUE[value].reg_num));
+            }
+            // if (retval->getKind() == Instruction::kFtoI)
+            //     code += space + "vmov\tr0,s" + to_string(15 - stoi(retval->getName())) + endl;
+            // else if (retval->getType()->isInt())
+            //     code += space + "mov\tr0, r" + retval->getName() + endl;
+            // else if (retval->getType()->isFloat())
+            //     code += space + "vmov.f32\ts0, s" + to_string(15 - stoi(retval->getName())) + endl;
         }
         code += space + "b\t" + func_exit + endl;
         return code;
