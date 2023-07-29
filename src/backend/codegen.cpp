@@ -743,7 +743,7 @@ namespace backend
                 }
                 if (num1 == 1)
                 {
-                    code += space + "and\tr" + res + ", " + lname + ", #" + to_string(rvalue - 1) + endl;
+                    code += space + "and\t" + regm.toString(dstRegId) + ", " + regm.toString(lRegId) + ", #" + to_string(rvalue - 1) + endl;
                 }
                 else
                 {
@@ -1652,8 +1652,10 @@ namespace backend
                     if (value->getType()->isInt())
                     {
                         if (srcRegId == RegManager::NONE)
+                        {
                             srcRegId = RegManager::R9;
-                        code += emitInst_mem("ldr", "r9", "fp", AVALUE[dynamic_cast<Instruction *>(value)].stack_offset);
+                            code += emitInst_mem("ldr", "r9", "fp", AVALUE[dynamic_cast<Instruction *>(value)].stack_offset);
+                        }
                         if (imm < 256)
                             // code += space + "str\tr" + value->getName() + ", [fp, #" + to_string(pos) + "]" + endl;
                             code += emitInst_mem("str", regm.toString(srcRegId), "fp", pos);
@@ -1673,8 +1675,10 @@ namespace backend
                     else if (value->getType()->isFloat())
                     {
                         if (srcRegId == RegManager::NONE)
+                        {
                             srcRegId = RegManager::S14;
-                        code += emitInst_mem("vldr.32", "s14", "fp", AVALUE[dynamic_cast<Instruction *>(value)].stack_offset);
+                            code += emitInst_mem("vldr.32", "s14", "fp", AVALUE[dynamic_cast<Instruction *>(value)].stack_offset);
+                        }
                         if (imm < 256)
                             // code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [fp, #" + to_string(pos) + "]" + endl;
                             code += emitInst_mem("vstr.32", regm.toString(srcRegId), "fp", pos);
@@ -1744,7 +1748,7 @@ namespace backend
                             code += space + "mla\tr8, r9, r10, r8" + endl;
                         }
                         else
-                            code += space + "mla, r8, " + regm.toString(AVALUE[value].reg_num) + ", r10, r8" + endl;
+                            code += space + "mla\tr8, " + regm.toString(AVALUE[value].reg_num) + ", r10, r8" + endl;
                         // code += space + "movw\tr10, #" + to_string(unsigned(full_num[dim] & 0x0000FFFF)) + endl;
                         // code += space + "movt\tr10, #" + to_string(unsigned((full_num[dim--] >> 16) & 0xffff)) + endl;
                         // code += space + "mla\tr" + first_var->getName() + ", r" + (*iter)->getName() + ", r10, r" + first_var->getName() + endl;
@@ -1830,22 +1834,10 @@ namespace backend
                     }
                     // code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r" + first_var->getName() + "]" + endl;
                 }
-                // 恢复R8对应的变量,仅当其在load指令后还活跃
+                // 恢复R8对应的变量,仅当其在store指令后还活跃
                 if (protect_value && protect_value->GetEnd() > stInst->GetStart())
                 {
                     AVALUE[protect_value].reg_num = RegManager::R8;
-                }
-                // 更新RVALUE,AVALUE
-                for (auto indice : stInst->getIndices())
-                {
-                    if (!isa<ConstantValue>(indice) && indice->GetEnd() <= stInst->GetStart())
-                    {
-                        auto value = dynamic_cast<Instruction *>(indice);
-                        RVALUE[Register[value]] = nullptr;
-                        auto iter = AVALUE.find(value);
-                        if (iter != AVALUE.end())
-                            AVALUE.erase(iter);
-                    }
                 }
             }
         }
@@ -1863,8 +1855,9 @@ namespace backend
             vector<int> dim_len;
             vector<int> full_num;
             // 获取全局数组(首)地址
-            code += space + "movw\tr10, #:lower16:" + pointer->getName() + endl;
-            code += space + "movt\tr10, #:upper16:" + pointer->getName() + endl;
+            // code += space + "movw\tr10, #:lower16:" + pointer->getName() + endl;
+            // code += space + "movt\tr10, #:upper16:" + pointer->getName() + endl;
+
             // 全局数组的偏移量
             if (NumDims > 0)
             {
@@ -1888,9 +1881,11 @@ namespace backend
                 }
                 pos += offset_array * 4;
             }
-            // 数组下标均为常数
+            // 标量/数组下标均为常数
             if (flag == false)
             {
+                code += emitInst_1srcR_1DstR("movw", "r9", "#:lower16:" + pointer->getName());
+                code += emitInst_1srcR_1DstR("movt", "r9", "#:upper16:" + pointer->getName());
                 int imm = pos;
                 // 存入常数
                 if (isa<ConstantValue>(value))
@@ -1898,28 +1893,44 @@ namespace backend
                     if (value->isInt())
                     {
                         int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                        code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
-                        code += space + "movt\tr3, #" + to_string((constant_value >> 16) & 0xffff) + endl;
+                        code += emitInst_nosrcR_1DstR("movw", "r10", (constant_value & 0x0000FFFF));
+                        code += emitInst_nosrcR_1DstR("movt", "r10", ((constant_value >> 16) & 0xffff));
+                        // code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
+                        // code += space + "movt\tr3, #" + to_string((constant_value >> 16) & 0xffff) + endl;
                         if (imm < 256)
-                            code += space + "str\tr3, [r10, #" + to_string(pos) + "]" + endl;
+                            // code += space + "str\tr3, [r10, #" + to_string(pos) + "]" + endl;
+                            code += emitInst_mem("str", "r10", "r9", pos);
                         else if (imm < 65536)
                         {
-                            code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
+                            code += emitInst_1srcR_1DstR("add", "r9", "r9", imm / 256 * 256);
                             if (imm % 256 != 0)
-                                code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
-                            code += space + "str\tr3, [r10]" + endl;
+                                code += emitInst_1srcR_1DstR("add", "r9", "r9", imm % 256);
+                            code += emitInst_mem("str", "r10", "r9");
+                            // code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
+                            // if (imm % 256 != 0)
+                            //     code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
+                            // code += space + "str\tr3, [r10]" + endl;
                         }
                         else
                         {
-                            code += space + "add\tr10, r10, #" + to_string(imm / 4096 * 4096) + endl;
+                            code += emitInst_1srcR_1DstR("add", "r9", "r9", imm / 4096 * 4096);
                             if (imm % 4096 != 0)
                             {
                                 imm = imm % 4096;
-                                code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
+                                code += emitInst_1srcR_1DstR("add", "r9", "r9", imm / 256 * 256);
                                 if (imm % 256)
-                                    code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
+                                    code += emitInst_1srcR_1DstR("add", "r9", "r9", imm % 256);
+                                code += emitInst_mem("str", "r10", "r9");
                             }
-                            code += space + "str\tr3, [r10]" + endl;
+                            // code += space + "add\tr10, r10, #" + to_string(imm / 4096 * 4096) + endl;
+                            // if (imm % 4096 != 0)
+                            // {
+                            //     imm = imm % 4096;
+                            //     code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
+                            //     if (imm % 256)
+                            //         code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
+                            // }
+                            // code += space + "str\tr3, [r10]" + endl;
                         }
                     }
                     else if (value->isFloat())
@@ -1927,72 +1938,77 @@ namespace backend
                         float constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
                         unsigned dec;
                         std::memcpy(&dec, &constant_value, sizeof(dec));
-                        code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
-                        code += space + "movt\tr3, #" + to_string((dec >> 16) & 0xffff) + endl;
+                        code += emitInst_nosrcR_1DstR("movw", "r10", (dec & 0x0000FFFF));
+                        code += emitInst_nosrcR_1DstR("movt", "r10", ((dec >> 16) & 0xffff));
                         if (imm < 256)
-                            code += space + "str\tr3, [r10, #" + to_string(pos) + "]" + endl;
+                            // code += emitInst_mem("str", "r10", "r9", pos);
+                            code += space + "str\tr10, [r9, #" + to_string(pos) + "]\t@ float" + endl;
                         else
                         {
-                            code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
+                            code += emitInst_1srcR_1DstR("add", "r9", "r9", imm / 256 * 256);
                             if (imm % 256 != 0)
-                                code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
-                            code += space + "str\tr3, [r10]\t@ float" + endl;
+                                code += emitInst_1srcR_1DstR("add", "r9", "r9", imm % 256);
+                            code += space + "str\tr10, [r9]\t@ float" + endl;
                         }
-                    }
-                }
-                // 存入函数返回值
-                else if (isa<CallInst>(value))
-                {
-                    if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
-                    {
-                        if (imm < 256)
-                            code += space + "str\tr0, [r10, #" + to_string(pos) + "]" + endl;
-                        else
-                        {
-                            code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
-                            if (imm % 256 != 0)
-                                code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
-                            code += space + "str\tr0, [r10]" + endl;
-                        }
-                    }
-                    else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
-                    {
-                        if (imm < 256)
-                            code += space + "vstr.32\ts0, [r10, #" + to_string(pos) + "]" + endl;
-                        else
-                        {
-                            code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
-                            if (imm % 256 != 0)
-                                code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
-                            code += space + "vstr.32\ts0, [r10]" + endl;
-                        }
+                        // code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
+                        // code += space + "movt\tr3, #" + to_string((dec >> 16) & 0xffff) + endl;
+                        // if (imm < 256)
+                        //     code += space + "str\tr3, [r10, #" + to_string(pos) + "]" + endl;
+                        // else
+                        // {
+                        //     code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
+                        //     if (imm % 256 != 0)
+                        //         code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
+                        //     code += space + "str\tr3, [r10]\t@ float" + endl;
+                        // }
                     }
                 }
                 // 存入其他值
                 else
                 {
+                    RegId srcRegId = Register[dynamic_cast<Instruction *>(value)];
                     if (value->getType()->isInt())
                     {
+                        if (srcRegId == RegManager::NONE)
+                        {
+                            srcRegId = RegManager::R10;
+                            code += emitInst_mem("ldr", "r10", "fp", AVALUE[dynamic_cast<Instruction *>(value)].stack_offset);
+                        }
                         if (imm < 256)
-                            code += space + "str\tr" + value->getName() + ", [r10, #" + to_string(pos) + "]" + endl;
+                            // code += space + "str\tr" + value->getName() + ", [r10, #" + to_string(pos) + "]" + endl;
+                            code += emitInst_mem("str", regm.toString(srcRegId), "r9", pos);
                         else
                         {
-                            code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
+                            code += emitInst_1srcR_1DstR("add", "r9", "r9", imm / 256 * 256);
                             if (imm % 256 != 0)
-                                code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
-                            code += space + "str\tr" + value->getName() + ", [r10]" + endl;
+                                code += emitInst_1srcR_1DstR("add", "r9", "r9", imm % 256);
+                            code += emitInst_mem("str", regm.toString(srcRegId), "r9");
+                            // code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
+                            // if (imm % 256 != 0)
+                            //     code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
+                            // code += space + "str\tr" + value->getName() + ", [r10]" + endl;
                         }
                     }
                     else if (value->getType()->isFloat())
                     {
+                        if (srcRegId == RegManager::NONE)
+                        {
+                            srcRegId = RegManager::S14;
+                            code += emitInst_mem("vldr.32", "s14", "fp", AVALUE[dynamic_cast<Instruction *>(value)].stack_offset);
+                        }
                         if (imm < 256)
-                            code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r10, #" + to_string(pos) + "]" + endl;
+                            // code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r10, #" + to_string(pos) + "]" + endl;
+                            code += emitInst_mem("vstr.32", regm.toString(srcRegId), "r9", pos);
                         else
                         {
-                            code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
+                            code += emitInst_1srcR_1DstR("add", "r9", "r9", imm / 256 * 256);
                             if (imm % 256 != 0)
-                                code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
-                            code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r10]" + endl;
+                                code += emitInst_1srcR_1DstR("add", "r9", "r9", imm % 256);
+                            code += emitInst_mem("vstr.32", regm.toString(srcRegId), "r9");
+                            // code += space + "add\tr10, r10, #" + to_string(imm / 256 * 256) + endl;
+                            // if (imm % 256 != 0)
+                            //     code += space + "add\tr10, r10, #" + to_string(imm % 256) + endl;
+                            // code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r10]" + endl;
                         }
                     }
                 }
@@ -2000,6 +2016,15 @@ namespace backend
             // 数组下标含有变量
             else
             {
+                // 借用R8作为地址寄存器, 将存在R8的变量保护起来
+                Instruction *protect_value = nullptr;
+                if (RVALUE.find(RegManager::R8) != RVALUE.end())
+                    protect_value = RVALUE[RegManager::R8];
+                if (protect_value)
+                {
+                    AVALUE[protect_value].reg_num = RegManager::NONE;
+                    AVALUE[protect_value].stack_offset = protect_reg_offset;
+                }
                 dim = NumDims - 1;
                 flag = false;
                 for (auto iter = stInst->getIndices().begin(); iter != stInst->getIndices().end(); iter++)
@@ -2008,60 +2033,107 @@ namespace backend
                         dim--;
                     else if (flag == false)
                     {
-                        code += space + "movw\tr9, #" + to_string(unsigned(full_num[dim] & 0x0000FFFF)) + endl;
-                        code += space + "movt\tr9, #" + to_string(unsigned((full_num[dim--] >> 16) & 0xffff)) + endl;
-                        code += space + "mul\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", r9" + endl;
-                        code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(offset_array) + endl;
+                        code += emitInst_nosrcR_1DstR("mov", "r8", offset_array);
+                        auto value = dynamic_cast<Instruction *>(*iter);
+                        code += emitInst_nosrcR_1DstR("movw", "r10", (full_num[dim] & 0x0000ffff));
+                        code += emitInst_nosrcR_1DstR("movt", "r10", ((full_num[dim] >> 16) & 0xffff));
+                        dim--;
+                        if (AVALUE[value].reg_num == RegManager::NONE)
+                        {
+                            code += emitInst_mem("ldr", "r9", "fp", AVALUE[value].stack_offset);
+                            code += space + "mla\tr8, r9, r10, r8" + endl;
+                        }
+                        else
+                            code += space + "mla\tr8, " + regm.toString(AVALUE[value].reg_num) + ", r10, r8" + endl;
                         flag = true;
+                        // code += space + "movw\tr9, #" + to_string(unsigned(full_num[dim] & 0x0000FFFF)) + endl;
+                        // code += space + "movt\tr9, #" + to_string(unsigned((full_num[dim--] >> 16) & 0xffff)) + endl;
+                        // code += space + "mul\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", r9" + endl;
+                        // code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(offset_array) + endl;
+                        // flag = true;
                     }
                     else
                     {
-                        code += space + "movw\tr9, #" + to_string(unsigned(full_num[dim] & 0x0000FFFF)) + endl;
-                        code += space + "movt\tr9, #" + to_string(unsigned((full_num[dim--] >> 16) & 0xffff)) + endl;
-                        code += space + "mla\tr" + first_var->getName() + ", r" + (*iter)->getName() + ", r9, r" + first_var->getName() + endl;
+                        auto value = dynamic_cast<Instruction *>(*iter);
+                        code += emitInst_nosrcR_1DstR("movw", "r10", (full_num[dim] & 0x0000FFFF));
+                        code += emitInst_nosrcR_1DstR("movt", "r10", ((full_num[dim] >> 16) & 0xFFFF));
+                        dim--;
+                        if (AVALUE[value].reg_num == RegManager::NONE)
+                        {
+                            code += emitInst_mem("ldr", "r9", "fp", AVALUE[value].stack_offset);
+                            code += space + "mla\tr8, r9, r10, r8" + endl;
+                        }
+                        else
+                            code += space + "mla\tr8, " + regm.toString(AVALUE[value].reg_num) + ", r10, r8" + endl;
+                        // code += space + "movw\tr9, #" + to_string(unsigned(full_num[dim] & 0x0000FFFF)) + endl;
+                        // code += space + "movt\tr9, #" + to_string(unsigned((full_num[dim--] >> 16) & 0xffff)) + endl;
+                        // code += space + "mla\tr" + first_var->getName() + ", r" + (*iter)->getName() + ", r9, r" + first_var->getName() + endl;
                     }
                 }
-                code += space + "lsl\tr" + first_var->getName() + ", r" + first_var->getName() + ", #2" + endl;
-                code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r10" + endl;
+                code += emitInst_1srcR_1DstR("lsl", "r8", "r8", 2);
+                code += emitInst_1srcR_1DstR("movw", "r9", "#:lower16:" + pointer->getName());
+                code += emitInst_1srcR_1DstR("movt", "r9", "#:upper16:" + pointer->getName());
+                code += emitInst_2srcR_1dstR("add", "r8", "r9", "r8");
+                // code += space + "lsl\tr" + first_var->getName() + ", r" + first_var->getName() + ", #2" + endl;
+                // code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r10" + endl;
                 // 存入常数
                 if (isa<ConstantValue>(value))
                 {
-                    int src_reg = std::stoi(first_var->getName()) + 1;
+                    // int src_reg = std::stoi(first_var->getName()) + 1;
                     if (value->isInt())
                     {
                         int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                        code += space + "movw\tr" + to_string(src_reg) + ", #" + to_string(constant_value & 0x0000FFFF) + endl;
-                        code += space + "movt\tr" + to_string(src_reg) + ", #" + to_string((constant_value >> 16) & 0xffff) + endl;
-                        code += space + "str\tr" + to_string(src_reg) + ", [r" + first_var->getName() + "]" + endl;
+                        code += emitInst_nosrcR_1DstR("movw", "r9", (constant_value & 0x0000FFFF));
+                        code += emitInst_nosrcR_1DstR("movt", "r9", ((constant_value >> 16) & 0xffff));
+                        code += emitInst_mem("str", "r9", "r8");
+                        // code += space + "movw\tr" + to_string(src_reg) + ", #" + to_string(constant_value & 0x0000FFFF) + endl;
+                        // code += space + "movt\tr" + to_string(src_reg) + ", #" + to_string((constant_value >> 16) & 0xffff) + endl;
+                        // code += space + "str\tr" + to_string(src_reg) + ", [r" + first_var->getName() + "]" + endl;
                     }
                     else if (value->isFloat())
                     {
                         float constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
                         unsigned dec;
                         std::memcpy(&dec, &constant_value, sizeof(dec));
-                        code += space + "movw\tr" + to_string(src_reg) + ", #" + to_string(dec & 0x0000FFFF) + endl;
-                        code += space + "movt\tr" + to_string(src_reg) + ", #" + to_string((dec >> 16) & 0xffff) + endl;
-                        code += space + "str\tr" + to_string(src_reg) + ", [r" + first_var->getName() + "]\t@ float" + endl;
+                        code += emitInst_nosrcR_1DstR("movw", "r9", (dec & 0x0000FFFF));
+                        code += emitInst_nosrcR_1DstR("movt", "r9", ((dec >> 16) & 0xffff));
+                        code += space + "str\tr9, [r8]\t@ float" + endl;
+                        // code += space + "movw\tr" + to_string(src_reg) + ", #" + to_string(dec & 0x0000FFFF) + endl;
+                        // code += space + "movt\tr" + to_string(src_reg) + ", #" + to_string((dec >> 16) & 0xffff) + endl;
+                        // code += space + "str\tr" + to_string(src_reg) + ", [r" + first_var->getName() + "]\t@ float" + endl;
                     }
-                }
-                // 存入函数返回值
-                else if (isa<CallInst>(value))
-                {
-                    if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
-                        code += space + "str\tr0, [r" + first_var->getName() + "]" + endl;
-                    else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
-                        code += space + "vstr.32\ts0, [r" + first_var->getName() + "]" + endl;
                 }
                 // 存入其他值
                 else
                 {
+                    RegId srcRegId = Register[dynamic_cast<Instruction *>(value)];
                     if (value->getType()->isInt())
-                        code += space + "str\tr" + value->getName() + ", [r" + first_var->getName() + "]" + endl;
+                    {
+                        if (srcRegId == RegManager::NONE)
+                        {
+                            srcRegId = RegManager::R9;
+                            code += emitInst_mem("ldr", "r9", "fp", AVALUE[dynamic_cast<Instruction *>(value)].stack_offset);
+                        }
+                        code += emitInst_mem("str", regm.toString(srcRegId), "r8");
+                        // code += space + "str\tr" + value->getName() + ", [r" + first_var->getName() + "]" + endl;
+                    }
                     else if (value->getType()->isFloat())
-                        code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r" + first_var->getName() + "]" + endl;
+                    {
+                        if (srcRegId == RegManager::NONE)
+                        {
+                            srcRegId = RegManager::S14;
+                            code += emitInst_mem("vldr.32", "s14", "fp", AVALUE[dynamic_cast<Instruction *>(value)].stack_offset);
+                        }
+                        code += emitInst_mem("vstr.32", regm.toString(srcRegId), "r8");
+                        // code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r" + first_var->getName() + "]" + endl;
+                    }
+                }
+                // 恢复R8对应的变量,仅当其在store指令后还活跃
+                if (protect_value && protect_value->GetEnd() < stInst->GetStart())
+                {
+                    AVALUE[protect_value].reg_num = RegManager::R8;
                 }
             }
-            return code;
         }
         // if pointer is an argument
         else
@@ -2079,35 +2151,50 @@ namespace backend
                     if (value->isInt())
                     {
                         int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                        code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
-                        code += space + "movt\tr3, #" + to_string((constant_value >> 16) & 0xffff) + endl;
-                        code += space + "str\tr3, [fp, #" + to_string(pos) + "]" + endl;
+                        code += emitInst_nosrcR_1DstR("movw", "r9", (constant_value & 0x0000FFFF));
+                        code += emitInst_nosrcR_1DstR("movt", "r9", ((constant_value >> 16) & 0xffff));
+                        code += emitInst_mem("str", "r9", "fp", pos);
+                        // code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
+                        // code += space + "movt\tr3, #" + to_string((constant_value >> 16) & 0xffff) + endl;
+                        // code += space + "str\tr3, [fp, #" + to_string(pos) + "]" + endl;
                     }
                     else if (value->isFloat())
                     {
                         float constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
                         unsigned dec;
                         std::memcpy(&dec, &constant_value, sizeof(dec));
-                        code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
-                        code += space + "movt\tr3, #" + to_string((dec >> 16) & 0xffff) + endl;
-                        code += space + "str\tr3, [fp, #" + to_string(pos) + "]\t@ float" + endl;
+                        code += emitInst_nosrcR_1DstR("movw", "r9", (dec & 0x0000FFFF));
+                        code += emitInst_nosrcR_1DstR("movt", "r9", ((dec >> 16) & 0xffff));
+                        code += space + "str\tr9, [fp, #" + to_string(pos) + "]\t@ float" + endl;
+                        // code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
+                        // code += space + "movt\tr3, #" + to_string((dec >> 16) & 0xffff) + endl;
+                        // code += space + "str\tr3, [fp, #" + to_string(pos) + "]\t@ float" + endl;
                     }
-                }
-                // 存入函数返回值
-                else if (isa<CallInst>(value))
-                {
-                    if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
-                        code += space + "str\tr0, [fp, #" + to_string(pos) + "]" + endl;
-                    else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
-                        code += space + "vstr.32\ts0, [fp, #" + to_string(pos) + "]" + endl;
                 }
                 // 存入其他值
                 else
                 {
+                    RegId srcRegId = Register[dynamic_cast<Instruction *>(value)];
                     if (value->getType()->isInt())
-                        code += space + "str\tr" + value->getName() + ", [fp, #" + to_string(pos) + "]" + endl;
+                    {
+                        if (srcRegId == RegManager::NONE)
+                        {
+                            srcRegId = RegManager::R9;
+                            code += emitInst_mem("ldr", "r9", "fp", AVALUE[dynamic_cast<Instruction *>(value)].stack_offset);
+                        }
+                        code += emitInst_mem("str", regm.toString(srcRegId), "fp", pos);
+                        // code += space + "str\tr" + value->getName() + ", [fp, #" + to_string(pos) + "]" + endl;
+                    }
                     else if (value->getType()->isFloat())
-                        code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [fp, #" + to_string(pos) + "]" + endl;
+                    {
+                        if (srcRegId == RegManager::NONE)
+                        {
+                            srcRegId = RegManager::S14;
+                            code += emitInst_mem("vldr.32", "s14", "fp", AVALUE[dynamic_cast<Instruction *>(value)].stack_offset);
+                        }
+                        code += emitInst_mem("vstr.32", regm.toString(srcRegId), "fp", pos);
+                        // code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [fp, #" + to_string(pos) + "]" + endl;
+                    }
                 }
             }
             // 参数数组
@@ -2142,45 +2229,61 @@ namespace backend
                 if (flag == false)
                 {
                     offset_array *= 4;
+                    code += emitInst_mem("ldr", "r9", "fp", pos);
                     // 存入常数
                     if (isa<ConstantValue>(value))
                     {
-                        code += space + "ldr\tr0, [fp, #" + to_string(pos) + "]" + endl;
+                        // code += space + "ldr\tr0, [fp, #" + to_string(pos) + "]" + endl;
                         if (value->isInt())
                         {
                             int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                            code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
-                            code += space + "movt\tr3, #" + to_string((constant_value >> 16) & 0xffff) + endl;
-                            code += space + "str\tr3, [r0, #" + to_string(offset_array) + "]" + endl;
+                            code += emitInst_nosrcR_1DstR("movw", "r10", (constant_value & 0x0000FFFF));
+                            code += emitInst_nosrcR_1DstR("movt", "r10", ((constant_value >> 16) & 0xffff));
+                            code += emitInst_mem("str", "r10", "r9", offset_array);
+                            // code += space + "movw\tr3, #" + to_string(constant_value & 0x0000FFFF) + endl;
+                            // code += space + "movt\tr3, #" + to_string((constant_value >> 16) & 0xffff) + endl;
+                            // code += space + "str\tr3, [r0, #" + to_string(offset_array) + "]" + endl;
                         }
                         else if (value->isFloat())
                         {
                             float constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
                             unsigned dec;
                             std::memcpy(&dec, &constant_value, sizeof(dec));
-                            code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
-                            code += space + "movt\tr3, #" + to_string((dec >> 16) & 0xffff) + endl;
-                            code += space + "str\tr3, [r0, #" + to_string(offset_array) + "]\t@ float" + endl;
+                            code += emitInst_nosrcR_1DstR("movw", "r10", (dec & 0x0000FFFF));
+                            code += emitInst_nosrcR_1DstR("movt", "r10", ((dec >> 16) & 0xffff));
+                            code += space + "str\tr10, [r9, #" + to_string(offset_array) + "]\t@ float" + endl;
+                            // code += space + "movw\tr3, #" + to_string(dec & 0x0000FFFF) + endl;
+                            // code += space + "movt\tr3, #" + to_string((dec >> 16) & 0xffff) + endl;
+                            // code += space + "str\tr3, [r0, #" + to_string(offset_array) + "]\t@ float" + endl;
                         }
-                    }
-                    // 存入函数返回值
-                    else if (isa<CallInst>(value))
-                    {
-                        code += space + "ldr\tr1, [fp, #" + to_string(pos) + "]" + endl;
-                        if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
-                            code += space + "str\tr0, [r1, #" + to_string(offset_array) + "]" + endl;
-                        else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
-                            code += space + "vstr.32\ts0, [r1, #" + to_string(offset_array) + "]" + endl;
                     }
                     // 存入其他值
                     else
                     {
-                        int src_reg = (1 + std::stoi(value->getName())) % 11;
-                        code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #" + to_string(pos) + "]" + endl;
+                        // int src_reg = (1 + std::stoi(value->getName())) % 11;
+                        // code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #" + to_string(pos) + "]" + endl;
+                        RegId srcRegId = Register[dynamic_cast<Instruction *>(value)];
+
                         if (value->getType()->isInt())
-                            code += space + "str\tr" + value->getName() + ", [r" + to_string(src_reg) + ", #" + to_string(offset_array) + "]" + endl;
+                        {
+                            if (srcRegId == RegManager::NONE)
+                            {
+                                srcRegId = RegManager::R10;
+                                code += emitInst_mem("ldr", "r10", "fp", AVALUE[dynamic_cast<Instruction *>(value)].stack_offset);
+                            }
+                            code += emitInst_mem("str", regm.toString(srcRegId), "r9", offset_array);
+                            // code += space + "str\tr" + value->getName() + ", [r" + to_string(src_reg) + ", #" + to_string(offset_array) + "]" + endl;
+                        }
                         else if (value->getType()->isFloat())
-                            code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r" + to_string(src_reg) + ", #" + to_string(offset_array) + "]" + endl;
+                        {
+                            if (srcRegId == RegManager::NONE)
+                            {
+                                srcRegId = RegManager::S14;
+                                code += emitInst_mem("vldr.32", "s14", "fp", AVALUE[dynamic_cast<Instruction *>(value)].stack_offset);
+                            }
+                            code += emitInst_mem("vstr.32", regm.toString(srcRegId), "r9", offset_array);
+                            // code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r" + to_string(src_reg) + ", #" + to_string(offset_array) + "]" + endl;
+                        }
                     }
                 }
                 // 数组下标含有变量
@@ -2189,6 +2292,15 @@ namespace backend
                     // code += "参数数组,下标含有变量\n";
                     // for (int i = 0; i < 3; i++)
                     //     code += to_string(full_num[i]) + "\n";
+                    // 借用R8作为地址寄存器,将存在R8的变量保护起来
+                    Instruction *protect_value = nullptr;
+                    if (RVALUE.find(RegManager::R8) != RVALUE.end())
+                        protect_value = RVALUE[RegManager::R8];
+                    if (protect_value)
+                    {
+                        AVALUE[protect_value].reg_num = RegManager::NONE;
+                        AVALUE[protect_value].stack_offset = protect_reg_offset;
+                    }
                     dim = NumDims - 1;
                     flag = false;
                     for (auto iter = stInst->getIndices().begin(); iter != stInst->getIndices().end(); iter++)
@@ -2197,71 +2309,128 @@ namespace backend
                             dim--;
                         else if (flag == false)
                         {
-                            code += space + "movw\tr10, #" + to_string(full_num[dim] & 0x0000FFFF) + endl;
-                            code += space + "movt\tr10, #" + to_string((full_num[dim--] >> 16) & 0xffff) + endl;
-                            code += space + "mul\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", r10" + endl;
-                            code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(offset_array) + endl;
+                            code += emitInst_nosrcR_1DstR("mov", "r8", offset_array);
+                            auto value = dynamic_cast<Instruction *>(*iter);
+                            code += emitInst_nosrcR_1DstR("movw", "r10", (full_num[dim] & 0x0000ffff));
+                            code += emitInst_nosrcR_1DstR("movt", "r10", ((full_num[dim] >> 16) & 0xffff));
+                            dim--;
+                            if (AVALUE[value].reg_num == RegManager::NONE)
+                            {
+                                code += emitInst_mem("ldr", "r9", "fp", AVALUE[value].stack_offset);
+                                code += space + "mla\tr8, r9, r10, r8" + endl;
+                            }
+                            else
+                                code += space + "mla\tr8, " + regm.toString(AVALUE[value].reg_num) + ", r10, r8" + endl;
                             flag = true;
+                            // code += space + "movw\tr10, #" + to_string(full_num[dim] & 0x0000FFFF) + endl;
+                            // code += space + "movt\tr10, #" + to_string((full_num[dim--] >> 16) & 0xffff) + endl;
+                            // code += space + "mul\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", r10" + endl;
+                            // code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(offset_array) + endl;
+                            // flag = true;
                         }
                         else
                         {
-                            code += space + "movw\tr10, #" + to_string(full_num[dim] && 0x0000FFFF) + endl;
-                            code += space + "movt\tr10, #" + to_string((full_num[dim--] >> 16) & 0xffff) + endl;
-                            code += space + "mla\tr" + first_var->getName() + ", r" + (*iter)->getName() + ", r10, r" + first_var->getName() + endl;
+                            auto value = dynamic_cast<Instruction *>(*iter);
+                            code += emitInst_nosrcR_1DstR("movw", "r10", (full_num[dim] & 0x0000FFFF));
+                            code += emitInst_nosrcR_1DstR("movt", "r10", ((full_num[dim] >> 16) & 0xFFFF));
+                            dim--;
+                            if (AVALUE[value].reg_num == RegManager::NONE)
+                            {
+                                code += emitInst_mem("ldr", "r9", "fp", AVALUE[value].stack_offset);
+                                code += space + "mla\tr8, r9, r10, r8" + endl;
+                            }
+                            else
+                                code += space + "mla\tr8, " + regm.toString(AVALUE[value].reg_num) + ", r10, r8" + endl;
+                            // code += space + "movw\tr10, #" + to_string(full_num[dim] && 0x0000FFFF) + endl;
+                            // code += space + "movt\tr10, #" + to_string((full_num[dim--] >> 16) & 0xffff) + endl;
+                            // code += space + "mla\tr" + first_var->getName() + ", r" + (*iter)->getName() + ", r10, r" + first_var->getName() + endl;
                         }
                     }
-                    code += space + "lsl\tr" + first_var->getName() + ", r" + first_var->getName() + ", #2" + endl;
-                    int src_reg = (1 + std::stoi(first_var->getName())) % 11;
+                    // code += space + "lsl\tr" + first_var->getName() + ", r" + first_var->getName() + ", #2" + endl;
+                    code += emitInst_1srcR_1DstR("lsl", "r8", "r8", 2);
+                    // int src_reg = (1 + std::stoi(first_var->getName())) % 11;
+                    code += emitInst_mem("ldr", "r9", "fp", pos);
+                    code += emitInst_2srcR_1dstR("add", "r8", "r9", "r8");
                     // 存入常数
                     if (isa<ConstantValue>(value))
                     {
-                        code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #" + to_string(paramsStOffset[arg]) + "]" + endl;
-                        code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r" + to_string(src_reg) + endl;
+                        // code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #" + to_string(paramsStOffset[arg]) + "]" + endl;
+                        // code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r" + to_string(src_reg) + endl;
                         if (value->isInt())
                         {
                             int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
-                            code += space + "movw\tr" + to_string(src_reg) + ", #" + to_string(constant_value & 0x0000FFFF) + endl;
-                            code += space + "movt\tr" + to_string(src_reg) + ", #" + to_string((constant_value >> 16) & 0xffff) + endl;
-                            code += space + "str\tr" + to_string(src_reg) + ", [r" + first_var->getName() + "]" + endl;
+                            code += emitInst_nosrcR_1DstR("movw", "r9", (constant_value & 0x0000FFFF));
+                            code += emitInst_nosrcR_1DstR("movt", "r9", ((constant_value >> 16) & 0xffff));
+                            code += emitInst_mem("str", "r9", "r8");
+                            // code += space + "movw\tr" + to_string(src_reg) + ", #" + to_string(constant_value & 0x0000FFFF) + endl;
+                            // code += space + "movt\tr" + to_string(src_reg) + ", #" + to_string((constant_value >> 16) & 0xffff) + endl;
+                            // code += space + "str\tr" + to_string(src_reg) + ", [r" + first_var->getName() + "]" + endl;
                         }
                         else if (value->isFloat())
                         {
                             float constant_value = dynamic_cast<ConstantValue *>(value)->getDouble();
                             unsigned dec;
                             std::memcpy(&dec, &constant_value, sizeof(dec));
-                            code += space + "movw\tr" + to_string(src_reg) + ", #" + to_string(dec & 0x0000FFFF) + endl;
-                            code += space + "movt\tr" + to_string(src_reg) + ", #" + to_string((dec >> 16) & 0xffff) + endl;
-                            code += space + "str\tr" + to_string(src_reg) + ", [r" + first_var->getName() + "]\t@ float" + endl;
+                            code += emitInst_nosrcR_1DstR("movw", "r9", (dec & 0x0000FFFF));
+                            code += emitInst_nosrcR_1DstR("movt", "r9", ((dec >> 16) & 0xffff));
+                            code += space + "str\tr9, [r8]\t@ float" + endl;
+                            // code += space + "movw\tr" + to_string(src_reg) + ", #" + to_string(dec & 0x0000FFFF) + endl;
+                            // code += space + "movt\tr" + to_string(src_reg) + ", #" + to_string((dec >> 16) & 0xffff) + endl;
+                            // code += space + "str\tr" + to_string(src_reg) + ", [r" + first_var->getName() + "]\t@ float" + endl;
                         }
-                    }
-                    // 存入函数返回值
-                    else if (isa<CallInst>(value))
-                    {
-                        code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #" + to_string(paramsStOffset[arg]) + "]" + endl;
-                        code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r" + to_string(src_reg) + endl;
-                        if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isInt())
-                            code += space + "str\tr0, [r" + first_var->getName() + "]" + endl;
-                        else if (dynamic_cast<CallInst *>(value)->getCallee()->getReturnType()->isFloat())
-                            code += space + "vstr.32\ts0, [r" + first_var->getName() + "]" + endl;
                     }
                     // 存入其他值
                     else
                     {
-                        code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #" + to_string(paramsStOffset[arg]) + "]" + endl;
-                        code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r" + to_string(src_reg) + endl;
+                        // code += space + "ldr\tr" + to_string(src_reg) + ", [fp, #" + to_string(paramsStOffset[arg]) + "]" + endl;
+                        // code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r" + to_string(src_reg) + endl;
+                        RegId srcRegId = Register[dynamic_cast<Instruction *>(value)];
                         if (value->getType()->isInt())
-                            code += space + "str\tr" + value->getName() + ", [r" + first_var->getName() + "]" + endl;
+                        {
+                            if (srcRegId == RegManager::NONE)
+                            {
+                                srcRegId = RegManager::R9;
+                                code += emitInst_mem("ldr", "r9", "fp", AVALUE[dynamic_cast<Instruction *>(value)].stack_offset);
+                            }
+                            code += emitInst_mem("str", regm.toString(srcRegId), "r8");
+                            // code += space + "str\tr" + value->getName() + ", [r" + first_var->getName() + "]" + endl;
+                        }
                         else if (value->getType()->isFloat())
-                            code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r" + first_var->getName() + "]" + endl;
+                        {
+                            if (srcRegId == RegManager::NONE)
+                            {
+                                srcRegId = RegManager::S14;
+                                code += emitInst_mem("vldr.32", "s14", "fp", AVALUE[dynamic_cast<Instruction *>(value)].stack_offset);
+                            }
+                            code += emitInst_mem("vstr.32", regm.toString(srcRegId), "r8");
+                            // code += space + "vstr.32\ts" + to_string(15 - std::stoi(value->getName())) + ", [r" + first_var->getName() + "]" + endl;
+                        }
+                    }
+                    // 恢复R8对应的变量,仅当其在store指令后还活跃
+                    if (protect_value && protect_value->GetEnd() < stInst->GetStart())
+                    {
+                        AVALUE[protect_value].reg_num = RegManager::R8;
                     }
                 }
             }
         }
+        // 更新RVALUE,AVALUE
         if (!isa<ConstantValue>(value) && value->GetEnd() <= stInst->GetStart())
         {
             RVALUE[Register[dynamic_cast<Instruction *>(value)]] = nullptr;
             auto iter = AVALUE.find(dynamic_cast<Instruction *>(value));
             AVALUE.erase(iter);
+        }
+        for (auto indice : stInst->getIndices())
+        {
+            if (!isa<ConstantValue>(indice) && indice->GetEnd() <= stInst->GetStart())
+            {
+                auto value = dynamic_cast<Instruction *>(indice);
+                RVALUE[Register[value]] = nullptr;
+                auto iter = AVALUE.find(value);
+                if (iter != AVALUE.end())
+                    AVALUE.erase(iter);
+            }
         }
         return code;
     }
@@ -2353,6 +2522,8 @@ namespace backend
                     }
                     offset_array += index * full_num[dim--];
                 }
+                if (NumIndices < NumDims && dstRegId == RegManager::S14)
+                    dstRegId = RegManager::R9;
                 // 数组下标均为常数
                 if (flag == false)
                 {
@@ -2403,8 +2574,6 @@ namespace backend
                     // load出一个(子)数组,求出其首地址
                     else if (NumIndices < NumDims)
                     {
-                        if (dstRegId == RegManager::S14)
-                            dstRegId = RegManager::R9;
                         int imm = -pos;
                         if (imm < 256)
                             code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), "fp", imm);
@@ -2427,8 +2596,6 @@ namespace backend
                 // 数组下标含有变量
                 else
                 {
-                    if (NumIndices < NumDims && dstRegId == RegManager::S14)
-                        dstRegId = RegManager::R9;
                     // 借用R8作为地址寄存器,将存在R8的变量保护起来
                     Instruction *protect_value = nullptr;
                     if (RVALUE.find(RegManager::R8) != RVALUE.end())
@@ -2485,7 +2652,7 @@ namespace backend
                                 code += space + "mla\tr8, r9, r10, r8" + endl;
                             }
                             else
-                                code += space + "mla, r8, " + regm.toString(AVALUE[value].reg_num) + ", r10, r8" + endl;
+                                code += space + "mla\tr8, " + regm.toString(AVALUE[value].reg_num) + ", r10, r8" + endl;
                             //     code += space + "movw\tr10, #" + to_string(full_num[dim] & 0x0000FFFF) + endl;
                             //     code += space + "movt\tr10, #" + to_string((full_num[dim--] >> 16) & 0xffff) + endl;
                             //     code += space + "mla\tr" + first_var->getName() + ", r" + (*iter)->getName() + ", r10, r" + first_var->getName() + endl;
@@ -2536,18 +2703,6 @@ namespace backend
                     {
                         AVALUE[protect_value].reg_num = RegManager::R8;
                     }
-                    // 更新RVALUE,AVALUE
-                    for (auto indice : ldInst->getIndices())
-                    {
-                        if (!isa<ConstantValue>(indice) && indice->GetEnd() <= ldInst->GetStart())
-                        {
-                            auto value = dynamic_cast<Instruction *>(indice);
-                            RVALUE[Register[value]] = nullptr;
-                            auto iter = AVALUE.find(value);
-                            if (iter != AVALUE.end())
-                                AVALUE.erase(iter);
-                        }
-                    }
                 }
             }
         }
@@ -2559,15 +2714,20 @@ namespace backend
             int NumDims = global_value->getNumDims();
             pos = 0;
             // 获取全局数组(首)地址
-            code += space + "movw\tr" + to_string(reg_num) + ", #:lower16:" + pointer->getName() + endl;
-            code += space + "movt\tr" + to_string(reg_num) + ", #:upper16:" + pointer->getName() + endl;
+            // code += space + "movw\tr" + to_string(reg_num) + ", #:lower16:" + pointer->getName() + endl;
+            // code += space + "movt\tr" + to_string(reg_num) + ", #:upper16:" + pointer->getName() + endl;
+
             // 全局标量
             if (NumDims == 0)
             {
+                code += emitInst_1srcR_1DstR("movw", "r9", "#:lower16:" + pointer->getName());
+                code += emitInst_1srcR_1DstR("movt", "r9", "#:upper16:" + pointer->getName());
                 if (type->isInt())
-                    code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                    // code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                    code += emitInst_mem("ldr", regm.toString(dstRegId), "r9");
                 else if (type->isFloat())
-                    code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                    // code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                    code += emitInst_mem("vldr.32", regm.toString(dstRegId), "r9");
             }
             // 全局数组
             else if (NumDims > 0)
@@ -2597,48 +2757,71 @@ namespace backend
                     }
                     offset_array += index * full_num[dim--];
                 }
+                if (NumIndices < NumDims && dstRegId == RegManager::S14)
+                    dstRegId = RegManager::R9;
                 // 数组下标均为常数
                 if (flag == false)
                 {
                     pos += offset_array * 4;
                     int imm = pos;
+                    code += emitInst_1srcR_1DstR("movw", "r9", "#:lower16:" + pointer->getName());
+                    code += emitInst_1srcR_1DstR("movt", "r9", "#:upper16:" + pointer->getName());
                     // load出数组的一个元素
                     if (NumIndices == NumDims)
                     {
                         if (type->isInt())
                         {
                             if (imm < 256)
-                                code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(pos) + "]" + endl;
+                                // code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(pos) + "]" + endl;
+                                code += emitInst_mem("ldr", regm.toString(dstRegId), "r9", pos);
                             else if (imm < 65536)
                             {
-                                code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 256 * 256) + endl;
+                                code += emitInst_1srcR_1DstR("add", "r9", "r9", imm / 256 * 256);
                                 if (imm % 256 != 0)
-                                    code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
-                                code += "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                                    code += emitInst_1srcR_1DstR("add", "r9", "r9", imm % 256);
+                                code += emitInst_mem("ldr", regm.toString(dstRegId), "r9");
+                                // code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 256 * 256) + endl;
+                                // if (imm % 256 != 0)
+                                //     code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
+                                // code += "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
                             }
                             else
                             {
-                                code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 4096 * 4096) + endl;
+                                code += emitInst_1srcR_1DstR("add", "r9", "r9", imm / 4096 * 4096);
                                 if (imm % 4096 != 0)
                                 {
                                     imm = imm % 4096;
-                                    code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 256 * 256) + endl;
+                                    code += emitInst_1srcR_1DstR("add", "r9", "r9", imm / 256 * 256);
                                     if (imm % 256 != 0)
-                                        code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
+                                        code += emitInst_1srcR_1DstR("add", "r9", "r9", imm % 256);
+                                    code += emitInst_mem("ldr", regm.toString(dstRegId), "r9");
                                 }
-                                code += "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                                // code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 4096 * 4096) + endl;
+                                // if (imm % 4096 != 0)
+                                // {
+                                //     imm = imm % 4096;
+                                //     code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 256 * 256) + endl;
+                                //     if (imm % 256 != 0)
+                                //         code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
+                                // }
+                                // code += "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
                             }
                         }
                         else if (type->isFloat())
                         {
                             if (imm < 256)
-                                code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(pos) + "]" + endl;
+                                // code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(pos) + "]" + endl;
+                                code += emitInst_mem("vldr.32", regm.toString(dstRegId), "r9", pos);
                             else
                             {
-                                code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 256 * 256) + endl;
+                                code += emitInst_1srcR_1DstR("add", "r9", "r9", imm / 256 * 256);
                                 if (imm % 256 != 0)
-                                    code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
-                                code += "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                                    code += emitInst_1srcR_1DstR("add", "r9", "r9", imm % 256);
+                                code += emitInst_mem("vldr.32", regm.toString(dstRegId), "r9");
+                                // code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 256 * 256) + endl;
+                                // if (imm % 256 != 0)
+                                //     code += "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
+                                // code += "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
                             }
                         }
                     }
@@ -2647,18 +2830,31 @@ namespace backend
                     {
                         int imm = pos;
                         if (imm < 256)
-                            code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(pos) + endl;
+                            // code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(pos) + endl;
+                            code += space + "add\t" + regm.toString(dstRegId) + ", r9, #" + to_string(pos) + endl;
                         else
                         {
-                            code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 256 * 256) + endl;
+                            code += emitInst_1srcR_1DstR("add", "r9", "r9", imm / 256 * 256);
                             if (imm % 256 != 0)
-                                code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
+                                code += emitInst_1srcR_1DstR("add", regm.toString(dstRegId), "r9", imm % 256);
+                            // code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 256 * 256) + endl;
+                            // if (imm % 256 != 0)
+                            //     code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
                         }
                     }
                 }
                 // 数组下标含有变量
                 else
                 {
+                    // 借用R8作为地址寄存器,将存在R8的变量保护起来
+                    Instruction *protect_value = nullptr;
+                    if (RVALUE.find(RegManager::R8) != RVALUE.end())
+                        protect_value = RVALUE[RegManager::R8];
+                    if (protect_value)
+                    {
+                        AVALUE[protect_value].reg_num = RegManager::NONE;
+                        AVALUE[protect_value].stack_offset = protect_reg_offset;
+                    }
                     dim = NumDims - 1;
                     flag = false;
                     for (auto iter = ldInst->getIndices().begin(); iter != ldInst->getIndices().end(); iter++)
@@ -2667,33 +2863,69 @@ namespace backend
                             dim--;
                         else if (flag == false)
                         {
-                            code += space + "movw\tr9, #" + to_string(full_num[dim] & 0x0000FFFF) + endl;
-                            code += space + "movt\tr9, #" + to_string((full_num[dim--] >> 16) & 0xffff) + endl;
-                            code += space + "mul\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", r9" + endl;
-                            code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(offset_array) + endl;
+                            code += emitInst_nosrcR_1DstR("mov", "r8", offset_array);
+                            auto value = dynamic_cast<Instruction *>(*iter);
+                            code += emitInst_nosrcR_1DstR("movw", "r10", (full_num[dim] & 0x0000FFFF));
+                            code += emitInst_nosrcR_1DstR("movt", "r10", ((full_num[dim] >> 16) & 0xFFFF));
+                            dim--;
+                            if (AVALUE[value].reg_num == RegManager::NONE)
+                            {
+                                code += emitInst_mem("ldr", "r9", "fp", AVALUE[value].stack_offset);
+                                code += space + "mla\tr8, r9, r10, r8" + endl;
+                            }
+                            else
+                                code += space + "mla\tr8, " + regm.toString(AVALUE[value].reg_num) + ", r10, r8" + endl;
                             flag = true;
+                            // code += space + "movw\tr9, #" + to_string(full_num[dim] & 0x0000FFFF) + endl;
+                            // code += space + "movt\tr9, #" + to_string((full_num[dim--] >> 16) & 0xffff) + endl;
+                            // code += space + "mul\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", r9" + endl;
+                            // code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(offset_array) + endl;
+                            // flag = true;
                         }
                         else
                         {
-                            code += space + "movw\tr9, #" + to_string(full_num[dim] & 0x0000FFFF) + endl;
-                            code += space + "movt\tr9, #" + to_string((full_num[dim--] >> 16) & 0xffff) + endl;
-                            code += space + "mla\tr" + first_var->getName() + ", r" + (*iter)->getName() + ", r9, r" + first_var->getName() + endl;
+                            auto value = dynamic_cast<Instruction *>(*iter);
+                            code += emitInst_nosrcR_1DstR("movw", "r10", (full_num[dim] & 0x0000FFFF));
+                            code += emitInst_nosrcR_1DstR("movt", "r10", ((full_num[dim] >> 16) & 0xFFFF));
+                            dim--;
+                            if (AVALUE[value].reg_num == RegManager::NONE)
+                            {
+                                code += emitInst_mem("ldr", "r9", "fp", AVALUE[value].stack_offset);
+                                code += space + "mla\tr8, r9, r10, r8" + endl;
+                            }
+                            else
+                                code += space + "mla\tr8, " + regm.toString(AVALUE[value].reg_num) + ", r10, r8" + endl;
+                            // code += space + "movw\tr9, #" + to_string(full_num[dim] & 0x0000FFFF) + endl;
+                            // code += space + "movt\tr9, #" + to_string((full_num[dim--] >> 16) & 0xffff) + endl;
+                            // code += space + "mla\tr" + first_var->getName() + ", r" + (*iter)->getName() + ", r9, r" + first_var->getName() + endl;
                         }
                     }
-                    code += space + "lsl\tr" + first_var->getName() + ", r" + first_var->getName() + ", #2" + endl;
-                    code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r" + to_string(reg_num) + endl;
+                    code += emitInst_1srcR_1DstR("lsl", "r8", "r8", 2);
+                    code += emitInst_1srcR_1DstR("movw", "r9", "#:lower16:" + pointer->getName());
+                    code += emitInst_1srcR_1DstR("movt", "r9", "#:upper16:" + pointer->getName());
+                    code += emitInst_2srcR_1dstR("add", "r8", "r8", "r9");
+                    // code += space + "lsl\tr" + first_var->getName() + ", r" + first_var->getName() + ", #2" + endl;
+                    // code += space + "add\tr" + first_var->getName() + ", r" + first_var->getName() + ", r" + to_string(reg_num) + endl;
                     // load出数组的一个元素
                     if (NumIndices == NumDims)
                     {
                         if (type->isInt())
-                            code += space + "ldr\tr" + to_string(reg_num) + ", [r" + first_var->getName() + "]" + endl;
+                            // code += space + "ldr\tr" + to_string(reg_num) + ", [r" + first_var->getName() + "]" + endl;
+                            code += emitInst_mem("ldr", regm.toString(dstRegId), "r8");
                         else if (type->isFloat())
-                            code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + first_var->getName() + "]" + endl;
+                            // code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + first_var->getName() + "]" + endl;
+                            code += emitInst_mem("vldr.32", regm.toString(dstRegId), "r8");
                     }
                     // load出一个(子)数组,求出其首地址
                     else if (NumIndices < NumDims)
                     {
-                        code += space + "mov\tr" + to_string(reg_num) + ", r" + first_var->getName() + endl;
+                        // code += space + "mov\tr" + to_string(reg_num) + ", r" + first_var->getName() + endl;
+                        code += emitInst_1srcR_1DstR("mov", regm.toString(dstRegId), "r8");
+                    }
+                    // 恢复R8对应的变量,仅当其在load指令后还活跃
+                    if (protect_value && protect_value->GetEnd() > ldInst->GetStart())
+                    {
+                        AVALUE[protect_value].reg_num = RegManager::R8;
                     }
                 }
             }
@@ -2768,6 +3000,8 @@ namespace backend
                     }
                     offset_array += index * full_num[dim--];
                 }
+                if (NumIndices < NumDims && dstRegId == RegManager::S14)
+                    dstRegId = RegManager::R9;
                 // 数组下标均为常数
                 if (flag == false)
                 {
@@ -2775,39 +3009,62 @@ namespace backend
                     // load出数组的一个元素
                     if (NumIndices == NumDims)
                     {
-                        code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                        // code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                        code += emitInst_mem("ldr", "r9", "fp", pos);
                         if (type->isInt())
-                            code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(offset_array) + "]" + endl;
+                            // code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(offset_array) + "]" + endl;
+                            code += emitInst_mem("ldr", regm.toString(dstRegId), "r9", offset_array);
                         else if (type->isFloat())
-                            code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(offset_array) + "]" + endl;
+                            // code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(offset_array) + "]" + endl;
+                            code += emitInst_mem("vldr.32", regm.toString(dstRegId), "r9", offset_array);
                     }
                     // load出一个(子)数组,求出其首地址
                     else if (NumIndices < NumDims)
                     {
                         int imm = -pos;
                         if (imm < 256)
-                            code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                            // code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                            code += emitInst_mem("ldr", regm.toString(dstRegId), "fp", pos);
                         else
                         {
-                            code += space + "sub\tr" + to_string(reg_num) + ", fp, #" + to_string(imm / 256 * 256) + endl;
+                            code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), "fp", imm / 256 * 256);
                             if (imm % 256 != 0)
-                                code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
-                            code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                                code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), regm.toString(dstRegId), imm % 256);
+                            code += emitInst_mem("ldr", regm.toString(dstRegId), regm.toString(dstRegId));
+                            // code += space + "sub\tr" + to_string(reg_num) + ", fp, #" + to_string(imm / 256 * 256) + endl;
+                            // if (imm % 256 != 0)
+                            //     code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
+                            // code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
                         }
                         imm = offset_array;
-                        if (imm < 256)
-                            code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm) + endl;
+                        if (imm == 0)
+                            ;
+                        else if (imm < 256)
+                            // code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm) + endl;
+                            code += emitInst_1srcR_1DstR("add", regm.toString(dstRegId), regm.toString(dstRegId), imm);
                         else
                         {
-                            code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 256 * 256) + endl;
-                            if (imm % 256 != 0)
-                                code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
+                            code += emitInst_1srcR_1DstR("add", regm.toString(dstRegId), regm.toString(dstRegId), imm / 256 * 256);
+                            if (imm % 256)
+                                code += emitInst_1srcR_1DstR("add", regm.toString(dstRegId), regm.toString(dstRegId), imm % 256);
+                            // code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm / 256 * 256) + endl;
+                            // if (imm % 256 != 0)
+                            //     code += space + "add\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
                         }
                     }
                 }
                 // 数组下标含有变量
                 else
                 {
+                    // 借用R8作为地址寄存器, 将存在R8的变量保护起来
+                    Instruction *protect_value = nullptr;
+                    if (RVALUE.find(RegManager::R8) != RVALUE.end())
+                        protect_value = RVALUE[RegManager::R8];
+                    if (protect_value)
+                    {
+                        AVALUE[protect_value].reg_num = RegManager::NONE;
+                        AVALUE[protect_value].stack_offset = protect_reg_offset;
+                    }
                     dim = NumDims - 1;
                     flag = false;
                     for (auto iter = ldInst->getIndices().begin(); iter != ldInst->getIndices().end(); iter++)
@@ -2816,50 +3073,104 @@ namespace backend
                             dim--;
                         else if (flag == false)
                         {
-                            code += space + "movw\tr10, #" + to_string(full_num[dim] & 0x0000FFFF) + endl;
-                            code += space + "movt\tr10, #" + to_string((full_num[dim--] >> 16) & 0xffff) + endl;
-                            code += space + "mul\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", r10" + endl;
-                            code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(offset_array) + endl;
+                            code += emitInst_nosrcR_1DstR("mov", "r8", offset_array);
+                            auto value = dynamic_cast<Instruction *>(*iter);
+                            code += emitInst_nosrcR_1DstR("movw", "r10", (full_num[dim] & 0x0000FFFF));
+                            code += emitInst_nosrcR_1DstR("movt", "r10", ((full_num[dim] >> 16) & 0xFFFF));
+                            dim--;
+                            if (AVALUE[value].reg_num == RegManager::NONE)
+                            {
+                                code += emitInst_mem("ldr", "r9", "fp", AVALUE[value].stack_offset);
+                                code += space + "mla\tr8, r9, r10, r8" + endl;
+                            }
+                            else
+                                code += space + "mla\tr8, " + regm.toString(AVALUE[value].reg_num) + ", r10, r8" + endl;
                             flag = true;
+                            // code += space + "movw\tr10, #" + to_string(full_num[dim] & 0x0000FFFF) + endl;
+                            // code += space + "movt\tr10, #" + to_string((full_num[dim--] >> 16) & 0xffff) + endl;
+                            // code += space + "mul\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", r10" + endl;
+                            // code += space + "add\tr" + (*iter)->getName() + ", r" + (*iter)->getName() + ", #" + to_string(offset_array) + endl;
+                            // flag = true;
                         }
                         else
                         {
-                            code += space + "mov\tr10, #" + to_string(full_num[dim--]) + endl;
-                            code += space + "mla\tr" + first_var->getName() + ", r" + (*iter)->getName() + ", r10, r" + first_var->getName() + endl;
+                            auto value = dynamic_cast<Instruction *>(*iter);
+                            code += emitInst_nosrcR_1DstR("movw", "r10", (full_num[dim] & 0x0000FFFF));
+                            code += emitInst_nosrcR_1DstR("movt", "r10", ((full_num[dim] >> 16) & 0xFFFF));
+                            dim--;
+                            if (AVALUE[value].reg_num == RegManager::NONE)
+                            {
+                                code += emitInst_mem("ldr", "r9", "fp", AVALUE[value].stack_offset);
+                                code += space + "mla\tr8, r9, r10, r8" + endl;
+                            }
+                            else
+                                code += space + "mla\tr8, " + regm.toString(AVALUE[value].reg_num) + ", r10, r8" + endl;
+                            // code += space + "mov\tr10, #" + to_string(full_num[dim--]) + endl;
+                            // code += space + "mla\tr" + first_var->getName() + ", r" + (*iter)->getName() + ", r10, r" + first_var->getName() + endl;
                         }
                     }
-                    code += space + "lsl\tr" + first_var->getName() + ", r" + first_var->getName() + ", #2" + endl;
+                    // code += space + "lsl\tr" + first_var->getName() + ", r" + first_var->getName() + ", #2" + endl;
+                    code += emitInst_1srcR_1DstR("lsl", "r8", "r8", 2);
                     // 参数数组的首地址
                     int imm = -pos;
                     if (imm < 256)
-                        code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                        // code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
+                        code += emitInst_mem("ldr", "r9", "fp", pos);
                     else
                     {
-                        code += space + "sub\tr" + to_string(reg_num) + ", fp, #" + to_string(imm / 256 * 256) + endl;
-                        if (imm % 256 != 0)
-                            code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
-                        code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                        code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                        if (imm % 256)
+                            code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                        code += emitInst_mem("ldr", "r9", "r9");
+                        // code += space + "sub\tr" + to_string(reg_num) + ", fp, #" + to_string(imm / 256 * 256) + endl;
+                        // if (imm % 256 != 0)
+                        //     code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
+                        // code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
                     }
                     // 获得地址
-                    code += space + "add\tr" + first_var->getName() + ", r" + to_string(reg_num) + ", r" + first_var->getName() + endl;
+                    // code += space + "add\tr" + first_var->getName() + ", r" + to_string(reg_num) + ", r" + first_var->getName() + endl;
+                    code += emitInst_2srcR_1dstR("add", "r8", "r9", "r8");
                     // load出数组的一个元素
                     if (NumIndices == NumDims)
                     {
                         if (type->isInt())
-                            code += space + "ldr\tr" + to_string(reg_num) + ", [r" + first_var->getName() + "]" + endl;
+                            // code += space + "ldr\tr" + to_string(reg_num) + ", [r" + first_var->getName() + "]" + endl;
+                            code += emitInst_mem("ldr", regm.toString(dstRegId), "r8");
                         else if (type->isFloat())
-                            code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + first_var->getName() + "]" + endl;
+                            // code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + first_var->getName() + "]" + endl;
+                            code += emitInst_mem("vldr.32", regm.toString(dstRegId), "r8");
                     }
                     // load出一个(子)数组,求出其首地址
                     else if (NumIndices < NumDims)
                     {
+                        code += emitInst_1srcR_1DstR("mov", regm.toString(dstRegId), "r8");
+                    }
+                    // 恢复R8对应的变量,仅当其在load指令后还活跃
+                    if (protect_value && protect_value->GetEnd() > ldInst->GetStart())
+                    {
+                        AVALUE[protect_value].reg_num = RegManager::R8;
                     }
                 }
             }
         }
         // 更新RVALUE,AVALUE
+        for (auto indice : ldInst->getIndices())
+        {
+            if (!isa<ConstantValue>(indice) && indice->GetEnd() <= ldInst->GetStart())
+            {
+                auto value = dynamic_cast<Instruction *>(indice);
+                RVALUE[Register[value]] = nullptr;
+                auto iter = AVALUE.find(value);
+                if (iter != AVALUE.end())
+                    AVALUE.erase(iter);
+            }
+        }
         if (dstRegId == RegManager::R9 || dstRegId == RegManager::S14)
         {
+            if (dstRegId == RegManager::R9)
+                code += emitInst_mem("str", "r9", "fp", ldInst->GetLocation());
+            else if (dstRegId == RegManager::S14)
+                code += emitInst_mem("vstr.32", "s14", "fp", ldInst->GetLocation());
             dstRegId = RegManager::NONE;
             AVALUE[ldInst].stack_offset = ldInst->GetLocation();
         }
@@ -3033,9 +3344,21 @@ namespace backend
             }
             else
             {
-                code += space + "cmp\tr" + bInst->getName() + ", #0" + endl;
+                RegId cond_reg = Register[bInst];
+                if (cond_reg == RegManager::NONE)
+                {
+                    code += emitInst_mem("ldr", "r9", "fp", AVALUE[bInst].stack_offset);
+                    cond_reg = RegManager::R9;
+                }
+                // code += space + "cmp\tr" + bInst->getName() + ", #0" + endl;
+                code += emitInst_nosrcR_1DstR("cmp", regm.toString(cond_reg), 0);
                 code += space + "bne\t" + then_block->getName() + endl;
                 code += space + "b\t" + else_block->getName() + endl;
+            }
+            if (bInst->GetEnd() <= cbInst->GetStart())
+            {
+                auto iter = AVALUE.find(bInst);
+                AVALUE.erase(iter);
             }
         }
         else if (isa<ConstantValue>(cond))
@@ -3047,9 +3370,21 @@ namespace backend
         }
         else
         {
-            code += space + "cmp\tr" + cond->getName() + ", #0" + endl;
+            RegId cond_reg = Register[dynamic_cast<Instruction *>(cond)];
+            if (cond_reg == RegManager::NONE)
+            {
+                code += emitInst_mem("ldr", "r9", "fp", AVALUE[dynamic_cast<Instruction *>(cond)].stack_offset);
+                cond_reg = RegManager::R9;
+            }
+            // code += space + "cmp\tr" + bInst->getName() + ", #0" + endl;
+            code += emitInst_nosrcR_1DstR("cmp", regm.toString(cond_reg), 0);
             code += space + "bne\t" + then_block->getName() + endl;
             code += space + "b\t" + else_block->getName() + endl;
+            if (cond->GetEnd() <= cbInst->GetStart())
+            {
+                auto iter = AVALUE.find(dynamic_cast<Instruction *>(cond));
+                AVALUE.erase(iter);
+            }
         }
         return code;
     }
@@ -3174,7 +3509,16 @@ namespace backend
                 {
                     protect_cnt++;
                     auto protect_value = RVALUE[reg_num];
-                    code += emitInst_mem("str", regm.toString(reg_num), "fp", protect_reg_offset + protect_offset);
+                    int imm = -(protect_reg_offset + protect_offset);
+                    if (imm < 256)
+                        code += emitInst_mem("str", regm.toString(reg_num), "fp", protect_reg_offset + protect_offset);
+                    else
+                    {
+                        code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                        if (imm % 256 != 0)
+                            code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                        code += emitInst_mem("str", regm.toString(reg_num), "r9");
+                    }
                     AVALUE[protect_value].reg_num = RegManager::NONE;
                     AVALUE[protect_value].stack_offset = protect_reg_offset + protect_offset;
                     protect_offset -= 4;
@@ -3191,11 +3535,19 @@ namespace backend
                 else
                 {
                     auto value = dynamic_cast<Instruction *>(arg);
-                    // 若变量溢出
-                    // 若变量未溢出但在保护区
+                    // 若变量溢出&若变量未溢出但在保护区
                     if (AVALUE[value].reg_num == RegManager::NONE)
                     {
-                        code += emitInst_mem("ldr", regm.toString(reg_num), "fp", AVALUE[value].stack_offset);
+                        int imm = -AVALUE[value].stack_offset;
+                        if (imm < 256)
+                            code += emitInst_mem("ldr", regm.toString(reg_num), "fp", AVALUE[value].stack_offset);
+                        else
+                        {
+                            code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                            if (imm % 256 != 0)
+                                code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                            code += emitInst_mem("ldr", regm.toString(reg_num), "r9");
+                        }
                     }
                     // 若变量在寄存器中
                     else
@@ -3249,7 +3601,16 @@ namespace backend
                 {
                     protect_cnt++;
                     auto protect_value = RVALUE[reg_num];
-                    code += emitInst_mem("vstr", regm.toString(reg_num), "fp", protect_reg_offset + protect_offset);
+                    int imm = -(protect_reg_offset + protect_offset);
+                    if (imm < 256)
+                        code += emitInst_mem("vstr", regm.toString(reg_num), "fp", protect_reg_offset + protect_offset);
+                    else
+                    {
+                        code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                        if (imm % 256 != 0)
+                            code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                        code += emitInst_mem("vstr", regm.toString(reg_num), "r9");
+                    }
                     AVALUE[protect_value].reg_num = RegManager::NONE;
                     AVALUE[protect_value].stack_offset = protect_reg_offset + protect_offset;
                     protect_offset -= 4;
@@ -3275,7 +3636,16 @@ namespace backend
                     // 若变量未溢出,但被保护在栈上
                     if (AVALUE[value].reg_num == RegManager::NONE)
                     {
-                        code += emitInst_mem("vldr.32", regm.toString(reg_num), "fp", AVALUE[value].stack_offset);
+                        int imm = -AVALUE[value].stack_offset;
+                        if (imm < 256)
+                            code += emitInst_mem("vldr.32", regm.toString(reg_num), "fp", AVALUE[value].stack_offset);
+                        else
+                        {
+                            code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                            if (imm % 256 != 0)
+                                code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                            code += emitInst_mem("vldr.32", regm.toString(reg_num), "r9");
+                        }
                     }
                     // 若变量在寄存器中
                     else
@@ -3312,18 +3682,36 @@ namespace backend
                     // 若区间在call指令后不再活跃,不用保护
                     if (instr->GetEnd() <= callInst->GetStart())
                         continue;
-                    // 若区间溢出,不用保护
-                    if (Register[instr.get()] == RegManager::R0)
-                        continue;
-                    protect_value.insert(instr.get());
-                    // 若区间已经被保护,不用重复保护
+                    // 若区间在栈上,不用保护
                     if (AVALUE[instr.get()].reg_num == RegManager::NONE)
                         continue;
+                    protect_value.insert(instr.get());
                     // 若区间在call指令后仍然活跃,需要保护
+                    int imm = -(protect_reg_offset + protect_offset);
                     if (instr->getType()->isInt())
-                        code += emitInst_mem("str", regm.toString(AVALUE[instr.get()].reg_num), "fp", protect_reg_offset + protect_offset);
+                    {
+                        if (imm < 256)
+                            code += emitInst_mem("str", regm.toString(AVALUE[instr.get()].reg_num), "fp", protect_reg_offset + protect_offset);
+                        else
+                        {
+                            code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                            if (imm % 256 != 0)
+                                code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                            code += emitInst_mem("str", regm.toString(AVALUE[instr.get()].reg_num), "r9");
+                        }
+                    }
                     else
-                        code += emitInst_mem("vstr", regm.toString(AVALUE[instr.get()].reg_num), "fp", protect_reg_offset + protect_offset);
+                    {
+                        if (imm < 256)
+                            code += emitInst_mem("vstr", regm.toString(AVALUE[instr.get()].reg_num), "fp", protect_reg_offset + protect_offset);
+                        else
+                        {
+                            code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                            if (imm % 256 != 0)
+                                code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                            code += emitInst_mem("vstr", regm.toString(AVALUE[instr.get()].reg_num), "r9");
+                        }
+                    }
                     AVALUE[instr.get()].reg_num = RegManager::NONE;
                     AVALUE[instr.get()].stack_offset = protect_reg_offset + protect_offset;
                     protect_offset -= 4;
@@ -3339,10 +3727,19 @@ namespace backend
         RVALUE.clear();
         // 4.传递返回值(若有)
         if (callInst->getType()->isInt())
-            code += emitInst_1srcR_1DstR("mov", regm.toString(dstRegId), "r0");
+        {
+            if (dstRegId == RegManager::NONE)
+                code += emitInst_mem("str", "r0", "fp", callInst->GetLocation());
+            else
+                code += emitInst_1srcR_1DstR("mov", regm.toString(dstRegId), "r0");
+        }
         else if (callInst->getType()->isFloat())
-            code += emitInst_1srcR_1DstR("vmov", regm.toString(dstRegId), "s0");
-
+        {
+            if (dstRegId == RegManager::NONE)
+                code += emitInst_mem("vstr.32", "s0", "fp", callInst->GetLocation());
+            else
+                code += emitInst_1srcR_1DstR("vmov", regm.toString(dstRegId), "s0");
+        }
         // if (callInst->getType()->isInt())
         // {
         //     int protect_offset = callInst->ProtectOffset();
@@ -3375,10 +3772,31 @@ namespace backend
         // 5.将保护区释放回变量的寄存器
         for (auto value : protect_value)
         {
+            int imm = -AVALUE[value].stack_offset;
             if (value->getType()->isInt())
-                emitInst_mem("ldr", regm.toString(Register[value]), "fp", AVALUE[value].stack_offset);
+            {
+                if (imm < 256)
+                    code += emitInst_mem("ldr", regm.toString(Register[value]), "fp", AVALUE[value].stack_offset);
+                else
+                {
+                    code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                    if (imm % 256 != 0)
+                        code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                    code += emitInst_mem("ldr", regm.toString(Register[value]), "r9");
+                }
+            }
             else if (value->getType()->isFloat())
-                emitInst_mem("vldr.32", regm.toString(Register[value]), "fp", AVALUE[value].stack_offset);
+            {
+                if (imm < 256)
+                    code += emitInst_mem("vldr.32", regm.toString(Register[value]), "fp", AVALUE[value].stack_offset);
+                else
+                {
+                    code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                    if (imm % 256 != 0)
+                        code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                    code += emitInst_mem("vldr.32", regm.toString(Register[value]), "r9");
+                }
+            }
             AVALUE[value].reg_num = Register[value];
             RVALUE[Register[value]] = value;
         }
@@ -3389,12 +3807,19 @@ namespace backend
                 continue;
             auto value = dynamic_cast<Instruction *>(arg);
             // 若变量不再活跃,将其AVALUE删除
-            if ((value->GetEnd() == callInst->GetStart()) && (AVALUE.find(value) != AVALUE.end()))
-                AVALUE.erase(AVALUE.find(value));
+            if (value->GetEnd() == callInst->GetStart())
+            {
+                RVALUE[Register[value]] = nullptr;
+                auto iter = AVALUE.find(value);
+                if (iter != AVALUE.end())
+                    AVALUE.erase(iter);
+            }
         }
         if (!callInst->getType()->isVoid())
         {
             AVALUE[callInst].reg_num = dstRegId;
+            if (dstRegId == RegManager::NONE)
+                AVALUE[callInst].stack_offset = callInst->GetLocation();
             RVALUE[dstRegId] = callInst;
         }
         return {dstRegId, code};

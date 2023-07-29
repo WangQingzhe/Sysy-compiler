@@ -99,7 +99,7 @@ namespace backend
     emitInst_1srcR_1DstR(string name, string dstReg, string srcReg, int imm = 0)
     {
         string inst = space + name + "\t" + dstReg + ", " + srcReg;
-        if (imm == 0)
+        if (imm == 0 && !(name == "add") && !(name == "sub"))
             inst += endl;
         else
             inst += ", #" + to_string(imm) + endl;
