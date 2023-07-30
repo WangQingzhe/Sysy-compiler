@@ -453,12 +453,6 @@ namespace backend
             rconst = true;
             r_val = dynamic_cast<ConstantValue *>(rhs)->getInt();
         }
-        else if (isa<CallInst>(rhs) && !lconst)
-        {
-            rname = "r" + rhs->getName();
-            rRegId = Register[dynamic_cast<Instruction *>(rhs)];
-            code += space + "ldr\tr" + lhs->getName() + ", [fp, #" + to_string(protect_reg_offset) + "]" + endl;
-        }
         else
         {
             rname = "r" + rhs->getName();
@@ -3683,9 +3677,12 @@ namespace backend
                     if (instr->GetEnd() <= callInst->GetStart())
                         continue;
                     // 若区间在栈上,不用保护
-                    if (AVALUE[instr.get()].reg_num == RegManager::NONE)
+                    if (Register[instr.get()] == RegManager::NONE)
                         continue;
                     protect_value.insert(instr.get());
+                    // 若区间已被保护,不用再生成store指令
+                    if (AVALUE[instr.get()].reg_num == RegManager::NONE)
+                        continue;
                     // 若区间在call指令后仍然活跃,需要保护
                     int imm = -(protect_reg_offset + protect_offset);
                     if (instr->getType()->isInt())
@@ -3772,6 +3769,7 @@ namespace backend
         // 5.将保护区释放回变量的寄存器
         for (auto value : protect_value)
         {
+            // code += regm.toString(Register[value]) + " " + to_string(AVALUE[value].stack_offset) + endl;
             int imm = -AVALUE[value].stack_offset;
             if (value->getType()->isInt())
             {
