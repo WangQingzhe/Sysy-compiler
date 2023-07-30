@@ -122,8 +122,8 @@ namespace backend
         int float_num = 0;
         for (auto arg = args.begin(); arg != args.end(); ++arg)
         {
-            // if (int_num >= 4 && float_num >= 4)
-            //     break;
+            if (int_num >= 4 && float_num >= 5)
+                break;
             int para_offset = paramsStOffset[arg->get()];
             int imm = -para_offset;
             // r0-r3
@@ -370,22 +370,43 @@ namespace backend
         {
             // 形式参数
             auto args = func->getEntryBlock()->getArguments();
-            int arg_num = 0;
+            // int arg_num = 0;
+            int int_num = 0;
+            int float_num = 0;
             for (auto arg = args.begin(); arg != args.end(); ++arg)
             {
                 // r0-r3
-                if (arg_num < 4)
+                if (arg->get()->getType()->as<PointerType>()->getBaseType()->isInt() || arg->get()->getNumDims() > 0)
                 {
-                    paramsStOffset.emplace(arg->get(), top_offset);
-                    top_offset -= 4;
+                    if (int_num < 4)
+                    {
+                        paramsStOffset.emplace(arg->get(), top_offset);
+                        top_offset -= 4;
+                    }
+                    // other
+                    else
+                    {
+                        paramsStOffset.emplace(arg->get(), above_offset);
+                        above_offset += 4;
+                    }
+                    int_num++;
                 }
-                // other
+                // s0-s3
                 else
                 {
-                    paramsStOffset.emplace(arg->get(), above_offset);
-                    above_offset += 4;
+                    if (float_num < 5)
+                    {
+                        paramsStOffset.emplace(arg->get(), top_offset);
+                        top_offset -= 4;
+                    }
+                    // other
+                    else
+                    {
+                        paramsStOffset.emplace(arg->get(), above_offset);
+                        above_offset += 4;
+                    }
+                    float_num++;
                 }
-                arg_num++;
             }
             // 中间变量
             // temp_offset = top_offset;
@@ -3503,53 +3524,6 @@ namespace backend
         // 1.保护R0-R3,S0-S3并传递参数
         for (auto arg : args)
         {
-            // if (arg_num > 4)
-            // {
-            //     if (arg->getType()->isInt())
-            //     {
-            //         if (isa<ConstantValue>(arg))
-            //         {
-            //             code += space + "mov\tr4, #" + to_string(dynamic_cast<ConstantValue *>(arg)->getInt()) + endl;
-            //             code += space + "str\tr4, [sp, #" + to_string(para_offset) + "]" + endl;
-            //         }
-            //         // else
-            //         //     code += space + "str\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
-            //     }
-            //     else if (arg->getType()->isFloat())
-            //     {
-            //         if (isa<ConstantValue>(arg))
-            //         {
-            //             float Fvalue = dynamic_cast<ConstantValue *>(arg)->getFloat();
-            //             int mid;
-            //             memcpy(&mid, &Fvalue, sizeof(Fvalue));
-            //             code += space + "movw\tr4, #" + to_string(mid & 0xffff) + endl;
-            //             code += space + "movt\tr4, #" + to_string((mid >> 16) & 0xffff) + endl;
-            //             code += space + "vmov\ts4, " + "r4" + endl;
-            //             code += space + "vstr\ts4, [sp, #" + to_string(para_offset) + "]" + endl;
-            //         }
-            //         // else if (isa<LoadInst>(arg))
-            //         // {
-            //         //     auto ld_inst = dynamic_cast<LoadInst *>(arg);
-            //         //     auto pointer = ld_inst->getPointer();
-            //         //     int numdims = 0;
-            //         //     if (isa<GlobalValue>(pointer))
-            //         //         numdims = dynamic_cast<GlobalValue *>(pointer)->getNumDims();
-            //         //     else if (isa<AllocaInst>(pointer))
-            //         //         numdims = dynamic_cast<AllocaInst *>(pointer)->getNumDims();
-            //         //     else if (isa<Argument>(pointer))
-            //         //         numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
-            //         //     if (ld_inst->getNumIndices() < numdims)
-            //         //         code += space + "str\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
-            //         //     else
-            //         //         code += space + "vstr\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
-            //         // }
-            //         // else
-            //         //     code += space + "vstr\tr" + arg->getName() + ", [sp, #" + to_string(para_offset) + "]" + endl;
-            //     }
-            //     para_offset += 4;
-            //     continue;
-            // }
-            // string src_name;
             bool LoadArray = false;
             // float数组仍然用R寄存器传参
             if (isa<LoadInst>(arg))
