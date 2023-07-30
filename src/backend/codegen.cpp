@@ -1687,6 +1687,16 @@ namespace backend
                     protect_value = RVALUE[RegManager::R8];
                 if (protect_value)
                 {
+                    int imm = -protect_reg_offset;
+                    if (imm < 256)
+                        code += emitInst_mem("str", "r8", "fp", protect_reg_offset);
+                    else
+                    {
+                        code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                        if (imm % 256 != 0)
+                            code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                        code += emitInst_mem("str", "r8", "r9");
+                    }
                     AVALUE[protect_value].reg_num = RegManager::NONE;
                     AVALUE[protect_value].stack_offset = protect_reg_offset;
                 }
@@ -1725,7 +1735,16 @@ namespace backend
                         dim--;
                         if (AVALUE[value].reg_num == RegManager::NONE)
                         {
-                            code += emitInst_mem("ldr", "r9", "fp", AVALUE[value].stack_offset);
+                            int imm = -AVALUE[value].stack_offset;
+                            if (imm < 256)
+                                code += emitInst_mem("ldr", "r9", "fp", AVALUE[value].stack_offset);
+                            else
+                            {
+                                code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                                if (imm % 256 != 0)
+                                    code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                                code += emitInst_mem("ldr", "r9", "r9");
+                            }
                             code += space + "mla\tr8, r9, r10, r8" + endl;
                         }
                         else
@@ -2003,6 +2022,16 @@ namespace backend
                     protect_value = RVALUE[RegManager::R8];
                 if (protect_value)
                 {
+                    int imm = -protect_reg_offset;
+                    if (imm < 256)
+                        code += emitInst_mem("str", "r8", "fp", protect_reg_offset);
+                    else
+                    {
+                        code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                        if (imm % 256 != 0)
+                            code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                        code += emitInst_mem("str", "r8", "r9");
+                    }
                     AVALUE[protect_value].reg_num = RegManager::NONE;
                     AVALUE[protect_value].stack_offset = protect_reg_offset;
                 }
@@ -2279,6 +2308,16 @@ namespace backend
                         protect_value = RVALUE[RegManager::R8];
                     if (protect_value)
                     {
+                        int imm = -protect_reg_offset;
+                        if (imm < 256)
+                            code += emitInst_mem("str", "r8", "fp", protect_reg_offset);
+                        else
+                        {
+                            code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                            if (imm % 256 != 0)
+                                code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                            code += emitInst_mem("str", "r8", "r9");
+                        }
                         AVALUE[protect_value].reg_num = RegManager::NONE;
                         AVALUE[protect_value].stack_offset = protect_reg_offset;
                     }
@@ -2584,6 +2623,16 @@ namespace backend
                         protect_value = RVALUE[RegManager::R8];
                     if (protect_value)
                     {
+                        int imm = -protect_reg_offset;
+                        if (imm < 256)
+                            code += emitInst_mem("str", "r8", "fp", protect_reg_offset);
+                        else
+                        {
+                            code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                            if (imm % 256 != 0)
+                                code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                            code += emitInst_mem("str", "r8", "r9");
+                        }
                         AVALUE[protect_value].reg_num = RegManager::NONE;
                         AVALUE[protect_value].stack_offset = protect_reg_offset;
                     }
@@ -2834,6 +2883,16 @@ namespace backend
                         protect_value = RVALUE[RegManager::R8];
                     if (protect_value)
                     {
+                        int imm = -protect_reg_offset;
+                        if (imm < 256)
+                            code += emitInst_mem("str", "r8", "fp", protect_reg_offset);
+                        else
+                        {
+                            code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                            if (imm % 256 != 0)
+                                code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                            code += emitInst_mem("str", "r8", "r9");
+                        }
                         AVALUE[protect_value].reg_num = RegManager::NONE;
                         AVALUE[protect_value].stack_offset = protect_reg_offset;
                     }
@@ -2993,9 +3052,32 @@ namespace backend
                     {
                         // code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
                         code += emitInst_mem("ldr", "r9", "fp", pos);
+                        int imm = offset_array;
                         if (type->isInt())
-                            // code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(offset_array) + "]" + endl;
-                            code += emitInst_mem("ldr", regm.toString(dstRegId), "r9", offset_array);
+                        // code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(offset_array) + "]" + endl;
+                        {
+                            if (imm < 256)
+                                code += emitInst_mem("ldr", regm.toString(dstRegId), "r9", offset_array);
+                            else if (imm < 65536)
+                            {
+                                code += emitInst_1srcR_1DstR("add", "r9", "r9", imm / 256 * 256);
+                                if (imm % 256 != 0)
+                                    code += emitInst_1srcR_1DstR("add", "r9", "r9", imm % 256);
+                                code += emitInst_mem("ldr", regm.toString(dstRegId), "r9");
+                            }
+                            else
+                            {
+                                code += emitInst_1srcR_1DstR("add", "r9", "r9", imm / 4096 * 4096);
+                                if (imm % 4096 != 0)
+                                {
+                                    imm = imm % 4096;
+                                    code += emitInst_1srcR_1DstR("add", "r9", "r9", imm / 256 * 256);
+                                    if (imm % 256 != 0)
+                                        code += emitInst_1srcR_1DstR("add", "r9", "r9", imm % 256);
+                                }
+                                code += emitInst_mem("ldr", regm.toString(dstRegId), "r9");
+                            }
+                        }
                         else if (type->isFloat())
                             // code += space + "vldr.32\ts" + to_string(15 - reg_num) + ", [r" + to_string(reg_num) + ", #" + to_string(offset_array) + "]" + endl;
                             code += emitInst_mem("vldr.32", regm.toString(dstRegId), "r9", offset_array);
@@ -3044,6 +3126,16 @@ namespace backend
                         protect_value = RVALUE[RegManager::R8];
                     if (protect_value)
                     {
+                        int imm = -protect_reg_offset;
+                        if (imm < 256)
+                            code += emitInst_mem("str", "r8", "fp", protect_reg_offset);
+                        else
+                        {
+                            code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                            if (imm % 256 != 0)
+                                code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                            code += emitInst_mem("str", "r8", "r9");
+                        }
                         AVALUE[protect_value].reg_num = RegManager::NONE;
                         AVALUE[protect_value].stack_offset = protect_reg_offset;
                     }
