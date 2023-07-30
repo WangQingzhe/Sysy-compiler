@@ -1091,11 +1091,6 @@ namespace backend
             rname = "#" + string(s);
             rconst = true;
         }
-        else if (isa<CallInst>(rhs))
-        {
-            rname = 's' + to_string(15 - stoi(rhs->getName()));
-            code += space + "vldr.32\ts" + lhs->getName() + ", [fp, #" + to_string(protect_reg_offset) + "]" + endl;
-        }
         else
         {
             rRegId = Register[dynamic_cast<Instruction *>(rhs)];
@@ -1146,7 +1141,7 @@ namespace backend
                 code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_l);
-                code += space + "vsub.f64\td17" + ", d16" + ", d17" + endl;
+                code += space + "vsub.f64\td17" + ", d17" + ", d16" + endl;
                 code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
             }
             else if (rconst)
@@ -1352,14 +1347,6 @@ namespace backend
                 code += emitInst_2srcR("vcmpe.f32", regm.toString(lRegId), regm.toString(rRegId));
             code += space + "vmrs\tAPSR_nzcv, FPSCR" + endl;
         }
-        int protect_offset = bInst->ProtectOffset();
-        int pass_offset = bInst->PassOffset();
-        // 如果该指令需要被保护
-        if (protect_offset >= 0)
-            code += space + "vst\t" + regm.toString(dstRegId) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
-        // 如果该指令需要立即传参(即为第4个之后的参数)
-        if (pass_offset >= 0)
-            code += space + "vst\t" + regm.toString(dstRegId) + ", [sp, #" + to_string(pass_offset) + "]" + endl;
         // update RVALUE and AVALUE
         if (!lconst && lhs->GetEnd() <= bInst->GetStart())
         {
@@ -2450,6 +2437,7 @@ namespace backend
         // if pointer is a localvariable
         if (localVarStOffset.find(dynamic_cast<Instruction *>(pointer)) != localVarStOffset.end())
         {
+            // code += "%" + ldInst->getName() + endl;
             // 局部变量的维度,(起始)地址偏移量
             auto local_variable = dynamic_cast<AllocaInst *>(pointer);
             int NumDims = local_variable->getNumDims();
