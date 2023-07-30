@@ -3634,7 +3634,7 @@ namespace backend
                     // 若参数为常数
                     if (isa<ConstantValue>(arg))
                     {
-                        float imm = dynamic_cast<ConstantValue *>(arg)->getFloat();
+                        float imm = dynamic_cast<ConstantValue *>(arg)->getDouble();
                         unsigned dec;
                         memcpy(&dec, &imm, sizeof(float));
                         code += emitInst_nosrcR_1DstR("movw", "r9", (dec & 0xffff));
