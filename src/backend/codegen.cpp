@@ -117,40 +117,47 @@ namespace backend
         // r0-r3入栈
         auto entry_block = func->getEntryBlock();
         auto args = entry_block->getArguments();
-        int arg_num = 0;
+        // int arg_num = 0;
+        int int_num = 0;
+        int float_num = 0;
         for (auto arg = args.begin(); arg != args.end(); ++arg)
         {
-            if (arg_num >= 4)
+            if (int_num >= 4 && float_num >= 4)
                 break;
             int para_offset = paramsStOffset[arg->get()];
             int imm = -para_offset;
             // r0-r3
             if (arg->get()->getType()->as<PointerType>()->getBaseType()->isInt() || arg->get()->getNumDims() > 0)
             {
+                if (int_num >= 4)
+                    continue;
                 if (imm < 256)
-                    code += space + "str\tr" + to_string(arg_num) + ", [fp, #" + to_string(para_offset) + "]" + endl;
+                    code += space + "str\tr" + to_string(int_num) + ", [fp, #" + to_string(para_offset) + "]" + endl;
                 else
                 {
-                    code += space + "sub\tr4, fp, #" + to_string(imm / 256 * 256) + endl;
+                    code += space + "sub\tr9, fp, #" + to_string(imm / 256 * 256) + endl;
                     if (imm % 256 != 0)
-                        code += space + "sub\tr4, r4, #" + to_string(imm % 256) + endl;
-                    code += space + "str\tr" + to_string(arg_num) + ", [r4]" + endl;
+                        code += space + "sub\tr9, r9, #" + to_string(imm % 256) + endl;
+                    code += space + "str\tr" + to_string(int_num) + ", [r9]" + endl;
                 }
+                int_num++;
             }
             // s0-s3
             else
             {
+                if (float_num >= 4)
+                    continue;
                 if (imm < 256)
-                    code += space + "vstr\ts" + to_string(arg_num) + ", [fp, #" + to_string(para_offset) + "]" + endl;
+                    code += space + "vstr\ts" + to_string(float_num) + ", [fp, #" + to_string(para_offset) + "]" + endl;
                 else
                 {
-                    code += space + "sub\tr4, fp, #" + to_string(imm / 256 * 256) + endl;
+                    code += space + "sub\tr9, fp, #" + to_string(imm / 256 * 256) + endl;
                     if (imm % 256 != 0)
-                        code += space + "sub\tr4, r4, #" + to_string(imm % 256) + endl;
-                    code += space + "vstr\ts" + to_string(arg_num) + ", [r4]" + endl;
+                        code += space + "sub\tr9, r9, #" + to_string(imm % 256) + endl;
+                    code += space + "vstr\ts" + to_string(float_num) + ", [r9]" + endl;
                 }
+                float_num++;
             }
-            arg_num++;
         }
         return code;
     }
@@ -1201,7 +1208,7 @@ namespace backend
                 code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
                 imm_offset += 8;
                 imms.push_back(val_l);
-                code += space + "vdiv.f64\td17" + ", d16" + ", d17" + endl;
+                code += space + "vdiv.f64\td17" + ", d17" + ", d16" + endl;
                 code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
             }
             else if (rconst)
