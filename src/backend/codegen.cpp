@@ -1393,62 +1393,77 @@ namespace backend
             else
             {
                 RegId srcreg = Register[dynamic_cast<Instruction *>(val)];
-                val_name = regm.toString(srcreg);
-                code += space + "rsb\t" + regm.toString(dstRegId) + ", " + val_name + ", #0" + endl;
+                if (srcreg == RegManager::NONE)
+                {
+                    srcreg = RegManager::R9;
+                    code += emitInst_mem("ldr", "r9", "fp", AVALUE[dynamic_cast<Instruction *>(val)].stack_offset);
+                }
+                if (dstRegId == RegManager::NONE)
+                    dstRegId = RegManager::R9;
+                code += space + "rsb\t" + regm.toString(dstRegId) + ", " + regm.toString(srcreg) + ", #0" + endl;
+                if (dstRegId == RegManager::R9)
+                {
+                    dstRegId = RegManager::NONE;
+                    AVALUE[uInst].stack_offset = uInst->GetLocation();
+                    code += emitInst_mem("str", "r9", "fp", uInst->GetLocation());
+                }
             }
-            int protect_offset = uInst->ProtectOffset();
-            int pass_offset = uInst->PassOffset();
-            // 如果该指令需要被保护
-            if (protect_offset >= 0)
-                code += space + "str\t" + regm.toString(dstRegId) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
-            // 如果该指令需要立即传参(即为第4个之后的参数)
-            if (pass_offset >= 0)
-                code += space + "str\t" + regm.toString(dstRegId) + ", [sp, #" + to_string(pass_offset) + "]" + endl;
         }
         else if (uInst->getKind() == Instruction::kFNeg)
         {
             RegId srcreg = Register[dynamic_cast<Instruction *>(val)];
-            // val_name = regm.toString(srcreg);
-            val_name = regm.toString(srcreg);
+            if (srcreg == RegManager::NONE)
+            {
+                srcreg = RegManager::S14;
+                code += emitInst_mem("vldr.32", "s14", "fp", AVALUE[dynamic_cast<Instruction *>(val)].stack_offset);
+            }
+            if (dstRegId == RegManager::NONE)
+                dstRegId = RegManager::S14;
             code += emitInst_1srcR_1DstR("vneg.f32", regm.toString(dstRegId), regm.toString(srcreg));
-            // code += space + "vneg.f32\ts" + to_string(15 - int(dstRegId)) + ", " + val_name + endl;
-            int protect_offset = uInst->ProtectOffset();
-            int pass_offset = uInst->PassOffset();
-            // 如果该指令需要被保护
-            if (protect_offset >= 0)
-                code += space + "vstr\t" + regm.toString(dstRegId) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
-            // 如果该指令需要立即传参(即为第4个之后的参数)
-            if (pass_offset >= 0)
-                code += space + "vstr\t" + regm.toString(dstRegId) + ", [sp, #" + to_string(pass_offset) + "]" + endl;
+            if (dstRegId == RegManager::S14)
+            {
+                dstRegId = RegManager::NONE;
+                AVALUE[uInst].stack_offset = uInst->GetLocation();
+                code += emitInst_mem("vstr", "s14", "fp", uInst->GetLocation());
+            }
         }
         else if (uInst->getKind() == Instruction::kFtoI)
         {
             RegId srcreg = Register[dynamic_cast<Instruction *>(val)];
-            val_name = regm.toString(srcreg);
-            code += space + "vcvt.s32.f32\t" + val_name + " ," + val_name + endl;
-            code += space + "vmov\t" + regm.toString(dstRegId) + ", " + val_name + endl;
-            int protect_offset = uInst->ProtectOffset();
-            int pass_offset = uInst->PassOffset();
-            // 如果该指令需要被保护
-            if (protect_offset >= 0)
-                code += space + "str\tr" + regm.toString(dstRegId) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
-            // 如果该指令需要立即传参(即为第4个之后的参数)
-            if (pass_offset >= 0)
-                code += space + "str\tr" + regm.toString(dstRegId) + ", [sp, #" + to_string(pass_offset) + "]" + endl;
+            if (srcreg == RegManager::NONE)
+            {
+                srcreg = RegManager::S14;
+                code += emitInst_mem("vldr.32", "s14", "fp", AVALUE[dynamic_cast<Instruction *>(val)].stack_offset);
+            }
+            if (dstRegId == RegManager::NONE)
+                dstRegId = RegManager::R9;
+            code += emitInst_1srcR_1DstR("vcvt.s32.f32", regm.toString(srcreg), regm.toString(srcreg));
+            code += emitInst_1srcR_1DstR("vmov", regm.toString(dstRegId), regm.toString(srcreg));
+            if (dstRegId == RegManager::R9)
+            {
+                dstRegId = RegManager::NONE;
+                AVALUE[uInst].stack_offset = uInst->GetLocation();
+                code += emitInst_mem("str", "r9", "fp", uInst->GetLocation());
+            }
         }
         else if (uInst->getKind() == Instruction::kItoF)
         {
             RegId srcreg = Register[dynamic_cast<Instruction *>(val)];
+            if (srcreg == RegManager::NONE)
+            {
+                srcreg = RegManager::R9;
+                code += emitInst_mem("ldr", "r9", "fp", AVALUE[dynamic_cast<Instruction *>(val)].stack_offset);
+            }
+            if (dstRegId == RegManager::NONE)
+                dstRegId = RegManager::S14;
             code += space + "vmov\t" + regm.toString(dstRegId) + ", " + regm.toString(srcreg) + endl;
             code += space + "vcvt.f32.s32\t" + regm.toString(dstRegId) + ", " + regm.toString(dstRegId) + endl;
-            int protect_offset = uInst->ProtectOffset();
-            int pass_offset = uInst->PassOffset();
-            // 如果该指令需要被保护
-            if (protect_offset >= 0)
-                code += space + "vstr\t" + regm.toString(dstRegId) + ", [fp, #" + to_string(protect_reg_offset - protect_offset) + "]" + endl;
-            // 如果该指令需要立即传参(即为第4个之后的参数)
-            if (pass_offset >= 0)
-                code += space + "vstr\t" + regm.toString(dstRegId) + ", [sp, #" + to_string(pass_offset) + endl;
+            if (dstRegId == RegManager::S14)
+            {
+                dstRegId = RegManager::NONE;
+                AVALUE[uInst].stack_offset = uInst->GetLocation();
+                code += emitInst_mem("vstr", "s14", "fp", uInst->GetLocation());
+            }
         }
         if (!isa<ConstantValue>(val) && val->GetEnd() <= uInst->GetStart())
         {
