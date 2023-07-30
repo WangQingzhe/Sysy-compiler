@@ -122,8 +122,8 @@ namespace backend
         int float_num = 0;
         for (auto arg = args.begin(); arg != args.end(); ++arg)
         {
-            if (int_num >= 4 && float_num >= 4)
-                break;
+            // if (int_num >= 4 && float_num >= 4)
+            //     break;
             int para_offset = paramsStOffset[arg->get()];
             int imm = -para_offset;
             // r0-r3
@@ -145,7 +145,7 @@ namespace backend
             // s0-s3
             else
             {
-                if (float_num >= 4)
+                if (float_num >= 5)
                     continue;
                 if (imm < 256)
                     code += space + "vstr\ts" + to_string(float_num) + ", [fp, #" + to_string(para_offset) + "]" + endl;
@@ -3655,7 +3655,7 @@ namespace backend
             }
             else if (arg->getType()->isFloat())
             {
-                if (float_num >= 4)
+                if (float_num >= 5)
                 {
                     // 若参数为常数
                     if (isa<ConstantValue>(arg))
