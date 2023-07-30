@@ -1483,18 +1483,18 @@ namespace backend
                 code += space + "bl\tmemset" + endl;
                 haveCall = true;
             }
-            else if (num % 4 == 0)
-            {
-                code += space + "vmov.i32\tq8, #0\t@ v16qi" + endl;
-                code += space + "vst1.8\t{q8}, [r3:64]" + endl;
-                num -= 4;
-                while (num != 0)
-                {
-                    num -= 4;
-                    code += space + "add\tr3, #16" + endl;
-                    code += space + "vst1.8\t{q8}, [r3:64]" + endl;
-                }
-            }
+            // else if (num % 4 == 0)
+            // {
+            //     code += space + "vmov.i32\tq8, #0\t@ v16qi" + endl;
+            //     code += space + "vst1.8\t{q8}, [r3:64]" + endl;
+            //     num -= 4;
+            //     while (num != 0)
+            //     {
+            //         num -= 4;
+            //         code += space + "add\tr3, #16" + endl;
+            //         code += space + "vst1.8\t{q8}, [r3:64]" + endl;
+            //     }
+            // }
             else if (num % 2 == 0)
             {
                 code += space + "vmov\td18, d16\t@ v8qi" + endl;
