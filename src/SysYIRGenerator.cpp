@@ -465,7 +465,13 @@ namespace sysy
       if (global_val->isconst() && const_indices)
       {
         if (global_val->getNumDims() == 0)
-          value = global_val->init();
+        {
+          if (global_val->isInt())
+            value = global_val->init();
+          else
+            value = builder.createLoadInst(value, indices);
+        }
+        // value = global_val->init();
         else if (global_val->isInt())
           value = ConstantValue::get(global_val->getInt(indices));
         else

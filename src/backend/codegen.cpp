@@ -1445,7 +1445,7 @@ namespace backend
             {
                 dstRegId = RegManager::NONE;
                 AVALUE[uInst].stack_offset = uInst->GetLocation();
-                code += emitInst_mem("vstr", "s14", "fp", uInst->GetLocation());
+                code += emitInst_mem("vstr.32", "s14", "fp", uInst->GetLocation());
             }
         }
         else if (uInst->getKind() == Instruction::kFtoI)
@@ -1483,7 +1483,7 @@ namespace backend
             {
                 dstRegId = RegManager::NONE;
                 AVALUE[uInst].stack_offset = uInst->GetLocation();
-                code += emitInst_mem("vstr", "s14", "fp", uInst->GetLocation());
+                code += emitInst_mem("vstr.32", "s14", "fp", uInst->GetLocation());
             }
         }
         if (!isa<ConstantValue>(val) && val->GetEnd() <= uInst->GetStart())
@@ -3654,12 +3654,12 @@ namespace backend
                         if (AVALUE[value].reg_num == RegManager::NONE)
                         {
                             code += emitInst_mem("vldr.32", "s14", "fp", AVALUE[value].stack_offset);
-                            code += emitInst_mem("vstr", "s14", "sp", para_offset);
+                            code += emitInst_mem("vstr.32", "s14", "sp", para_offset);
                         }
                         // 若变量在寄存器中
                         else
                         {
-                            code += emitInst_mem("vstr", regm.toString(AVALUE[value].reg_num), "sp", para_offset);
+                            code += emitInst_mem("vstr.32", regm.toString(AVALUE[value].reg_num), "sp", para_offset);
                         }
                     }
                     para_offset += 4;
@@ -3673,13 +3673,13 @@ namespace backend
                     auto protect_value = RVALUE[reg_num];
                     int imm = -(protect_reg_offset + protect_offset);
                     if (imm < 256)
-                        code += emitInst_mem("vstr", regm.toString(reg_num), "fp", protect_reg_offset + protect_offset);
+                        code += emitInst_mem("vstr.32", regm.toString(reg_num), "fp", protect_reg_offset + protect_offset);
                     else
                     {
                         code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
                         if (imm % 256 != 0)
                             code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
-                        code += emitInst_mem("vstr", regm.toString(reg_num), "r9");
+                        code += emitInst_mem("vstr.32", regm.toString(reg_num), "r9");
                     }
                     AVALUE[protect_value].reg_num = RegManager::NONE;
                     AVALUE[protect_value].stack_offset = protect_reg_offset + protect_offset;
@@ -3776,13 +3776,13 @@ namespace backend
                     else
                     {
                         if (imm < 256)
-                            code += emitInst_mem("vstr", regm.toString(AVALUE[instr.get()].reg_num), "fp", protect_reg_offset + protect_offset);
+                            code += emitInst_mem("vstr.32", regm.toString(AVALUE[instr.get()].reg_num), "fp", protect_reg_offset + protect_offset);
                         else
                         {
                             code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
                             if (imm % 256 != 0)
                                 code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
-                            code += emitInst_mem("vstr", regm.toString(AVALUE[instr.get()].reg_num), "r9");
+                            code += emitInst_mem("vstr.32", regm.toString(AVALUE[instr.get()].reg_num), "r9");
                         }
                     }
                     AVALUE[instr.get()].reg_num = RegManager::NONE;
