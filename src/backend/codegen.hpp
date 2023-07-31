@@ -365,7 +365,7 @@ namespace backend
         int max_param = 0;          // 记录函数中所有函数调用的参数最多个数
         int max_protect = 1;        // 记录函数需要保护的变量的最多个数
         int imm_offset = 0;         // 记录当前引用的静态区立即数在静态区的偏移量
-        vector<double> imms;        // 记录函数引用的所有静态区立即数
+        vector<int> imms;           // 记录函数引用的所有静态区立即数
         string imms_name;           // 记录函数静态区立即数的标号名
         bool haveCall = false;      // 函数是否有子函数调用
         struct cmp

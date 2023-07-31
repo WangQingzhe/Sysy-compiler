@@ -465,17 +465,12 @@ namespace sysy
       if (global_val->isconst() && const_indices)
       {
         if (global_val->getNumDims() == 0)
-        {
-          if (global_val->isInt())
-            value = global_val->init();
-          else
-            value = builder.createLoadInst(value, indices);
-        }
-        // value = global_val->init();
+          value = global_val->init();
         else if (global_val->isInt())
           value = ConstantValue::get(global_val->getInt(indices));
         else
           value = ConstantValue::get(global_val->getDouble(indices));
+        dynamic_cast<ConstantValue *>(value)->setLvalue(true);
       }
       else
         value = builder.createLoadInst(value, indices);
@@ -489,6 +484,7 @@ namespace sysy
           value = ConstantValue::get(alloca_inst->getInt(indices));
         else
           value = ConstantValue::get(alloca_inst->getDouble(indices));
+        dynamic_cast<ConstantValue *>(value)->setLvalue(true);
       }
       else
         value = builder.createLoadInst(value, indices);
@@ -547,11 +543,19 @@ namespace sysy
     auto rhsTy = rhs->getType();
     auto type = getArithmeticResultType(lhsTy, rhsTy);
     if (lhsTy != type && lconst)
+    {
+      bool flag = dynamic_cast<ConstantValue *>(lhs)->IsLvalue();
       lhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(lhs)->getInt()));
+      dynamic_cast<ConstantValue *>(lhs)->setLvalue(flag);
+    }
     else if (lhsTy != type)
       lhs = builder.createIToFInst(lhs);
     if (rhsTy != type && rconst)
+    {
+      bool flag = dynamic_cast<ConstantValue *>(rhs)->IsLvalue();
       rhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(rhs)->getInt()));
+      dynamic_cast<ConstantValue *>(rhs)->setLvalue(flag);
+    }
     else if (rhsTy != type)
       rhs = builder.createIToFInst(rhs);
     // create the arithmetic instruction
@@ -602,18 +606,6 @@ namespace sysy
         // lfloat = dynamic_cast<ConstantValue *>(lhs)->getFloat();
         ldouble = dynamic_cast<ConstantValue *>(lhs)->getDouble();
     }
-    // else if (isa<AllocaInst>(lhs) && dynamic_cast<AllocaInst *>(lhs)->Const())
-    // {
-    //   lconst = true;
-    //   if (dynamic_cast<AllocaInst *>(lhs)->isInt())
-    //   {
-    //     lint = dynamic_cast<AllocaInst *>(lhs)->getInt();
-    //     ldouble = dynamic_cast<AllocaInst *>(lhs)->getInt();
-    //   }
-    //   else
-    //     // lfloat = dynamic_cast<AllocaInst *>(lhs)->getFloat();
-    //     ldouble = dynamic_cast<AllocaInst *>(lhs)->getDouble();
-    // }
     // judge if rhs is a constant
     bool rconst = false;
     int rint = 0;
@@ -631,28 +623,24 @@ namespace sysy
         // rfloat = dynamic_cast<ConstantValue *>(rhs)->getFloat();
         rdouble = dynamic_cast<ConstantValue *>(rhs)->getDouble();
     }
-    // else if (isa<AllocaInst>(rhs) && dynamic_cast<AllocaInst *>(rhs)->Const())
-    // {
-    //   rconst = true;
-    //   if (dynamic_cast<AllocaInst *>(rhs)->isInt())
-    //   {
-    //     rint = dynamic_cast<AllocaInst *>(rhs)->getInt();
-    //     rdouble = dynamic_cast<AllocaInst *>(rhs)->getInt();
-    //   }
-    //   else
-    //     // rfloat = dynamic_cast<AllocaInst *>(rhs)->getFloat();
-    //     rdouble = dynamic_cast<AllocaInst *>(rhs)->getDouble();
-    // }
     // create convert instruction if needed
     auto lhsTy = lhs->getType();
     auto rhsTy = rhs->getType();
     auto type = getArithmeticResultType(lhsTy, rhsTy);
     if (lhsTy != type && lconst)
+    {
+      bool flag = dynamic_cast<ConstantValue *>(lhs)->IsLvalue();
       lhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(lhs)->getInt()));
+      dynamic_cast<ConstantValue *>(lhs)->setLvalue(flag);
+    }
     else if (lhsTy != type)
       lhs = builder.createIToFInst(lhs);
     if (rhsTy != type && rconst)
+    {
+      bool flag = dynamic_cast<ConstantValue *>(rhs)->IsLvalue();
       rhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(rhs)->getInt()));
+      dynamic_cast<ConstantValue *>(rhs)->setLvalue(flag);
+    }
     else if (rhsTy != type)
       rhs = builder.createIToFInst(rhs);
     // create the arithmetic instruction
@@ -660,7 +648,11 @@ namespace sysy
     if (ctx->MUL())
     {
       if (lconst && rconst)
+      {
         result = type->isInt() ? ConstantValue::get(lint * rint) : ConstantValue::get(ldouble * rdouble);
+        if (dynamic_cast<ConstantValue *>(lhs)->IsLvalue() || dynamic_cast<ConstantValue *>(rhs)->IsLvalue())
+          dynamic_cast<ConstantValue *>(result)->setLvalue(true);
+      }
       else
         result = type->isInt() ? builder.createMulInst(lhs, rhs)
                                : builder.createFMulInst(lhs, rhs);
@@ -668,7 +660,11 @@ namespace sysy
     else if (ctx->DIV())
     {
       if (lconst && rconst)
+      {
         result = type->isInt() ? ConstantValue::get(lint / rint) : ConstantValue::get(ldouble / rdouble);
+        if (dynamic_cast<ConstantValue *>(lhs)->IsLvalue() || dynamic_cast<ConstantValue *>(rhs)->IsLvalue())
+          dynamic_cast<ConstantValue *>(result)->setLvalue(true);
+      }
       else
         result = type->isInt() ? builder.createDivInst(lhs, rhs)
                                : builder.createFDivInst(lhs, rhs);

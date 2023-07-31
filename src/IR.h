@@ -318,6 +318,7 @@ namespace sysy
       float fScalar;
       double dScalar;
     };
+    bool islvalue = false;
 
   protected:
     ConstantValue(int value)
@@ -354,6 +355,10 @@ namespace sysy
       assert(isFloat());
       return dScalar;
     }
+    // 设置常数是否为左值
+    void setLvalue(bool flag) { islvalue = flag; }
+    // 判断常数是否为左值
+    bool IsLvalue() { return islvalue; }
 
   public:
     void print(std::ostream &os) const override;

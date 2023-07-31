@@ -1124,34 +1124,70 @@ namespace backend
             rRegId = Register[dynamic_cast<Instruction *>(rhs)];
             rname = "s" + to_string(15 - std::stoi(rhs->getName()));
         }
-        auto res = to_string(15 - std::stoi(bInst->getName()));
         // 各种指令分开处理
         if (bInst->getKind() == Instruction::kFAdd)
         {
             if (lconst)
             {
-                double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
-                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
-                // std::string dname = to_string(16 + std::stoi(rhs->getName()));
-                // std::string immname = to_string(16 + std::stoi(bInst->getName()));
-                code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(rRegId) + endl;
-                code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
-                imm_offset += 8;
-                imms.push_back(val_l);
-                code += space + "vadd.f64\td17" + ", d16" + ", d17" + endl;
-                code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
+                // 1.当立即数为const float,按float处理
+                if (dynamic_cast<ConstantValue *>(lhs)->IsLvalue())
+                {
+                    float val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
+                    int num = 0;
+                    memcpy(&num, &val_l, sizeof(float));
+                    code += space + "vldr.32\ts15" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                    imm_offset += 4;
+                    imms.push_back(num);
+                    code += emitInst_2srcR_1dstR("vadd.f32", regm.toString(dstRegId), "s15", regm.toString(rRegId));
+                }
+                // 2.当立即数为常数,按double处理
+                else
+                {
+                    double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
+                    long long num;
+                    int num1, num2;
+                    memcpy(&num, &val_l, sizeof(double));
+                    num1 = (num & 0x00000000FFFFFFFF);
+                    num2 = (num >> 32) & 0xFFFFFFFF;
+                    code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(rRegId) + endl;
+                    code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                    imm_offset += 8;
+                    imms.push_back(num1);
+                    imms.push_back(num2);
+                    code += space + "vadd.f64\td17" + ", d17" + ", d16" + endl;
+                    code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
+                }
             }
             else if (rconst)
             {
-                double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
-                // std::string dname = to_string(16 + std::stoi(lhs->getName()));
-                // std::string immname = to_string(16 + std::stoi(bInst->getName()));
-                code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(lRegId) + endl;
-                code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
-                imm_offset += 8;
-                imms.push_back(val_r);
-                code += space + "vadd.f64\td17" + ", d16" + ", d17" + endl;
-                code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
+                // 1.当立即数为const float,按float处理
+                if (dynamic_cast<ConstantValue *>(rhs)->IsLvalue())
+                {
+                    float val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
+                    int num = 0;
+                    memcpy(&num, &val_r, sizeof(float));
+                    code += space + "vldr.32\ts15" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                    imm_offset += 4;
+                    imms.push_back(num);
+                    code += emitInst_2srcR_1dstR("vadd.f32", regm.toString(dstRegId), regm.toString(lRegId), "s15");
+                }
+                // 2.当立即数为常数,按double处理
+                else
+                {
+                    double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
+                    long long num;
+                    int num1, num2;
+                    memcpy(&num, &val_r, sizeof(double));
+                    num1 = (num & 0x00000000FFFFFFFF);
+                    num2 = (num >> 32) & 0xFFFFFFFF;
+                    code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(lRegId) + endl;
+                    code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                    imm_offset += 8;
+                    imms.push_back(num1);
+                    imms.push_back(num2);
+                    code += space + "vadd.f64\td17" + ", d16" + ", d17" + endl;
+                    code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
+                }
             }
             else
                 code += emitInst_2srcR_1dstR("vadd.f32", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
@@ -1161,28 +1197,65 @@ namespace backend
         {
             if (lconst)
             {
-                double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
-                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
-                // std::string dname = to_string(16 + std::stoi(rhs->getName()));
-                // std::string immname = to_string(16 + std::stoi(bInst->getName()));
-                code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(rRegId) + endl;
-                code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
-                imm_offset += 8;
-                imms.push_back(val_l);
-                code += space + "vsub.f64\td17" + ", d17" + ", d16" + endl;
-                code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
+                // 1.当立即数为const float,按float处理
+                if (dynamic_cast<ConstantValue *>(lhs)->IsLvalue())
+                {
+                    float val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
+                    int num = 0;
+                    memcpy(&num, &val_l, sizeof(float));
+                    code += space + "vldr.32\ts15" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                    imm_offset += 4;
+                    imms.push_back(num);
+                    code += emitInst_2srcR_1dstR("vsub.f32", regm.toString(dstRegId), "s15", regm.toString(rRegId));
+                }
+                // 2.当立即数为常数,按double处理
+                else
+                {
+                    double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
+                    long long num;
+                    int num1, num2;
+                    memcpy(&num, &val_l, sizeof(double));
+                    num1 = (num & 0x00000000FFFFFFFF);
+                    num2 = (num >> 32) & 0xFFFFFFFF;
+                    code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(rRegId) + endl;
+                    code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                    imm_offset += 8;
+                    imms.push_back(num1);
+                    imms.push_back(num2);
+                    code += space + "vsub.f64\td17" + ", d17" + ", d16" + endl;
+                    code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
+                }
             }
             else if (rconst)
             {
-                double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
-                // std::string dname = to_string(16 + std::stoi(lhs->getName()));
-                // std::string immname = to_string(16 + std::stoi(bInst->getName()));
-                code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(lRegId) + endl;
-                code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
-                imm_offset += 8;
-                imms.push_back(val_r);
-                code += space + "vsub.f64\td17" + ", d16" + ", d17" + endl;
-                code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
+                // 1.当立即数为const float,按float处理
+                if (dynamic_cast<ConstantValue *>(rhs)->IsLvalue())
+                {
+                    float val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
+                    int num = 0;
+                    memcpy(&num, &val_r, sizeof(float));
+                    code += space + "vldr.32\ts15" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                    imm_offset += 4;
+                    imms.push_back(num);
+                    code += emitInst_2srcR_1dstR("vsub.f32", regm.toString(dstRegId), regm.toString(lRegId), "s15");
+                }
+                // 2.当立即数为常数,按double处理
+                else
+                {
+                    double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
+                    long long num;
+                    int num1, num2;
+                    memcpy(&num, &val_r, sizeof(double));
+                    num1 = (num & 0x00000000FFFFFFFF);
+                    num2 = (num >> 32) & 0xFFFFFFFF;
+                    code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(lRegId) + endl;
+                    code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                    imm_offset += 8;
+                    imms.push_back(num1);
+                    imms.push_back(num2);
+                    code += space + "vsub.f64\td17" + ", d16" + ", d17" + endl;
+                    code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
+                }
             }
             else
                 code += emitInst_2srcR_1dstR("vsub.f32", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
@@ -1191,28 +1264,65 @@ namespace backend
         {
             if (lconst)
             {
-                double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
-                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
-                // std::string dname = to_string(16 + std::stoi(rhs->getName()));
-                // std::string immname = to_string(16 + std::stoi(bInst->getName()));
-                code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(rRegId) + endl;
-                code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
-                imm_offset += 8;
-                imms.push_back(val_l);
-                code += space + "vmul.f64\td17" + ", d16" + ", d17" + endl;
-                code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
+                // 1.当立即数为const float,按float处理
+                if (dynamic_cast<ConstantValue *>(lhs)->IsLvalue())
+                {
+                    float val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
+                    int num = 0;
+                    memcpy(&num, &val_l, sizeof(float));
+                    code += space + "vldr.32\ts15" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                    imm_offset += 4;
+                    imms.push_back(num);
+                    code += emitInst_2srcR_1dstR("vmul.f32", regm.toString(dstRegId), "s15", regm.toString(rRegId));
+                }
+                // 2.当立即数为常数,按double处理
+                else
+                {
+                    double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
+                    long long num;
+                    int num1, num2;
+                    memcpy(&num, &val_l, sizeof(double));
+                    num1 = (num & 0x00000000FFFFFFFF);
+                    num2 = (num >> 32) & 0xFFFFFFFF;
+                    code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(rRegId) + endl;
+                    code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                    imm_offset += 8;
+                    imms.push_back(num1);
+                    imms.push_back(num2);
+                    code += space + "vmul.f64\td17" + ", d17" + ", d16" + endl;
+                    code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
+                }
             }
             else if (rconst)
             {
-                double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
-                // std::string dname = to_string(16 + std::stoi(lhs->getName()));
-                // std::string immname = to_string(16 + std::stoi(bInst->getName()));
-                code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(lRegId) + endl;
-                code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
-                imm_offset += 8;
-                imms.push_back(val_r);
-                code += space + "vmul.f64\td17" + ", d16" + ", d17" + endl;
-                code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
+                // 1.当立即数为const float,按float处理
+                if (dynamic_cast<ConstantValue *>(rhs)->IsLvalue())
+                {
+                    float val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
+                    int num = 0;
+                    memcpy(&num, &val_r, sizeof(float));
+                    code += space + "vldr.32\ts15" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                    imm_offset += 4;
+                    imms.push_back(num);
+                    code += emitInst_2srcR_1dstR("vmul.f32", regm.toString(dstRegId), regm.toString(lRegId), "s15");
+                }
+                // 2.当立即数为常数,按double处理
+                else
+                {
+                    double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
+                    long long num;
+                    int num1, num2;
+                    memcpy(&num, &val_r, sizeof(double));
+                    num1 = (num & 0x00000000FFFFFFFF);
+                    num2 = (num >> 32) & 0xFFFFFFFF;
+                    code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(lRegId) + endl;
+                    code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                    imm_offset += 8;
+                    imms.push_back(num1);
+                    imms.push_back(num2);
+                    code += space + "vmul.f64\td17" + ", d16" + ", d17" + endl;
+                    code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
+                }
             }
             else
                 code += emitInst_2srcR_1dstR("vmul.f32", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
@@ -1221,28 +1331,65 @@ namespace backend
         {
             if (lconst)
             {
-                double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
-                // lname 是一个立即数，rname是一个32位寄存器号，dname是把rname放到64位寄存器的那个寄存器号，immname是存立即数的64位寄存器
-                // std::string dname = to_string(16 + std::stoi(rhs->getName()));
-                // std::string immname = to_string(16 + std::stoi(bInst->getName()));
-                code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(rRegId) + endl;
-                code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
-                imm_offset += 8;
-                imms.push_back(val_l);
-                code += space + "vdiv.f64\td17" + ", d17" + ", d16" + endl;
-                code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
+                // 1.当立即数为const float,按float处理
+                if (dynamic_cast<ConstantValue *>(lhs)->IsLvalue())
+                {
+                    float val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
+                    int num = 0;
+                    memcpy(&num, &val_l, sizeof(float));
+                    code += space + "vldr.32\ts15" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                    imm_offset += 4;
+                    imms.push_back(num);
+                    code += emitInst_2srcR_1dstR("vdiv.f32", regm.toString(dstRegId), "s15", regm.toString(rRegId));
+                }
+                // 2.当立即数为常数,按double处理
+                else
+                {
+                    double val_l = dynamic_cast<ConstantValue *>(lhs)->getDouble();
+                    long long num;
+                    int num1, num2;
+                    memcpy(&num, &val_l, sizeof(double));
+                    num1 = (num & 0x00000000FFFFFFFF);
+                    num2 = (num >> 32) & 0xFFFFFFFF;
+                    code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(rRegId) + endl;
+                    code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                    imm_offset += 8;
+                    imms.push_back(num1);
+                    imms.push_back(num2);
+                    code += space + "vdiv.f64\td17" + ", d17" + ", d16" + endl;
+                    code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
+                }
             }
             else if (rconst)
             {
-                double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
-                // std::string dname = to_string(16 + std::stoi(lhs->getName()));
-                // std::string immname = to_string(16 + std::stoi(bInst->getName()));
-                code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(lRegId) + endl;
-                code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
-                imm_offset += 8;
-                imms.push_back(val_r);
-                code += space + "vdiv.f64\td17" + ", d16" + ", d17" + endl;
-                code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
+                // 1.当立即数为const float,按float处理
+                if (dynamic_cast<ConstantValue *>(rhs)->IsLvalue())
+                {
+                    float val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
+                    int num = 0;
+                    memcpy(&num, &val_r, sizeof(float));
+                    code += space + "vldr.32\ts15" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                    imm_offset += 4;
+                    imms.push_back(num);
+                    code += emitInst_2srcR_1dstR("vdiv.f32", regm.toString(dstRegId), regm.toString(lRegId), "s15");
+                }
+                // 2.当立即数为常数,按double处理
+                else
+                {
+                    double val_r = dynamic_cast<ConstantValue *>(rhs)->getDouble();
+                    long long num;
+                    int num1, num2;
+                    memcpy(&num, &val_r, sizeof(double));
+                    num1 = (num & 0x00000000FFFFFFFF);
+                    num2 = (num >> 32) & 0xFFFFFFFF;
+                    code += space + "vcvt.f64.f32\td16" + ", " + regm.toString(lRegId) + endl;
+                    code += space + "vldr.64\td17" + ", " + imms_name + "+" + to_string(imm_offset) + endl;
+                    imm_offset += 8;
+                    imms.push_back(num1);
+                    imms.push_back(num2);
+                    code += space + "vdiv.f64\td17" + ", d16" + ", d17" + endl;
+                    code += space + "vcvt.f32.f64\t" + regm.toString(dstRegId) + ", d17" + endl;
+                }
             }
             else
                 code += emitInst_2srcR_1dstR("vdiv.f32", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
@@ -2502,7 +2649,6 @@ namespace backend
         string code;
         // dst register
         dstRegId = Register[ldInst];
-        int reg_num = dstRegId == stoi(ldInst->getName());
         // variable to be loaded
         auto pointer = ldInst->getPointer();
         auto type = pointer->getType()->as<PointerType>()->getBaseType();
@@ -4139,14 +4285,15 @@ namespace backend
             immcode += imms_name + ":" + endl;
         for (auto imm : imms)
         {
-            double Dimm = imm;
-            long long num;
-            int num1, num2;
-            memcpy(&num, &Dimm, sizeof(Dimm));
-            num1 = (num & 0x00000000FFFFFFFF);
-            num2 = (num >> 32) & 0xFFFFFFFF;
-            immcode += space + ".word\t" + to_string(num1) + endl;
-            immcode += space + ".word\t" + to_string(num2) + endl;
+            // double Dimm = imm;
+            // long long num;
+            // int num1, num2;
+            // memcpy(&num, &Dimm, sizeof(Dimm));
+            // num1 = (num & 0x00000000FFFFFFFF);
+            // num2 = (num >> 32) & 0xFFFFFFFF;
+            // immcode += space + ".word\t" + to_string(num1) + endl;
+            // immcode += space + ".word\t" + to_string(num2) + endl;
+            immcode += space + ".word\t" + to_string(imm) + endl;
         }
         code += immcode;
         return code;
