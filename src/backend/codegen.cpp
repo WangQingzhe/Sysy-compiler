@@ -106,6 +106,11 @@ namespace backend
         // 开辟栈空间
         top_offset -= 4 * max_protect;
         int imm = -(top_offset + 4);
+        if (imm % 8 != 0)
+        {
+            top_offset -= 4;
+            imm += 4;
+        }
         if (imm > 255)
         {
             code += space + "sub\tsp, sp, #" + to_string(imm / 256 * 256) + endl;
@@ -357,7 +362,7 @@ namespace backend
                     auto Dims = alloca_inst->getDims();
                     int num = 1;
                     for (auto iter = Dims.begin(); iter != Dims.end(); iter++)
-                        num *= static_cast<const ConstantValue *>(*iter)->getInt();
+                        num *= dynamic_cast<ConstantValue *>(*iter)->getInt();
                     if (NumDims == 0)
                         localVarStOffset.emplace(alloca_inst, top_offset);
                     else if (NumDims > 0)
@@ -1687,7 +1692,7 @@ namespace backend
             // }
             else if (num % 2 == 0)
             {
-                code += space + "vmov\td18, d16\t@ v8qi" + endl;
+                code += space + "vmov.i32\td18, #0\t@ v8qi" + endl;
                 for (int i = 0; i < num / 2; i++)
                 {
                     code += space + "vstr\td18, [r3, #" + to_string(i * 8) + "]" + endl;
@@ -1696,7 +1701,7 @@ namespace backend
             else
             {
                 int i;
-                code += space + "vmov\td18, d16\t@ v8qi" + endl;
+                code += space + "vmov.i32\td18, #0\t@ v8qi" + endl;
                 for (i = 0; i < num / 2; i++)
                 {
                     code += space + "vstr\td18, [r3, #" + to_string(i * 8) + "]" + endl;
@@ -3626,7 +3631,9 @@ namespace backend
         }
         else if (isa<ConstantValue>(cond))
         {
-            if (dynamic_cast<ConstantValue *>(cond)->getInt())
+            if (cond->isInt() && dynamic_cast<ConstantValue *>(cond)->getInt())
+                code += space + "b\t" + then_block->getName() + endl;
+            else if (cond->isFloat() && dynamic_cast<ConstantValue *>(cond)->getDouble())
                 code += space + "b\t" + then_block->getName() + endl;
             else
                 code += space + "b\t" + else_block->getName() + endl;

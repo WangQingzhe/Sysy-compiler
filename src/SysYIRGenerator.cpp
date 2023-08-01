@@ -113,9 +113,9 @@ namespace sysy
         if (init && isa<ConstantValue>(init))
         {
           Type *btype = type->as<PointerType>()->getBaseType();
-          if (btype->isInt() && init->getType()->isFloat())
+          if (btype->isInt() && init->isFloat())
             init = ConstantValue::get((int)dynamic_cast<ConstantValue *>(init)->getDouble());
-          else if (btype->isFloat() && init->getType()->isInt())
+          else if (btype->isFloat() && init->isInt())
             init = ConstantValue::get((double)dynamic_cast<ConstantValue *>(init)->getInt());
         }
         //******************Revised by lyq BEGIN***************************************
@@ -182,9 +182,9 @@ namespace sysy
           if (isa<ConstantValue>(value))
           {
             // if var is int, convert the constant into int type
-            if (ctx->btype()->INT() && dynamic_cast<ConstantValue *>(value)->isFloat())
+            if (ctx->btype()->INT() && value->isFloat())
               value = ConstantValue::get((int)dynamic_cast<ConstantValue *>(value)->getDouble());
-            else if (ctx->btype()->FLOAT() && dynamic_cast<ConstantValue *>(value)->isInt())
+            else if (ctx->btype()->FLOAT() && value->isInt())
               value = ConstantValue::get((double)dynamic_cast<ConstantValue *>(value)->getInt());
           }
           else if (alloca->getType()->as<PointerType>()->getBaseType()->isInt() && value->getType()->isFloat())
@@ -231,9 +231,9 @@ namespace sysy
       // convert the constant into type of the lvalue
       if (isa<ConstantValue>(value))
       {
-        if (current_type->isInt() && value->getType()->isFloat())
+        if (current_type->isInt() && value->isFloat())
           value = ConstantValue::get((int)dynamic_cast<ConstantValue *>(value)->getDouble());
-        else if (current_type->isFloat() && value->getType()->isInt())
+        else if (current_type->isFloat() && value->isInt())
           value = ConstantValue::get((double)dynamic_cast<ConstantValue *>(value)->getInt());
       }
       else if (current_type->isInt() && value->getType()->isFloat())
@@ -266,7 +266,7 @@ namespace sysy
         }
         // goto next element
         n++;
-        while (d >= 0 && n >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
+        while (d >= 0 && current_alloca->getDim(d)->isInt() && n >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
           n = path[--d] + 1;
       }
       else
@@ -278,7 +278,7 @@ namespace sysy
           current_global->setDouble(constant_var->getDouble(), indices);
         // goto next element
         n++;
-        while (d >= 0 && n >= dynamic_cast<ConstantValue *>(current_global->getDim(d))->getInt())
+        while (d >= 0 && current_global->getDim(d)->isInt() && n >= dynamic_cast<ConstantValue *>(current_global->getDim(d))->getInt())
           n = path[--d] + 1;
       }
       return value;
@@ -294,10 +294,10 @@ namespace sysy
       n = cur_n;
       n++;
       if (isalloca)
-        while (d >= 0 && n >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
+        while (d >= 0 && current_alloca->getDim(d)->isInt() && n >= dynamic_cast<ConstantValue *>(current_alloca->getDim(d))->getInt())
           n = path[--d] + 1;
       else
-        while (d >= 0 && n >= dynamic_cast<ConstantValue *>(current_global->getDim(d))->getInt())
+        while (d >= 0 && current_global->getDim(d)->isInt() && n >= dynamic_cast<ConstantValue *>(current_global->getDim(d))->getInt())
           n = path[--d] + 1;
       return value;
     }
@@ -403,7 +403,7 @@ namespace sysy
       }
       else if (pointer->getType()->as<PointerType>()->getBaseType()->isFloat())
       {
-        if (dynamic_cast<ConstantValue *>(rhs)->isInt())
+        if (rhs->isInt())
           rhs = ConstantValue::get((double)dynamic_cast<ConstantValue *>(rhs)->getInt());
       }
     }
@@ -545,7 +545,8 @@ namespace sysy
     if (lhsTy != type && lconst)
     {
       bool flag = dynamic_cast<ConstantValue *>(lhs)->IsLvalue();
-      lhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(lhs)->getInt()));
+      if (lhs->isInt())
+        lhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(lhs)->getInt()));
       dynamic_cast<ConstantValue *>(lhs)->setLvalue(flag);
     }
     else if (lhsTy != type)
@@ -553,7 +554,8 @@ namespace sysy
     if (rhsTy != type && rconst)
     {
       bool flag = dynamic_cast<ConstantValue *>(rhs)->IsLvalue();
-      rhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(rhs)->getInt()));
+      if (rhs->isInt())
+        rhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(rhs)->getInt()));
       dynamic_cast<ConstantValue *>(rhs)->setLvalue(flag);
     }
     else if (rhsTy != type)
@@ -630,7 +632,8 @@ namespace sysy
     if (lhsTy != type && lconst)
     {
       bool flag = dynamic_cast<ConstantValue *>(lhs)->IsLvalue();
-      lhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(lhs)->getInt()));
+      if (lhs->isInt())
+        lhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(lhs)->getInt()));
       dynamic_cast<ConstantValue *>(lhs)->setLvalue(flag);
     }
     else if (lhsTy != type)
@@ -638,7 +641,8 @@ namespace sysy
     if (rhsTy != type && rconst)
     {
       bool flag = dynamic_cast<ConstantValue *>(rhs)->IsLvalue();
-      rhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(rhs)->getInt()));
+      if (rhs->isInt())
+        rhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(rhs)->getInt()));
       dynamic_cast<ConstantValue *>(rhs)->setLvalue(flag);
     }
     else if (rhsTy != type)
@@ -689,17 +693,17 @@ namespace sysy
     auto func = current_block->getParent();
     if (value)
     {
-      if (func->getReturnType()->isInt() && value->getType()->isFloat())
+      if (func->getReturnType()->isInt() && value->isFloat())
       {
         if (isa<ConstantValue>(value))
           value = ConstantValue::get((int)dynamic_cast<ConstantValue *>(value)->getDouble());
         else
           value = builder.createFtoIInst(value);
       }
-      else if (func->getReturnType()->isFloat() && value->getType()->isInt())
+      else if (func->getReturnType()->isFloat() && value->isInt())
       {
         if (isa<ConstantValue>(value))
-          value = ConstantValue::get((float)dynamic_cast<ConstantValue *>(value)->getInt());
+          value = ConstantValue::get((double)dynamic_cast<ConstantValue *>(value)->getInt());
         else
           value = builder.createIToFInst(value);
       }
@@ -731,14 +735,14 @@ namespace sysy
         if (isa<ConstantValue>(arg))
         {
           int id = parent_func->allocateVariableID();
-          if (arg_type->isInt() && arg->getType()->isFloat())
+          if (arg_type->isInt() && arg->isFloat())
             arg = ConstantValue::get((int)dynamic_cast<ConstantValue *>(arg)->getDouble());
-          else if (arg_type->isFloat() && arg->getType()->isInt())
+          else if (arg_type->isFloat() && arg->isInt())
             arg = ConstantValue::get((double)dynamic_cast<ConstantValue *>(arg)->getInt());
         }
-        else if (arg_type->isInt() && arg->getType()->isFloat())
+        else if (arg_type->isInt() && arg->isFloat())
           arg = builder.createFtoIInst(arg);
-        else if (arg_type->isFloat() && arg->getType()->isInt())
+        else if (arg_type->isFloat() && arg->isInt())
           arg = builder.createIToFInst(arg);
         // 第5个参数开始,设置为直接存到栈中,并记录偏移
         if (arg_num >= 4 && !isa<ConstantValue>(arg))
@@ -934,7 +938,7 @@ namespace sysy
       }
       else if (isa<AllocaInst>(hs) && dynamic_cast<AllocaInst *>(hs)->getNumDims() == 0)
       {
-        if (dynamic_cast<AllocaInst *>(hs)->isInt())
+        if (hs->isInt())
         {
           result = ConstantValue::get(-dynamic_cast<AllocaInst *>(hs)->getInt());
         }
@@ -1012,11 +1016,17 @@ namespace sysy
     auto rhsTy = rhs->getType();
     auto type = getArithmeticResultType(lhsTy, rhsTy);
     if (lhsTy != type && lconst)
-      lhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(lhs)->getInt()));
+    {
+      if (lhs->isInt())
+        lhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(lhs)->getInt()));
+    }
     else if (lhsTy != type)
       lhs = builder.createIToFInst(lhs);
     if (rhsTy != type && rconst)
-      rhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(rhs)->getInt()));
+    {
+      if (rhs->isInt())
+        rhs = ConstantValue::get((double)(dynamic_cast<ConstantValue *>(rhs)->getInt()));
+    }
     else if (rhsTy != type)
       rhs = builder.createIToFInst(rhs);
 
