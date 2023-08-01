@@ -39,6 +39,10 @@ int main(int argc, char **argv)
   SysYIRGenerator generator;
   generator.visitModule(moduleAST);
   auto moduleIR = generator.get();
+
+  DAG dag(moduleIR);
+  auto dagIR = dag.DAG_refine();
+  
   // only generate SysY IR code
   if (genir)
   {
@@ -46,10 +50,9 @@ int main(int argc, char **argv)
     return EXIT_SUCCESS;
   }
 
-  CodeGen codegen(moduleIR);
-  string asmCode = codegen.code_gen();
-  cout << asmCode << endl;
-  ;
+  // CodeGen codegen(moduleIR);
+  // string asmCode = codegen.code_gen();
+  // cout << asmCode << endl;
 
   return EXIT_SUCCESS;
 }
