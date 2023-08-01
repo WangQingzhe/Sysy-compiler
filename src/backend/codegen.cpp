@@ -3949,7 +3949,12 @@ namespace backend
         }
         max_protect = max_protect > protect_cnt ? max_protect : protect_cnt;
         // 3.执行函数调用
-        code += space + "bl\t" + callee_fuc->getName() + endl;
+        if (callee_fuc->getName() == "starttime")
+            code += space + "bl\t" + "_sysy_starttime" + endl;
+        else if (callee_fuc->getName() == "stoptime")
+            code += space + "bl\t" + "_sysy_stoptime" + endl;
+        else
+            code += space + "bl\t" + callee_fuc->getName() + endl;
         RVALUE.clear();
         // 4.传递返回值(若有)
         if (callInst->getType()->isInt())

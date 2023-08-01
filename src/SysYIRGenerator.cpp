@@ -721,6 +721,11 @@ namespace sysy
     vector<Value *> args;
     int arg_num = 0;
     int last_call_num = 0;
+    if (funcName == "starttime" || funcName == "stoptime")
+    {
+      int line = ctx->getStart()->getLine();
+      args.push_back(ConstantValue::get(line));
+    }
     if (auto rArgs = ctx->funcRParams())
     {
       auto iter = func->getParamTypes().begin();
