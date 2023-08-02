@@ -688,8 +688,10 @@ namespace backend
                 unsigned rval = rvalue > 0 ? rvalue : -rvalue;
                 bool negflag = rvalue > 0 ? 0 : 1;
                 unsigned C = rvalue > 0 ? rvalue : -rvalue;
+                int shiftnum = 31;
                 while (rval > 0)
                 {
+                    shiftnum++;
                     if ((rval & 1) == 1)
                         num1 += 1;
                     rval = rval >> 1;
@@ -716,13 +718,15 @@ namespace backend
                 }
                 else
                 {
-                    long Power32 = 0x100000000;
+                    shiftnum -= 1;
+                    long Power32 = long(1) << shiftnum;
                     int r = Power32 / C + 1;
                     code += space + "movw\tr9" + ", #" + to_string(unsigned(r & 0xffff)) + endl;
                     code += space + "movt\tr9" + ", #" + to_string(unsigned((r >> 16) & 0xFFFF)) + endl;
                     code += space + "smull\tr9" + ", r10" + ", r9" + ", " + regm.toString(lRegId) + endl;
-                    code += space + "asr\tr9" + ", " + regm.toString(lRegId) + ", #31" + endl;
-                    code += space + "sub\t" + regm.toString(dstRegId) + ", r10" + ", r9" + endl;
+                    code += space + "asr\tr9" + ", r10" + ", #" + to_string(shiftnum - 32) + endl;
+                    code += space + "asr\tr10" + ", " + regm.toString(lRegId) + ", #31" + endl;
+                    code += space + "sub\t" + regm.toString(dstRegId) + ", r9" + ", r10" + endl;
                     if (negflag)
                     {
                         code += emitInst_1srcR_1DstR("mvn", regm.toString(dstRegId), regm.toString(dstRegId));
@@ -762,11 +766,13 @@ namespace backend
                 rvalue = rvalue > 0 ? rvalue : -rvalue;
                 int num1 = 0;
                 int rval = rvalue;
+                int shiftnum = 31;
                 while (rval > 0)
                 {
                     if ((rval & 1) == 1)
                         num1 += 1;
                     rval = rval >> 1;
+                    shiftnum++;
                 }
                 if (num1 == 1)
                 {
@@ -775,7 +781,8 @@ namespace backend
                 else
                 {
                     int C = rvalue;
-                    long Power32 = 0x100000000;
+                    shiftnum -= 1;
+                    long Power32 = long(1) << shiftnum;
                     int r = Power32 / C + 1;
                     if (r > 0 && r <= 0xffff)
                         code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(r));
@@ -784,9 +791,10 @@ namespace backend
                         code += space + "movw\t" + "r9" + ", #" + to_string(int(r & 0xffff)) + endl;
                         code += space + "movt\t" + "r9" + ", #" + to_string(int((r >> 16) & 0xFFFF)) + endl;
                     }
-                    code += space + "smull\t" + "r9" + ", r10" + ", r9" + ", " + regm.toString(lRegId) + endl;
-                    code += space + "asr\t" + "r9" + ", " + regm.toString(lRegId) + ", #31" + endl;
-                    code += space + "sub\t" + "r9" + ", r10" + " ,r9" + endl;
+                    code += space + "smull\tr9" + ", r10" + ", r9" + ", " + regm.toString(lRegId) + endl;
+                    code += space + "asr\tr10" + ", r10" + ", #" + to_string(shiftnum - 32) + endl;
+                    code += space + "asr\tr9" + ", " + regm.toString(lRegId) + ", #31" + endl;
+                    code += space + "sub\tr9" + ", r10" + ", r9" + endl;
                     if (rvalue >= 0 && rvalue <= 0xffff)
                         code += emitInst_1srcR_1DstR("mov", "r10", "#" + to_string(rvalue));
                     else
