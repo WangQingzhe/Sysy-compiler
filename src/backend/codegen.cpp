@@ -709,6 +709,18 @@ namespace backend
                         b++;
                         rval = rval >> 1;
                     }
+                    rval = rvalue > 0 ? rvalue : -rvalue;
+                    rval -= 1;
+                    if (rvalue < 0xffff && rvalue > 0)
+                        code += emitInst_nosrcR_1DstR("movw", "r9", rval);
+                    else
+                    {
+                        code += emitInst_nosrcR_1DstR("movw", "r9", rval & 0xffff);
+                        code += emitInst_nosrcR_1DstR("movt", "r9", (rval >> 16) & 0xffff);
+                    }
+                    code += emitInst_2srcR_1dstR("add", "r9", regm.toString(lRegId), "r9");
+                    code += emitInst_nosrcR_1DstR("cmp", regm.toString(lRegId), 0);
+                    code += emitInst_2srcR("movlt", regm.toString(lRegId), "r9");
                     code += emitInst_2srcR_1dstR("asr", regm.toString(dstRegId), regm.toString(lRegId), "#" + to_string(b));
                     // code += space + "asr\tr" + res + ", " + lname + ", #" + to_string(b) + endl;
                     if (negflag)
@@ -727,7 +739,8 @@ namespace backend
                     code += space + "movw\tr9" + ", #" + to_string(unsigned(r & 0xffff)) + endl;
                     code += space + "movt\tr9" + ", #" + to_string(unsigned((r >> 16) & 0xFFFF)) + endl;
                     code += space + "smull\tr9" + ", r10" + ", r9" + ", " + regm.toString(lRegId) + endl;
-                    code += space + "asr\tr9" + ", r10" + ", #" + to_string(shiftnum - 32) + endl;
+                    if (shiftnum - 32)
+                        code += space + "asr\tr9" + ", r10" + ", #" + to_string(shiftnum - 32) + endl;
                     code += space + "asr\tr10" + ", " + regm.toString(lRegId) + ", #31" + endl;
                     code += space + "sub\t" + regm.toString(dstRegId) + ", r9" + ", r10" + endl;
                     if (negflag)
@@ -795,7 +808,8 @@ namespace backend
                         code += space + "movt\t" + "r9" + ", #" + to_string(int((r >> 16) & 0xFFFF)) + endl;
                     }
                     code += space + "smull\tr9" + ", r10" + ", r9" + ", " + regm.toString(lRegId) + endl;
-                    code += space + "asr\tr10" + ", r10" + ", #" + to_string(shiftnum - 32) + endl;
+                    if (shiftnum - 32)
+                        code += space + "asr\tr10" + ", r10" + ", #" + to_string(shiftnum - 32) + endl;
                     code += space + "asr\tr9" + ", " + regm.toString(lRegId) + ", #31" + endl;
                     code += space + "sub\tr9" + ", r10" + ", r9" + endl;
                     if (rvalue >= 0 && rvalue <= 0xffff)
