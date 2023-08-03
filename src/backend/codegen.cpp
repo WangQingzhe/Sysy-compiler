@@ -3784,7 +3784,13 @@ namespace backend
                 if (isa<ConstantValue>(arg))
                 {
                     int imm = dynamic_cast<ConstantValue *>(arg)->getInt();
-                    code += emitInst_nosrcR_1DstR("mov", regm.toString(reg_num), imm);
+                    if (imm < 256)
+                        code += emitInst_nosrcR_1DstR("mov", regm.toString(reg_num), imm);
+                    else
+                    {
+                        code += emitInst_nosrcR_1DstR("movw", regm.toString(reg_num), (imm & 0xFFFF));
+                        code += emitInst_nosrcR_1DstR("movt", regm.toString(reg_num), ((imm >> 16) & 0xFFFF));
+                    }
                     // src_name = "#" + to_string(dynamic_cast<ConstantValue *>(arg)->getInt());
                 }
                 // 若参数为变量
