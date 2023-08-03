@@ -1115,4 +1115,27 @@ namespace sysy
   {
     return ctx->exp()->accept(this);
   }
+
+  Module *LoadCut::Run()
+  {
+    // 计算kill集,gen集合
+    auto functions = OriginModule->getFunctions();
+    for (auto iter = functions->begin(); iter != functions->end(); iter++)
+    {
+      Function *func = iter->second;
+      auto bblist = func->getBasicBlocks();
+      if (bblist.empty())
+        continue;
+    }
+  }
+  void LoadCut::CalKill_Gen(BasicBlock *curbb)
+  {
+  }
+  void LoadCut::CalIn_Out(Function *curFunc)
+  {
+  }
+  void LoadCut::RegenerateIR()
+  {
+  }
+
 } // namespace sysy

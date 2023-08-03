@@ -405,6 +405,7 @@ namespace sysy
 
   class Instruction;
   class Function;
+  class Variable;
   /*!
    * The container for `Instruction` sequence.
    *
@@ -428,6 +429,10 @@ namespace sysy
     arg_list arguments;
     block_list successors;
     block_list predecessors;
+    vector<pair<Instruction *, Variable *>> gen;
+    vector<Variable *> kill;
+    vector<pair<Instruction *, Variable>> in;
+    vector<pair<Instruction *, Variable>> out;
 
   protected:
     explicit BasicBlock(Function *parent, const std::string &name = "");
@@ -1283,4 +1288,8 @@ namespace sysy
     return os;
   }
 
+  // 表示一个变量(局部变量/全局变量/参数)
+  class Variable
+  {
+  };
 } // namespace sysy

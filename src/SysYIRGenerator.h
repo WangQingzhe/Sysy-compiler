@@ -238,4 +238,26 @@ namespace sysy
     }
   }; // class SysYIRGenerator
 
+  // 优化一:load指令删减
+  class LoadCut
+  {
+  public:
+    Module *OriginModule;                  // 输入的IR
+    Module *pModule;                       // 新生成的IR
+    IRBuilder builder;                     // IR生成器
+    map<Variable *, Instruction *> AVALUE; // 记录每个变量存在哪个虚拟寄存器
+    map<Instruction *, Variable *> RVALUE; // 记录虚拟寄存器存储哪个变量
+
+  public:
+    LoadCut(Module *OriginModule) : OriginModule(OriginModule) {}
+
+  public:
+    // 计算每个基本块的Kill,Gen集合
+    void CalKill_Gen(BasicBlock *curbb);
+    // 计算每个基本块的In,Out集合
+    void CalIn_Out(Function *curFunc);
+    // 重新生成IR
+    void RegenerateIR();
+    Module *Run();
+  };
 } // namespace sysy
