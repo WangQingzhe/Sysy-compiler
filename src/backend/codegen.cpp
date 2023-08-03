@@ -796,8 +796,15 @@ namespace backend
                         code += emitInst_1srcR_1DstR("and", "r9", "r9", rvalue - 1);
                         code += emitInst_2srcR_1dstR("rsbpl", regm.toString(dstRegId), "r9", "#0");
                     }
+                    else if (rvalue == 256)
+                    {
+                        code += emitInst_1srcR_1DstR("uxtb", regm.toString(lRegId), regm.toString(lRegId));
+                        code += emitInst_1srcR_1DstR("uxtb", "r9", "r9");
+                        code += emitInst_2srcR_1dstR("rsbpl", regm.toString(dstRegId), "r9", "#0");
+                    }
                     else
                     {
+                        code += emitInst_2srcR_1dstR("ubfx", regm.toString(lRegId), regm.toString(lRegId), "#0", shiftnum - 32);
                         code += emitInst_2srcR_1dstR("ubfx", "r9", "r9", "#0", shiftnum - 32);
                         code += emitInst_2srcR_1dstR("rsbpl", regm.toString(dstRegId), "r9", "#0");
                     }
