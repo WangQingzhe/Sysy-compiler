@@ -738,9 +738,9 @@ namespace backend
                     int r = Power32 / C + 1;
                     code += space + "movw\tr9" + ", #" + to_string(unsigned(r & 0xffff)) + endl;
                     code += space + "movt\tr9" + ", #" + to_string(unsigned((r >> 16) & 0xFFFF)) + endl;
-                    code += space + "smull\tr9" + ", r10" + ", r9" + ", " + regm.toString(lRegId) + endl;
+                    code += space + "smull\tr10" + ", r9" + ", r9" + ", " + regm.toString(lRegId) + endl;
                     if (shiftnum - 32)
-                        code += space + "asr\tr9" + ", r10" + ", #" + to_string(shiftnum - 32) + endl;
+                        code += space + "asr\tr9" + ", r9" + ", #" + to_string(shiftnum - 32) + endl;
                     code += space + "asr\tr10" + ", " + regm.toString(lRegId) + ", #31" + endl;
                     code += space + "sub\t" + regm.toString(dstRegId) + ", r9" + ", r10" + endl;
                     if (negflag)
@@ -797,6 +797,7 @@ namespace backend
                     {
                         // code += space + "and\t" + regm.toString(dstRegId) + ", " + regm.toString(lRegId) + ", #" + to_string(rvalue - 1) + endl;
                         code += emitInst_1srcR_1DstR("and", "r9", "r9", rvalue - 1);
+                        code += emitInst_1srcR_1DstR("and", regm.toString(lRegId), regm.toString(lRegId), rvalue - 1);
                         code += emitInst_2srcR_1dstR("rsbpl", regm.toString(dstRegId), "r9", "#0");
                     }
                     else if (rvalue == 256)
