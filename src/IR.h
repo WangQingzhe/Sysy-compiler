@@ -429,10 +429,10 @@ namespace sysy
     arg_list arguments;
     block_list successors;
     block_list predecessors;
-    vector<pair<Instruction *, Variable *>> gen;
-    vector<Variable *> kill;
-    vector<pair<Instruction *, Variable>> in;
-    vector<pair<Instruction *, Variable>> out;
+    std::vector<std::pair<Instruction *, Variable *>> gen;
+    std::vector<Variable *> kill;
+    std::vector<std::pair<Instruction *, Variable *>> in;
+    std::vector<std::pair<Instruction *, Variable *>> out;
 
   protected:
     explicit BasicBlock(Function *parent, const std::string &name = "");
@@ -1244,6 +1244,13 @@ namespace sysy
       return global;
     }
     //******************Revised by lyq END*****************************************
+
+    // 给module增加一个全局变量
+    void addGlobalValue(GlobalValue *glbvl)
+    {
+      assert(glbvl);
+      globals.emplace(glbvl->getName(), glbvl);
+    }
     Function *getFunction(const std::string &name) const
     {
       auto result = functions.find(name);

@@ -1126,7 +1126,23 @@ namespace sysy
       auto bblist = func->getBasicBlocks();
       if (bblist.empty())
         continue;
+      for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+      {
+        auto bb = iter->get();
+        CalKill_Gen(bb);
+      }
     }
+    // 计算In,Out集合
+    for (auto iter = functions->begin(); iter != functions->end(); iter++)
+    {
+      Function *func = iter->second;
+      auto bblist = func->getBasicBlocks();
+      if (bblist.empty())
+        continue;
+      CalIn_Out(func);
+    }
+    // 重新生成IR
+    RegenerateIR();
   }
   void LoadCut::CalKill_Gen(BasicBlock *curbb)
   {
@@ -1136,6 +1152,29 @@ namespace sysy
   }
   void LoadCut::RegenerateIR()
   {
+    // 生成全局变量
+    auto global_values = OriginModule->getGlobalValues();
+    for (auto iter = global_values->begin(); iter != global_values->end(); iter++)
+    {
+      GlobalValue *glbvl = iter->second;
+      auto name = glbvl->getName();
+      auto type = glbvl->getType();
+      pModule->addGlobalValue(glbvl);
+    }
+    auto functions = OriginModule->getFunctions();
+    for (auto iter = functions->begin(); iter != functions->end(); iter++)
+    {
+      Function *func = iter->second;
+      RVALUE.clear();
+      auto bblist = func->getBasicBlocks();
+      if (bblist.empty())
+        continue;
+      for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+      {
+        auto bb = iter->get();
+        CalKill_Gen(bb);
+      }
+    }
   }
 
 } // namespace sysy

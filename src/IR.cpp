@@ -597,9 +597,20 @@ namespace sysy
 
   void Module::print(std::ostream &os) const
   {
-    for (auto &value : children)
-      if (value->getName() != "getint" && value->getName() != "getch" && value->getName() != "getfloat" && value->getName() != "getarray" && value->getName() != "getfarray" && value->getName() != "putint" && value->getName() != "putch" && value->getName() != "putfloat" && value->getName() != "putarray" && value->getName() != "putfarray" && value->getName() != "starttime" && value->getName() != "stoptime" && value->getName() != "putf")
-        os << *value << '\n';
+    // for (auto &value : children)
+    //   if (value->getName() != "getint" && value->getName() != "getch" && value->getName() != "getfloat" && value->getName() != "getarray" && value->getName() != "getfarray" && value->getName() != "putint" && value->getName() != "putch" && value->getName() != "putfloat" && value->getName() != "putarray" && value->getName() != "putfarray" && value->getName() != "starttime" && value->getName() != "stoptime" && value->getName() != "putf")
+    //     os << *value << '\n';
+    for (auto iter : globals)
+    {
+      auto glbvl = iter.second;
+      os << *glbvl << '\n';
+    }
+    for (auto iter : functions)
+    {
+      auto func = iter.second;
+      if (func->getName() != "getint" && func->getName() != "getch" && func->getName() != "getfloat" && func->getName() != "getarray" && func->getName() != "getfarray" && func->getName() != "putint" && func->getName() != "putch" && func->getName() != "putfloat" && func->getName() != "putarray" && func->getName() != "putfarray" && func->getName() != "starttime" && func->getName() != "stoptime" && func->getName() != "putf")
+        os << *func << '\n';
+    }
   }
 
   // ArrayValue *ArrayValue::get(Type *type, const vector<Value *> &values) {
