@@ -789,7 +789,18 @@ namespace backend
                 }
                 if (num1 == 1)
                 {
-                    code += space + "and\t" + regm.toString(dstRegId) + ", " + regm.toString(lRegId) + ", #" + to_string(rvalue - 1) + endl;
+                    code += emitInst_2srcR_1dstR("rsbs", "r9", regm.toString(lRegId), "#0");
+                    if (rvalue <= 128)
+                    {
+                        // code += space + "and\t" + regm.toString(dstRegId) + ", " + regm.toString(lRegId) + ", #" + to_string(rvalue - 1) + endl;
+                        code += emitInst_1srcR_1DstR("and", "r9", "r9", rvalue - 1);
+                        code += emitInst_2srcR_1dstR("rsbpl", regm.toString(dstRegId), "r9", "#0");
+                    }
+                    else
+                    {
+                        code += emitInst_2srcR_1dstR("ubfx", "r9", "r9", "#0", shiftnum - 32);
+                        code += emitInst_2srcR_1dstR("rsbpl", regm.toString(dstRegId), "r9", "#0");
+                    }
                 }
                 else
                 {

@@ -106,9 +106,15 @@ namespace backend
         return inst;
     }
     static string
-    emitInst_2srcR_1dstR(string name, string dstReg, string srcReg0, string srcReg1)
+    emitInst_2srcR_1dstR(string name, string dstReg, string srcReg0, string srcReg1, int imm = 0)
     {
-        return space + name + "\t" + dstReg + ", " + srcReg0 + ", " + srcReg1 + endl;
+        // return space + name + "\t" + dstReg + ", " + srcReg0 + ", " + srcReg1 + endl;
+        string inst = space + name + "\t" + dstReg + ", " + srcReg0 + ", " + srcReg1;
+        if (imm == 0)
+            inst += endl;
+        else
+            inst += ", #" + to_string(imm) + endl;
+        return inst;
     }
     static string
     emitInst_2srcR(string name, string srcReg0, string srcReg1)
