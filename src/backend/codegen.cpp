@@ -433,7 +433,7 @@ namespace backend
         string funcHead = functionHead_gen(func);
         string prologueCode = prologueCode_gen(func);
         string epilogueCode = epilogueCode_gen(func);
-        string literalPoolsCode = literalPoolsCode_gen(func);
+        string literalPoolsCode;
         code += funcHead + prologueCode + bbCode +
                 epilogueCode + literalPoolsCode;
 
@@ -444,6 +444,9 @@ namespace backend
     {
         curBB = bb;
         string bbLabel = bb->getName();
+        imms_name = "IMM_" + bbLabel;
+        imms.clear();
+        imm_offset = 0;
         // string bbLabel = getBBLabel(bb);
         string code;
         code += bbLabel + ":" + endl;
@@ -452,6 +455,7 @@ namespace backend
             auto instrType = instr->getKind();
             code += instruction_gen(instr.get());
         }
+        code += literalPoolsCode_gen(curFunc);
         return code;
     }
     /**
@@ -599,18 +603,11 @@ namespace backend
         }
         else if (bInst->getKind() == Instruction::kMul)
         {
-            if (lconst && rconst)
+            if (dstRegId == RegManager::NONE)
             {
-                int val = dynamic_cast<ConstantValue *>(lhs)->getInt() * dynamic_cast<ConstantValue *>(rhs)->getInt();
-                if (val >= 0)
-                    code += space + "mov\tr" + res + ", #" + to_string(val) + endl;
-                else
-                {
-                    code += space + "mov\tr" + res + ", #" + to_string(-val) + endl;
-                    code += space + "mvn\tr" + res + ", #1" + endl;
-                }
+                dstRegId = RegManager::R10;
             }
-            else if (lconst)
+            if (lconst)
             {
                 if (l_val <= 0xffff & l_val >= 0)
                 {
@@ -640,6 +637,12 @@ namespace backend
             }
             else
                 code += emitInst_2srcR_1dstR("mul", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
+            if (dstRegId == RegManager::R10)
+            {
+                dstRegId = RegManager::NONE;
+                code += emitInst_mem("str", "r10", "fp", bInst->GetLocation());
+                AVALUE[bInst].stack_offset = bInst->GetLocation();
+            }
         }
         else if (bInst->getKind() == Instruction::kDiv)
         {
@@ -1113,11 +1116,8 @@ namespace backend
             if (iter != AVALUE.end())
                 AVALUE.erase(iter);
         }
-        if (dstRegId != RegManager::NONE)
-        {
-            AVALUE[bInst].reg_num = dstRegId;
-            RVALUE[dstRegId] = bInst;
-        }
+        AVALUE[bInst].reg_num = dstRegId;
+        RVALUE[dstRegId] = bInst;
         return {dstRegId, code};
     }
 
@@ -3791,7 +3791,13 @@ namespace backend
                 if (isa<ConstantValue>(arg))
                 {
                     int imm = dynamic_cast<ConstantValue *>(arg)->getInt();
-                    code += emitInst_nosrcR_1DstR("mov", regm.toString(reg_num), imm);
+                    if (imm < 256)
+                        code += emitInst_nosrcR_1DstR("mov", regm.toString(reg_num), imm);
+                    else
+                    {
+                        code += emitInst_nosrcR_1DstR("movw", regm.toString(reg_num), (imm & 0xFFFF));
+                        code += emitInst_nosrcR_1DstR("movt", regm.toString(reg_num), ((imm >> 16) & 0xFFFF));
+                    }
                     // src_name = "#" + to_string(dynamic_cast<ConstantValue *>(arg)->getInt());
                 }
                 // 若参数为变量
