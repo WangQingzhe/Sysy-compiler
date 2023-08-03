@@ -111,14 +111,25 @@ namespace backend
             top_offset -= 4;
             imm += 4;
         }
-        if (imm > 255)
+        if(imm < 256)
+            code += space + "sub\tsp, sp, #" + to_string(imm) + endl;
+        else if (imm < 65536)
         {
             code += space + "sub\tsp, sp, #" + to_string(imm / 256 * 256) + endl;
             if (imm % 256 != 0)
                 code += space + "sub\tsp, sp, #" + to_string(imm % 256) + endl;
         }
         else
-            code += space + "sub\tsp, sp, #" + to_string(imm) + endl;
+        {
+            code += space + "sub\tsp, sp, #" + to_string(imm / 4096 * 4096) + endl;
+            if (imm % 4096 != 0)
+            {
+                imm = imm % 4096;
+                code += space + "sub\tsp, sp, #" + to_string(imm / 256*256) + endl;
+                if(imm % 256 != 0)
+                code += space + "sub\tsp, sp, #" + to_string(imm % 256) + endl;
+            }
+        }
         // r0-r3入栈
         auto entry_block = func->getEntryBlock();
         auto args = entry_block->getArguments();
@@ -138,11 +149,21 @@ namespace backend
                     continue;
                 if (imm < 256)
                     code += space + "str\tr" + to_string(int_num) + ", [fp, #" + to_string(para_offset) + "]" + endl;
-                else
+                else if(imm < 65536)
                 {
                     code += space + "sub\tr9, fp, #" + to_string(imm / 256 * 256) + endl;
                     if (imm % 256 != 0)
                         code += space + "sub\tr9, r9, #" + to_string(imm % 256) + endl;
+                    code += space + "str\tr" + to_string(int_num) + ", [r9]" + endl;
+                }
+                else{
+                    code += space + "sub\tr9, fp, #" + to_string(imm / 4096 * 4096) + endl;
+                    if (imm % 4096 != 0){
+                        imm = imm % 4096;
+                        code += space + "sub\tr9, r9, #" + to_string(imm / 256 * 256) + endl;
+                        if(imm % 256 != 0)
+                        code += space + "sub\tr9, r9, #" + to_string(imm % 256) + endl;
+                        }
                     code += space + "str\tr" + to_string(int_num) + ", [r9]" + endl;
                 }
                 int_num++;
@@ -1813,12 +1834,24 @@ namespace backend
                         code += emitInst_nosrcR_1DstR("movt", "r9", ((constant_value >> 16) & 0xffff));
                         if (imm < 256)
                             code += emitInst_mem("str", "r9", "fp", pos);
-                        else
+                        else if (imm < 65536)
                         {
                             code += emitInst_1srcR_1DstR("sub", "r10", "fp", imm / 256 * 256);
                             if (imm % 256 != 0)
                                 code += emitInst_1srcR_1DstR("sub", "r10", "r10", imm % 256);
                             code += emitInst_mem("str", "r9", "r10");
+                        }
+                        else
+                        {
+                            code += emitInst_1srcR_1DstR("sub", "r10", "fp", imm / 4096 * 4096);
+                            if (imm % 4096 != 0)
+                            {
+                                imm = imm % 4096;
+                                code += emitInst_1srcR_1DstR("sub", "r10", "r10", imm / 256 * 256);
+                                if (imm % 256 != 0)
+                                    code += emitInst_1srcR_1DstR("sub", "r10", "r10", imm % 256);
+                                code += emitInst_mem("str", "r9", "r10");
+                            }
                         }
                         // int constant_value = dynamic_cast<ConstantValue *>(value)->getInt();
                         // code += space + "movw\tr3, #" + to_string(unsigned(constant_value & 0x0000FFFF)) + endl;
@@ -3222,7 +3255,7 @@ namespace backend
                     if (imm < 256)
                         // code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
                         code += emitInst_mem("ldr", regm.toString(dstRegId), "fp", pos);
-                    else
+                    else if(imm < 65536)
                     {
                         code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), "fp", imm / 256 * 256);
                         if (imm % 256 != 0)
@@ -3232,6 +3265,16 @@ namespace backend
                         // if (imm % 256 != 0)
                         //     code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
                         // code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
+                    }
+                    else{
+                        code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), "fp", imm / 4096 * 4096);
+                        if (imm % 4096 != 0){
+                            imm = imm % 4096;
+                            code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), regm.toString(dstRegId), imm / 256 * 256);
+                            if(imm % 256 != 0)
+                            code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), regm.toString(dstRegId), imm % 256);
+                            }
+                        code += emitInst_mem("ldr", regm.toString(dstRegId), regm.toString(dstRegId));
                     }
                 }
                 else if (type->isFloat())
