@@ -192,7 +192,6 @@ namespace sysy
           else if (alloca->getType()->as<PointerType>()->getBaseType()->isFloat() && value->getType()->isInt())
             value = builder.createIToFInst(value);
           auto store = builder.createStoreInst(value, alloca);
-          builder.getBasicBlock()->getParent()->resetVariableID();
           // if var is a constant scalar, store its value to alloca inst
           if (isConst)
           {
@@ -254,7 +253,6 @@ namespace sysy
       {
         // store exp into alloca
         auto store = builder.createStoreInst(value, current_alloca, indices);
-        builder.getBasicBlock()->getParent()->resetVariableID();
         // if array is const store value into alloca
         if (current_alloca->Const())
         {
@@ -771,8 +769,6 @@ namespace sysy
       }
     }
     Value *call = builder.createCallInst(func, args);
-    if (call->getType()->isVoid())
-      parent_func->resetVariableID();
     dynamic_cast<Instruction *>(call)->set_protect_cnt(last_call_num);
     return call;
   }
@@ -811,12 +807,10 @@ namespace sysy
       exitblock->getPredecessors().push_back(current_block);
       Value *CondBr = builder.createCondBrInst(cond, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
       builder.poptarget();
-      func->resetVariableID();
       builder.setPosition(thenblock, thenblock->begin());
       visitStmt(ctx->stmt()[0]);
       Value *then_br = builder.createUncondBrInst(exitblock, vector<Value *>());
       // setup the instruction insert position
-      func->resetVariableID();
       builder.setPosition(exitblock, exitblock->begin());
       func->moveExitBlock();
     }
@@ -844,16 +838,13 @@ namespace sysy
       auto cond = any_cast<Value *>(ctx->exp()->accept(this));
       CondBrInst *CondBr = builder.createCondBrInst(cond, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
       builder.poptarget();
-      func->resetVariableID();
       builder.setPosition(thenblock, thenblock->begin());
       visitStmt(ctx->stmt()[0]);
       Value *then_br = builder.createUncondBrInst(exitblock, vector<Value *>());
-      func->resetVariableID();
       builder.setPosition(elseblock, elseblock->begin());
       visitStmt(ctx->stmt()[1]);
       Value *else_br = builder.createUncondBrInst(exitblock, vector<Value *>());
       // setup the instruction insert position
-      func->resetVariableID();
       builder.setPosition(exitblock, exitblock->begin());
       func->moveExitBlock();
     }
@@ -870,7 +861,6 @@ namespace sysy
     sprintf(headername, "header%d", builder.get_whilecnt());
     auto headerblock = func->addBasicBlock(headername);
     Value *head_uncondbr = builder.createUncondBrInst(headerblock, vector<Value *>{});
-    func->resetVariableID();
     builder.setPosition(headerblock, headerblock->begin());
     current_block->getSuccessors().push_back(headerblock);
     headerblock->getPredecessors().push_back(current_block);
@@ -901,7 +891,6 @@ namespace sysy
     // create condbr in header
     Value *header_condbr = builder.createCondBrInst(cond, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
     builder.poptarget();
-    func->resetVariableID();
     // generate code in body block
     builder.setPosition(bodyblock, bodyblock->begin());
     visitStmt(ctx->stmt());
@@ -909,7 +898,6 @@ namespace sysy
     builder.poploop();
     // create uncondbr in body block
     Value *body_uncondbr = builder.createUncondBrInst(headerblock, vector<Value *>());
-    func->resetVariableID();
     // setup the instruction insert position
     builder.setPosition(exitblock, exitblock->begin());
     func->moveExitBlock();
@@ -1097,7 +1085,6 @@ namespace sysy
     // create condbr instr
     Value *condbr = builder.createCondBrInst(lhs, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
     builder.poptarget();
-    func->resetVariableID();
     // generate code for rhs block
     builder.setPosition(rhs_block, rhs_block->begin());
     return (ctx->exp()[1]->accept(this));
@@ -1120,7 +1107,6 @@ namespace sysy
     // create condbr instr
     Value *condbr = builder.createCondBrInst(lhs, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
     builder.poptarget();
-    func->resetVariableID();
     // generate code for rhs block
     builder.setPosition(rhs_block, rhs_block->begin());
     return (ctx->exp()[1]->accept(this));
