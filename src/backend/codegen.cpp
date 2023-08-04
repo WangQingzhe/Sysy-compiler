@@ -284,8 +284,17 @@ namespace backend
                     unary_inst->setStart(instr_num);
                     value->setEnd(instr_num);
                 }
+                else if(instrType == Value::Kind::kReturn)
+                {
+                    auto retInst = dynamic_cast<ReturnInst*>(instr.get());
+                    auto retValue = retInst->getReturnValue();
+                    retValue->setEnd(instr_num);
+                }
                 instr_num++;
             }
+            // for (auto &instr : bb->getInstructions())
+            //     code += "%"+instr.get()->getName()+":"+to_string(instr.get()->GetStart())+"-"+to_string(instr.get()->GetEnd())+endl;
+
         }
         // 第二遍扫描,使用线性扫描算法对r寄存器进行分配
         for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)

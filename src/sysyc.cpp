@@ -47,10 +47,10 @@ int main(int argc, char **argv)
   generator.visitModule(moduleAST);
   auto moduleIR = generator.get();
   // only generate SysY IR code
+  LoadCut ldCut(moduleIR);
+  auto ldCutIR = ldCut.Run();
   if (genir)
   {
-    LoadCut ldCut(moduleIR);
-    auto ldCutIR = ldCut.Run();
     ldCutIR->print(cout);
     //ldCut.print_KILL_GEN(cout);
     //ldCut.print_IN_OUT(cout);
@@ -58,7 +58,8 @@ int main(int argc, char **argv)
     return EXIT_SUCCESS;
   }
 
-  CodeGen codegen(moduleIR);
+  // CodeGen codegen(moduleIR);
+  CodeGen codegen(ldCutIR);
   string asmCode = codegen.code_gen();
   cout << asmCode << endl;
   ;

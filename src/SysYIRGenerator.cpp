@@ -1373,6 +1373,16 @@ void LoadCut::print_IN_OUT(std::ostream &os){
       {
         auto bb = iter->get();
         auto mybb = myFunc->addBasicBlock(bb->getName());
+        if(iter == bblist.begin())
+        {
+          auto entry_args =  bb->getArguments();
+          for(auto i = entry_args.begin();i != entry_args.end();i++)
+          {
+            auto arg = i->get();
+            arg->getDims();
+            mybb->createArgument(arg->getType(),vector<int>(arg->getDims().begin(),arg->getDims().end()),arg->getName());
+          }
+        }
         builder.setPosition(mybb, mybb->end());
         // 初始化AVALUE
         AVALUE.clear();
