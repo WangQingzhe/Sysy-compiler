@@ -1,4 +1,4 @@
-# Install script for directory: /home/lyq/Desktop/Sysy/sysY_backend/sysy/src
+# Install script for directory: /home/lyq/Desktop/Sysy/sysY_Compiler/sysy/src
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

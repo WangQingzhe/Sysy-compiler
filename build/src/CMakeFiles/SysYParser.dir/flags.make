@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = -DSysYParser_EXPORTS
 
-CXX_INCLUDES = -I/home/lyq/Desktop/Sysy/sysY_backend/sysy/antlr/antlr4-runtime/runtime/src
+CXX_INCLUDES = -I/home/lyq/Desktop/Sysy/sysY_Compiler/sysy/antlr/antlr4-runtime/runtime/src
 
 CXX_FLAGS = -O3 -DNDEBUG -fPIC -std=c++17
 

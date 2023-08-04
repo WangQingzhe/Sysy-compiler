@@ -1153,8 +1153,8 @@ namespace sysy
       auto instr = instriter.get();
       if(isa<LoadInst>(instr))
       {
-        LoadInst *ldInstr = dynamic_cast<LoadInst *>(instr);
-        auto pointer = ldInstr->getPointer();
+        LoadInst *ldInst = dynamic_cast<LoadInst *>(instr);
+        auto pointer = ldInst->getPointer();
         auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
         curbb->gen.push_back({instr, {pointer, indices}});
       }
@@ -1174,7 +1174,8 @@ namespace sysy
               curbb->gen.erase(iter);
             }
           }
-          curbb->gen.push_back({value, {pointer, indices}});
+          Instruction *V = dynamic_cast<Instruction *>(value);
+          curbb->gen.push_back({V, {pointer, indices}});
         }
       }
     }
@@ -1191,8 +1192,14 @@ namespace sysy
       for(auto iter = bblist.begin(); iter != bblist.end(); iter++){
         BasicBlock* bb = iter->get();
         set<pair<Instruction *, pair<Value *, vector<Value *>>>> oldin, oldout, temp;
-        copy(in.begin(), in.end(), oldin.begin());
-        copy(out.begin(), out.end(), oldout.begin());
+        //copy(bb->in.begin(), bb->in.end(), oldin.begin());
+        for(auto item : bb->in){
+          oldin.insert(item);
+        }
+        //copy(bb->out.begin(), bb->out.end(), oldout.begin());
+        for(auto item : bb->out){
+          oldout.insert(item);
+        }
         bb->in.clear();
         bb->out.clear();
         // cal IN
@@ -1200,14 +1207,20 @@ namespace sysy
         if(!pres.empty()){
           for(int i = 0; i < pres.size(); i++){
             if(i == 0){
-              copy(pres[0]->out.begin(), pres[0]->out.end(), temp.begin());
+              //copy(pres[0]->out.begin(), pres[0]->out.end(), temp.begin());
+              for(auto item : pres[0]->out){
+                temp.insert(item);
+              }
             }
             else{
               set_intersection(temp.begin(), temp.end(), pres[i]->in.begin(), pres[i]->in.end(), inserter(temp, temp.begin()));
             }
           }
         }
-        copy(temp.begin(), temp.end(), bb->in.begin());
+        //copy(temp.begin(), temp.end(), bb->in.begin());
+        for (auto item : temp){
+          bb->in.insert(item);
+        }
         // cal OUT
         for(auto &item : bb->in){
           bool flag = true;
@@ -1225,11 +1238,16 @@ namespace sysy
           bb->out.insert(item);
         }
         // Check if changed
-        if(oldin != in || oldout != out)
+        if(oldin != bb->in || oldout != bb->out)
           change = true;
       }
       
-      
+      //print in out
+      for(auto iter = bblist.begin(); iter != bblist.end(); iter++)
+      {
+        BasicBlock* bb = iter->get();
+        std::cout << bb->getName() << endl;
+      }
       
     }
   }

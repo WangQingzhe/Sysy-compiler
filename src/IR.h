@@ -14,7 +14,7 @@
 #include <type_traits>
 #include <vector>
 #include <set>
-
+#include <algorithm>
 using std::pair;
 using std::vector;
 
@@ -440,8 +440,8 @@ namespace sysy
   public:
     vector<pair<Instruction *, pair<Value *, vector<Value *>>>> gen;
     vector<pair<Value *, vector<Value *>>> kill;
-    set<pair<Instruction *, pair<Value *, vector<Value *>>>> in;
-    set<pair<Instruction *, pair<Value *, vector<Value *>>>> out;
+    std::set<pair<Instruction *, pair<Value *, vector<Value *>>>> in;
+    std::set<pair<Instruction *, pair<Value *, vector<Value *>>>> out;
 
   protected:
     explicit BasicBlock(Function *parent, const std::string &name = "");
