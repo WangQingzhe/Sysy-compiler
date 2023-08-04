@@ -1159,7 +1159,7 @@ namespace sysy
       GlobalValue *glbvl = iter->second;
       pModule->addGlobalValue(glbvl);
     }
-    // 生成全局变量
+    // 生成函数
     auto functions = OriginModule->getFunctions();
     for (auto iter = functions->begin(); iter != functions->end(); iter++)
     {
@@ -1202,7 +1202,10 @@ namespace sysy
             // 如果变量不在AVALUE中
             else
             {
-              auto my_ldInst = builder.createLoadInst(pointer, indices);
+              for (int i = 0; i < indices.size(); i++)
+                indices[i] = indices[i]->getAlter();
+              auto my_ldInst = builder.createLoadInst(pointer->getAlter(), indices);
+              ldInst->setAlter(my_ldInst);
               AVALUE[pointer][indices] = instr;
               // RVALUE[instr] = pair<Value *, vector<Value *>>(pointer, indices);
               RVALUE.insert(ldInst);
@@ -1216,7 +1219,6 @@ namespace sysy
             auto indices = vector<Value *>(stInst->getIndices().begin(), stInst->getIndices().end());
             if (isa<ConstantValue>(value))
             {
-              builder.createStoreInst(value, pointer, indices);
               auto iter1 = AVALUE.find(pointer);
               if (iter1 != AVALUE.end())
               {
@@ -1224,6 +1226,9 @@ namespace sysy
                 if (iter2 != AVALUE[pointer].end())
                   AVALUE[pointer].erase(iter2);
               }
+              for (int i = 0; i < indices.size(); i++)
+                indices[i] = indices[i]->getAlter();
+              auto my_stInst = builder.createStoreInst(value->getAlter(), pointer->getAlter(), indices);
               continue;
             }
             if (isa<LoadInst>(value))
@@ -1232,12 +1237,16 @@ namespace sysy
               auto pre_pointer = ldInst->getPointer();
               auto pre_indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
               auto Vvalue = AVALUE[pre_pointer][pre_indices];
-              auto my_stInst = builder.createStoreInst(Vvalue, pointer, indices);
+              for (int i = 0; i < indices.size(); i++)
+                indices[i] = indices[i]->getAlter();
+              auto my_stInst = builder.createStoreInst(Vvalue->getAlter(), pointer->getAlter(), indices);
             }
             else
             {
-              auto my_stInst = builder.createStoreInst(value, pointer, indices);
               AVALUE[pointer][indices] = dynamic_cast<Instruction *>(value);
+              for (int i = 0; i < indices.size(); i++)
+                indices[i] = indices[i]->getAlter();
+              auto my_stInst = builder.createStoreInst(value->getAlter(), pointer->getAlter(), indices);
             }
           }
           else if (isa<BinaryInst>(instr))
@@ -1259,7 +1268,8 @@ namespace sysy
               auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
               rhs = AVALUE[pointer][indices];
             }
-            builder.createBinaryInst(bInst->getKind(), bInst->getType(), lhs, rhs);
+            auto my_bInst = builder.createBinaryInst(bInst->getKind(), bInst->getType(), lhs->getAlter(), rhs->getAlter());
+            bInst->setAlter(my_bInst);
           }
           else if (isa<UnaryInst>(instr))
           {
@@ -1272,7 +1282,8 @@ namespace sysy
               auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
               hs = AVALUE[pointer][indices];
             }
-            builder.createUnaryInst(uInst->getKind(), uInst->getType(), hs);
+            auto my_uInst = builder.createUnaryInst(uInst->getKind(), uInst->getType(), hs->getAlter());
+            uInst->setAlter(my_uInst);
           }
           else if (isa<CallInst>(instr))
           {
@@ -1286,12 +1297,13 @@ namespace sysy
                 auto ldInst = dynamic_cast<LoadInst *>(*iter);
                 auto pointer = ldInst->getPointer();
                 auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
-                my_args.push_back(AVALUE[pointer][indices]);
+                my_args.push_back(AVALUE[pointer][indices]->getAlter());
               }
               else
-                my_args.push_back(*iter);
+                my_args.push_back(iter->getAlter());
             }
-            builder.createCallInst(callInst->getCallee(), my_args);
+            auto my_callInst = builder.createCallInst(callInst->getCallee(), my_args);
+            callInst->setAlter(my_callInst);
           }
           else if (isa<ReturnInst>(instr))
           {
@@ -1304,7 +1316,8 @@ namespace sysy
               auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
               retValue = AVALUE[pointer][indices];
             }
-            builder.createReturnInst(retValue, mybb);
+            auto my_rInst = builder.createReturnInst(retValue->getAlter(), mybb);
+            rInst->setAlter(my_rInst);
           }
           else if (isa<CondBrInst>(instr))
           {
@@ -1317,12 +1330,19 @@ namespace sysy
               auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
               cond = AVALUE[pointer][indices];
             }
-            builder.createCondBrInst(cond, cbInst->getThenBlock(), cbInst->getElseBlock(), {}, {});
+            builder.createCondBrInst(cond->getAlter(), cbInst->getThenBlock(), cbInst->getElseBlock(), {}, {});
           }
           else if (isa<UncondBrInst>(instr))
           {
             auto ucbInst = dynamic_cast<UncondBrInst *>(instr);
             builder.createUncondBrInst(ucbInst->getBlock(), {});
+          }
+          else if (isa<AllocaInst>(instr))
+          {
+            auto allocaInst = dynamic_cast<AllocaInst *>(instr);
+            auto my_dims = vector<Value *>(allocaInst->getDims().begin(), allocaInst->getDims().end());
+            auto my_allocaInst = builder.createAllocaInst(allocaInst->getType(), my_dims, allocaInst->getName(), allocaInst->Const());
+            allocaInst->setAlter(my_allocaInst);
           }
         }
       }

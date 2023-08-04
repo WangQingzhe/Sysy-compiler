@@ -270,6 +270,7 @@ namespace sysy
     int startpoint = 0;
     int endpoint = 0;
     int location = 0;
+    Value *Alter = this;
 
   protected:
     Value(Kind kind, Type *type, const std::string &name = "")
@@ -301,6 +302,8 @@ namespace sysy
     int GetEnd() const { return endpoint; }
     void setLocation(int offset) { location = offset; }
     int GetLocation() const { return location; }
+    void setAlter(Value *alter) { Alter = alter; }
+    Value *getAlter() const { return Alter; }
 
   public:
     virtual void print(std::ostream &os) const {};
