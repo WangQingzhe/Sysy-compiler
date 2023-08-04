@@ -13,6 +13,7 @@
 #include <string>
 #include <type_traits>
 #include <vector>
+#include <set>
 
 using std::pair;
 using std::vector;
@@ -439,8 +440,8 @@ namespace sysy
   public:
     vector<pair<Instruction *, pair<Value *, vector<Value *>>>> gen;
     vector<pair<Value *, vector<Value *>>> kill;
-    vector<pair<Instruction *, pair<Value *, vector<Value *>>>> in;
-    vector<pair<Instruction *, pair<Value *, vector<Value *>>>> out;
+    set<pair<Instruction *, pair<Value *, vector<Value *>>>> in;
+    set<pair<Instruction *, pair<Value *, vector<Value *>>>> out;
 
   protected:
     explicit BasicBlock(Function *parent, const std::string &name = "");

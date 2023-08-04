@@ -1144,11 +1144,94 @@ namespace sysy
     // 重新生成IR
     RegenerateIR();
   }
+
+
   void LoadCut::CalKill_Gen(BasicBlock *curbb)
   {
+    for(auto &instriter : curbb->getInstructions())
+    {
+      auto instr = instriter.get();
+      if(isa<LoadInst>(instr))
+      {
+        LoadInst *ldInstr = dynamic_cast<LoadInst *>(instr);
+        auto pointer = ldInstr->getPointer();
+        auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+        curbb->gen.push_back({instr, {pointer, indices}});
+      }
+      else if(isa<StoreInst>(instr))
+      {
+        StoreInst *stInst = dynamic_cast<StoreInst *>(instr);
+        auto value = stInst->getValue();
+        auto pointer = stInst->getPointer();
+        auto indices = vector<Value *>(stInst->getIndices().begin(), stInst->getIndices().end());
+        curbb->kill.push_back({pointer, indices});
+        if(isa<Instruction>(value))
+        {
+          for(auto iter = curbb->gen.begin(); iter != curbb->gen.end(); iter++){
+            auto ptr = iter->second.first;
+            auto idx = iter->second.second;
+            if(ptr == pointer && idx == indices){
+              curbb->gen.erase(iter);
+            }
+          }
+          curbb->gen.push_back({value, {pointer, indices}});
+        }
+      }
+    }
   }
+
   void LoadCut::CalIn_Out(Function *curFunc)
   {
+    bool change = true;
+    auto bblist = curFunc->getBasicBlocks();
+      if(bblist.empty())
+        return;
+    while(change){
+      change = false;
+      for(auto iter = bblist.begin(); iter != bblist.end(); iter++){
+        BasicBlock* bb = iter->get();
+        set<pair<Instruction *, pair<Value *, vector<Value *>>>> oldin, oldout, temp;
+        copy(in.begin(), in.end(), oldin.begin());
+        copy(out.begin(), out.end(), oldout.begin());
+        bb->in.clear();
+        bb->out.clear();
+        // cal IN
+        auto pres = bb->getPredecessors(); 
+        if(!pres.empty()){
+          for(int i = 0; i < pres.size(); i++){
+            if(i == 0){
+              copy(pres[0]->out.begin(), pres[0]->out.end(), temp.begin());
+            }
+            else{
+              set_intersection(temp.begin(), temp.end(), pres[i]->in.begin(), pres[i]->in.end(), inserter(temp, temp.begin()));
+            }
+          }
+        }
+        copy(temp.begin(), temp.end(), bb->in.begin());
+        // cal OUT
+        for(auto &item : bb->in){
+          bool flag = true;
+          auto ptr = item.second.first;
+          auto idx = item.second.second;
+          for(auto kill : bb->kill){
+            if(ptr == kill.first && idx == kill.second)
+              flag = false;
+          }
+          if(flag){
+            bb->out.insert(item);
+          }
+        }
+        for(auto &item : bb->gen){
+          bb->out.insert(item);
+        }
+        // Check if changed
+        if(oldin != in || oldout != out)
+          change = true;
+      }
+      
+      
+      
+    }
   }
   void LoadCut::RegenerateIR()
   {
