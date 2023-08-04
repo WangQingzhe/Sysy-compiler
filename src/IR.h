@@ -432,8 +432,10 @@ namespace sysy
     arg_list arguments;
     block_list successors;
     block_list predecessors;
+
+  public:
     vector<pair<Instruction *, pair<Value *, vector<Value *>>>> gen;
-    vector<pair<Value*,vector<Value*>>> kill;
+    vector<pair<Value *, vector<Value *>>> kill;
     vector<pair<Instruction *, pair<Value *, vector<Value *>>>> in;
     vector<pair<Instruction *, pair<Value *, vector<Value *>>>> out;
 

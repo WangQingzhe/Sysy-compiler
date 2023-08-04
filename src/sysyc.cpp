@@ -1,3 +1,10 @@
+/*
+ * @Description:
+ * @Author: 王清哲
+ * @Date: 2023-07-29 17:14:14
+ * @LastEditTime: 2023-08-04 15:23:55
+ * @LastEditors: 王清哲
+ */
 #include "tree/ParseTreeWalker.h"
 #include <cstdlib>
 #include <fstream>
@@ -42,7 +49,10 @@ int main(int argc, char **argv)
   // only generate SysY IR code
   if (genir)
   {
-    moduleIR->print(cout);
+    LoadCut ldCut(moduleIR);
+    auto ldCutIR = ldCut.Run();
+    ldCutIR->print(cout);
+    // moduleIR->print(cout);
     return EXIT_SUCCESS;
   }
 

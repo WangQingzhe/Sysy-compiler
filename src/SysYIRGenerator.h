@@ -242,11 +242,12 @@ namespace sysy
   class LoadCut
   {
   public:
-    Module *OriginModule;                                   // 输入的IR
-    Module *pModule;                                        // 新生成的IR
-    IRBuilder builder;                                      // IR生成器
-    map<Value *, map<vector<Value *>, Instruction>> AVALUE; // 记录每个变量存在哪个虚拟寄存器
-    vector<Instruction *> RVALUE;                           // 记录虚拟寄存器存储哪个变量
+    Module *OriginModule;                                     // 输入的IR
+    Module *pModule;                                          // 新生成的IR
+    IRBuilder builder;                                        // IR生成器
+    map<Value *, map<vector<Value *>, Instruction *>> AVALUE; // 记录每个变量存在哪个虚拟寄存器
+    // map<Instruction *, pair<Value *, vector<Value *>>> RVALUE; // 记录虚拟寄存器存储哪个变量
+    set<Instruction *> RVALUE; // 记录虚拟寄存器存储哪个变量
 
   public:
     LoadCut(Module *OriginModule) : OriginModule(OriginModule) {}
