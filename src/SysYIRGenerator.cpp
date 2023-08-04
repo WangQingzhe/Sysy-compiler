@@ -1116,6 +1116,56 @@ namespace sysy
     return ctx->exp()->accept(this);
   }
 
+  void LoadCut::print_KILL_GEN(std::ostream &os) {
+    auto functions = OriginModule->getFunctions();
+    for (auto fiter = functions->begin(); fiter != functions->end(); fiter++)
+    {
+      Function *func = fiter->second;
+      auto bblist = func->getBasicBlocks();
+      os << "**********" << func->getName() << "**********" << "\n";
+      for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
+      {
+        auto bb = biter->get();
+        os << "$$" <<  bb->getName() << "$$" << "\n";
+        os << "[KILL]" << "\n";
+        for(auto &k : bb->kill){
+          os <<" "<<k.first->getName();
+        }
+        os << "\n";
+        os << "[GEN]" << "\n";
+        for (auto &g : bb->gen){
+          os << " " << g.second.first->getName() << "->" << g.first->getName();
+        }
+        os << "\n";
+      }
+    }
+  }
+
+void LoadCut::print_IN_OUT(std::ostream &os){
+  auto functions = OriginModule->getFunctions();
+  for (auto fiter = functions->begin(); fiter != functions->end(); fiter++)
+    {
+      Function *func = fiter->second;
+      auto bblist = func->getBasicBlocks();
+      os << "**********" << func->getName() << "**********" << "\n";
+      for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
+      {
+        auto bb = biter->get();
+        os << "$$" <<  bb->getName() << "$$" << "\n";
+        os << "[IN]" << "\n";
+        for(auto &k : bb->in){
+          os <<" "<< k.second.first->getName() << "->" << k.first->getName();
+        }
+        os << "\n";
+        os << "[OUT]" << "\n";
+        for (auto &g : bb->out){
+          os << " " << g.second.first->getName() << "->" << g.first->getName();
+        }
+        os << "\n";
+      }
+    }
+}
+
   Module *LoadCut::Run()
   {
     // 计算kill集,gen集合
@@ -1143,6 +1193,51 @@ namespace sysy
     }
     // 重新生成IR
     RegenerateIR();
+    // //print KILL GEN
+    // for (auto fiter = functions->begin(); fiter != functions->end(); fiter++)
+    // {
+    //   Function *func = fiter->second;
+    //   auto bblist = func->getBasicBlocks();
+    //   std::cout << "**********" << func->getName() << "**********" << std::endl;
+    //   for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
+    //   {
+    //     auto bb = biter->get();
+    //     std::cout << "$$" <<  bb->getName() << "$$" << std::endl;
+    //     std::cout << "[KILL]" << std::endl;
+    //     for(auto &k : bb->kill){
+    //       std::cout <<" "<<k.first->getName();
+    //     }
+    //     std::cout << std::endl;
+    //     std::cout << "[GEN]" << std::endl;
+    //     for (auto &g : bb->gen){
+    //       std::cout << " " << g.second.first->getName() << "->" << g.first->getName();
+    //     }
+    //     std::cout << std::endl;
+    //   }
+    // }
+
+    //print IN OUT
+    // for (auto fiter = functions->begin(); fiter != functions->end(); fiter++)
+    // {
+    //   Function *func = fiter->second;
+    //   auto bblist = func->getBasicBlocks();
+    //   std::cout << "**********" << func->getName() << "**********" << std::endl;
+    //   for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
+    //   {
+    //     auto bb = biter->get();
+    //     std::cout << "$$" <<  bb->getName() << "$$" << std::endl;
+    //     std::cout << "[IN]" << std::endl;
+    //     for(auto &k : bb->in){
+    //       std::cout <<" "<< k.second.first->getName() << "->" << k.first->getName();
+    //     }
+    //     std::cout << std::endl;
+    //     std::cout << "[OUT]" << std::endl;
+    //     for (auto &g : bb->out){
+    //       std::cout << " " << g.second.first->getName() << "->" << g.first->getName();
+    //     }
+    //     std::cout << std::endl;
+    //   }
+    // }
     return pModule;
   }
 
@@ -1168,11 +1263,14 @@ namespace sysy
         curbb->kill.push_back({pointer, indices});
         if(isa<Instruction>(value))
         {
-          for(auto iter = curbb->gen.begin(); iter != curbb->gen.end(); iter++){
+          for(auto iter = curbb->gen.begin(); iter != curbb->gen.end(); ){
             auto ptr = iter->second.first;
             auto idx = iter->second.second;
             if(ptr == pointer && idx == indices){
-              curbb->gen.erase(iter);
+              iter = curbb->gen.erase(iter);
+            }
+            else{
+              iter++;
             }
           }
           Instruction *V = dynamic_cast<Instruction *>(value);
@@ -1244,11 +1342,11 @@ namespace sysy
       }
       
       //print in out
-      for(auto iter = bblist.begin(); iter != bblist.end(); iter++)
-      {
-        BasicBlock* bb = iter->get();
-        std::cout << bb->getName() << endl;
-      }
+      // for(auto iter = bblist.begin(); iter != bblist.end(); iter++)
+      // {
+      //   BasicBlock* bb = iter->get();
+      //   std::cout << bb->getName() << endl;
+      // }
       
     }
   }

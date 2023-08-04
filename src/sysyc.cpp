@@ -52,6 +52,8 @@ int main(int argc, char **argv)
     LoadCut ldCut(moduleIR);
     auto ldCutIR = ldCut.Run();
     ldCutIR->print(cout);
+    //ldCut.print_KILL_GEN(cout);
+    //ldCut.print_IN_OUT(cout);
     // moduleIR->print(cout);
     return EXIT_SUCCESS;
   }

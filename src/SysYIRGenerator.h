@@ -259,6 +259,8 @@ namespace sysy
     void CalIn_Out(Function *curFunc);
     // 重新生成IR
     void RegenerateIR();
+    void print_KILL_GEN(std::ostream &os);
+    void print_IN_OUT(std::ostream &os);
     Module *Run();
   };
 } // namespace sysy
