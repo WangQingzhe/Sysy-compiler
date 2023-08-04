@@ -14,6 +14,9 @@
 #include <type_traits>
 #include <vector>
 
+using std::pair;
+using std::vector;
+
 namespace sysy
 {
 
@@ -429,10 +432,10 @@ namespace sysy
     arg_list arguments;
     block_list successors;
     block_list predecessors;
-    std::vector<std::pair<Instruction *, Variable *>> gen;
-    std::vector<Variable *> kill;
-    std::vector<std::pair<Instruction *, Variable *>> in;
-    std::vector<std::pair<Instruction *, Variable *>> out;
+    vector<pair<Instruction *, pair<Value *, vector<Value *>>>> gen;
+    vector<pair<Value*,vector<Value*>>> kill;
+    vector<pair<Instruction *, pair<Value *, vector<Value *>>>> in;
+    vector<pair<Instruction *, pair<Value *, vector<Value *>>>> out;
 
   protected:
     explicit BasicBlock(Function *parent, const std::string &name = "");

@@ -1157,10 +1157,9 @@ namespace sysy
     for (auto iter = global_values->begin(); iter != global_values->end(); iter++)
     {
       GlobalValue *glbvl = iter->second;
-      auto name = glbvl->getName();
-      auto type = glbvl->getType();
       pModule->addGlobalValue(glbvl);
     }
+    // 生成全局变量
     auto functions = OriginModule->getFunctions();
     for (auto iter = functions->begin(); iter != functions->end(); iter++)
     {
@@ -1172,7 +1171,7 @@ namespace sysy
       for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
       {
         auto bb = iter->get();
-        CalKill_Gen(bb);
+        // 初始化AVALUE
       }
     }
   }
