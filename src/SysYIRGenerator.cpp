@@ -1197,7 +1197,7 @@ namespace sysy
             if (AVALUE.find(pointer) != AVALUE.end() && AVALUE[pointer].find(indices) != AVALUE[pointer].end())
             {
               // RVALUE[instr] = pair<Value *, vector<Value *>>(pointer, indices);
-              RVALUE.insert(instr);
+              RVALUE.insert(ldInst);
             }
             // 如果变量不在AVALUE中
             else
@@ -1205,7 +1205,7 @@ namespace sysy
               auto my_ldInst = builder.createLoadInst(pointer, indices);
               AVALUE[pointer][indices] = instr;
               // RVALUE[instr] = pair<Value *, vector<Value *>>(pointer, indices);
-              RVALUE.insert(instr);
+              RVALUE.insert(ldInst);
             }
           }
           else if (isa<StoreInst>(instr))
@@ -1229,16 +1229,10 @@ namespace sysy
             if (isa<LoadInst>(value))
             {
               LoadInst *ldInst = dynamic_cast<LoadInst *>(value);
-              if (ldInst->getPointer() == pointer && ldInst->getIndices().begin() == stInst->getIndices().begin() && ldInst->getIndices().end() == stInst->getIndices().end())
-              {
-                auto Vvalue = AVALUE[pointer][indices];
-                auto my_stInst = builder.createStoreInst(Vvalue, pointer, indices);
-              }
-              else
-              {
-                auto my_stInst = builder.createStoreInst(value, pointer, indices);
-                AVALUE[pointer][indices] = dynamic_cast<Instruction *>(value);
-              }
+              auto pre_pointer = ldInst->getPointer();
+              auto pre_indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+              auto Vvalue = AVALUE[pre_pointer][pre_indices];
+              auto my_stInst = builder.createStoreInst(Vvalue, pointer, indices);
             }
             else
             {
