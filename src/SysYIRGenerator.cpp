@@ -1143,6 +1143,7 @@ namespace sysy
     }
     // 重新生成IR
     RegenerateIR();
+    return pModule;
   }
 
 

@@ -250,7 +250,7 @@ namespace sysy
     set<LoadInst *> RVALUE; // 记录虚拟寄存器存储哪个变量
 
   public:
-    LoadCut(Module *OriginModule) : OriginModule(OriginModule) {}
+    LoadCut(Module *OriginModule) : OriginModule(OriginModule) {pModule = new Module();}
 
   public:
     // 计算每个基本块的Kill,Gen集合
