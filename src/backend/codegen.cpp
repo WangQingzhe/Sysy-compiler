@@ -111,7 +111,7 @@ namespace backend
             top_offset -= 4;
             imm += 4;
         }
-        if(imm < 256)
+        if (imm < 256)
             code += space + "sub\tsp, sp, #" + to_string(imm) + endl;
         else if (imm < 65536)
         {
@@ -125,9 +125,9 @@ namespace backend
             if (imm % 4096 != 0)
             {
                 imm = imm % 4096;
-                code += space + "sub\tsp, sp, #" + to_string(imm / 256*256) + endl;
-                if(imm % 256 != 0)
-                code += space + "sub\tsp, sp, #" + to_string(imm % 256) + endl;
+                code += space + "sub\tsp, sp, #" + to_string(imm / 256 * 256) + endl;
+                if (imm % 256 != 0)
+                    code += space + "sub\tsp, sp, #" + to_string(imm % 256) + endl;
             }
         }
         // r0-r3入栈
@@ -149,21 +149,23 @@ namespace backend
                     continue;
                 if (imm < 256)
                     code += space + "str\tr" + to_string(int_num) + ", [fp, #" + to_string(para_offset) + "]" + endl;
-                else if(imm < 65536)
+                else if (imm < 65536)
                 {
                     code += space + "sub\tr9, fp, #" + to_string(imm / 256 * 256) + endl;
                     if (imm % 256 != 0)
                         code += space + "sub\tr9, r9, #" + to_string(imm % 256) + endl;
                     code += space + "str\tr" + to_string(int_num) + ", [r9]" + endl;
                 }
-                else{
+                else
+                {
                     code += space + "sub\tr9, fp, #" + to_string(imm / 4096 * 4096) + endl;
-                    if (imm % 4096 != 0){
+                    if (imm % 4096 != 0)
+                    {
                         imm = imm % 4096;
                         code += space + "sub\tr9, r9, #" + to_string(imm / 256 * 256) + endl;
-                        if(imm % 256 != 0)
-                        code += space + "sub\tr9, r9, #" + to_string(imm % 256) + endl;
-                        }
+                        if (imm % 256 != 0)
+                            code += space + "sub\tr9, r9, #" + to_string(imm % 256) + endl;
+                    }
                     code += space + "str\tr" + to_string(int_num) + ", [r9]" + endl;
                 }
                 int_num++;
@@ -284,18 +286,25 @@ namespace backend
                     unary_inst->setStart(instr_num);
                     value->setEnd(instr_num);
                 }
-                else if(instrType == Value::Kind::kReturn)
+                else if (instrType == Value::Kind::kReturn)
                 {
-                    auto retInst = dynamic_cast<ReturnInst*>(instr.get());
+                    auto retInst = dynamic_cast<ReturnInst *>(instr.get());
                     auto retValue = retInst->getReturnValue();
+                    if (retValue == nullptr)
+                        continue;
+                    // code += "return:" + to_string(instr_num) + " %" + retValue->getName() + endl;
                     retValue->setEnd(instr_num);
                 }
                 instr_num++;
             }
-            // for (auto &instr : bb->getInstructions())
-            //     code += "%"+instr.get()->getName()+":"+to_string(instr.get()->GetStart())+"-"+to_string(instr.get()->GetEnd())+endl;
-
         }
+        // for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
+        // {
+        //     auto bb = iter->get();
+        //     for (auto &instr : bb->getInstructions())
+        //         code += "%" + instr.get()->getName() + ":" + to_string(instr.get()->GetStart()) + "-" + to_string(instr.get()->GetEnd()) + endl;
+        // }
+
         // 第二遍扫描,使用线性扫描算法对r寄存器进行分配
         for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
         {
@@ -415,6 +424,7 @@ namespace backend
                 {
                     if (int_num < 4)
                     {
+                        // code += arg->get()->getName() + to_string(top_offset) + "\n";
                         paramsStOffset.emplace(arg->get(), top_offset);
                         top_offset -= 4;
                     }
@@ -512,7 +522,7 @@ namespace backend
         else
         {
             lname = "r" + lhs->getName();
-            lRegId = Register[dynamic_cast<Instruction *>(lhs)];
+            lRegId = AVALUE[dynamic_cast<Instruction *>(lhs)].reg_num;
         }
         if (isa<ConstantValue>(rhs))
         {
@@ -523,49 +533,45 @@ namespace backend
         else
         {
             rname = "r" + rhs->getName();
-            rRegId = Register[dynamic_cast<Instruction *>(rhs)];
+            rRegId = AVALUE[dynamic_cast<Instruction *>(rhs)].reg_num;
         }
         auto res = bInst->getName();
         if (bInst->getKind() == Instruction::kAdd)
         {
+            if (dstRegId == RegManager::NONE)
+            {
+                dstRegId = RegManager::R10;
+            }
             if (lconst)
             {
-                if (l_val <= 0xffff && l_val >= 0)
+                if (rRegId == RegManager::NONE)
                 {
-                    // add lconst r9 is used when mov immidiate number
-                    // code += space + "add\tr" + res + ", r" + res + ", " + rname + endl;
+                    rRegId = RegManager::R10;
+                    code += emitInst_mem("ldr", "r10", "fp", AVALUE[dynamic_cast<Instruction *>(rhs)].stack_offset);
+                }
+                if (l_val <= 0xffff & l_val >= 0)
+                {
                     code += space + "mov\tr9, " + lname + endl;
-                    if (rRegId != RegManager::NONE && dstRegId != RegManager::NONE)
-                        code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
-                    else if (dstRegId != RegManager::NONE)
-                    {
-                        code += emitInst_mem("ldr", "r10", "fp", rhs->GetLocation());
-                        code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), "r9", "r10");
-                    }
-                    else
-                    {
-                        code += emitInst_mem("ldr", "r10", "fp", rhs->GetLocation());
-                        code += emitInst_2srcR_1dstR("add", "r9", "r9", "r10");
-                        code += emitInst_mem("str", "r9", "fp", bInst->GetLocation());
-                        AVALUE[bInst].stack_offset = bInst->GetLocation();
-                    }
+                    code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), "r9", regm.toString(rRegId));
                 }
                 else
                 {
-                    // add lconst r9 is used when mov immidiate number
                     code += space + "movw\tr9" + ", #" + to_string(unsigned(l_val & 0xffff)) + endl;
                     code += space + "movt\tr9" + ", #" + to_string(unsigned((l_val >> 16) & 0xffff)) + endl;
-                    code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
-                    // code += space + "add\tr" + res + ", r" + res + ", " + rname + endl;
+                    code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), "r9", regm.toString(rRegId));
                 }
             }
             else if (rconst)
             {
+                if (lRegId == RegManager::NONE)
+                {
+                    lRegId = RegManager::R10;
+                    code += emitInst_mem("ldr", "r10", "fp", AVALUE[dynamic_cast<Instruction *>(lhs)].stack_offset);
+                }
                 if (r_val <= 0xffff && r_val >= 0)
                 {
                     code += space + "mov\tr9, " + rname + endl;
                     code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), regm.toString(lRegId), "r9");
-                    // code += space + "add\tr" + res + ", r" + res + ", " + lname + endl;
                 }
                 else
                 {
@@ -575,47 +581,58 @@ namespace backend
                 }
             }
             else
-            // "[fp - " + to_string(bInst->GetLocation()) + "]"
-            // code += space + "add\tr" + res + ", " + lname + ", " + rname + endl;
             {
-                if (rRegId != RegManager::NONE && dstRegId != RegManager::NONE && lRegId != RegManager::NONE)
-                    code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
-                else if (dstRegId != RegManager::NONE && rRegId != RegManager::NONE)
+                if (lRegId == RegManager::NONE)
                 {
-                    code += emitInst_mem("ldr", "r9", "fp", lhs->GetLocation());
-                    code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), "r9", regm.toString(rRegId));
+                    lRegId = RegManager::R9;
+                    code += emitInst_mem("ldr", "r9", "fp", AVALUE[dynamic_cast<Instruction *>(lhs)].stack_offset);
                 }
+                if (rRegId == RegManager::NONE)
+                {
+                    rRegId = RegManager::R10;
+                    code += emitInst_mem("ldr", "r10", "fp", AVALUE[dynamic_cast<Instruction *>(rhs)].stack_offset);
+                }
+                code += emitInst_2srcR_1dstR("add", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
+            }
+            if (dstRegId == RegManager::R10)
+            {
+                dstRegId = RegManager::NONE;
+                code += emitInst_mem("str", "r10", "fp", bInst->GetLocation());
+                AVALUE[bInst].stack_offset = bInst->GetLocation();
             }
         }
         else if (bInst->getKind() == Instruction::kSub)
         {
-            if (lconst && rconst)
+            if (dstRegId == RegManager::NONE)
             {
-                int val = dynamic_cast<ConstantValue *>(lhs)->getInt() - dynamic_cast<ConstantValue *>(rhs)->getInt();
-                if (val >= 0)
-                    code += space + "mov\tr" + res + ", #" + to_string(val) + endl;
-                else
-                {
-                    code += space + "mov\tr" + res + ", #" + to_string(-val) + endl;
-                    code += space + "mvn\tr" + res + ", #1" + endl;
-                }
+                dstRegId = RegManager::R10;
             }
-            else if (lconst)
+            if (lconst)
             {
+                if (rRegId == RegManager::NONE)
+                {
+                    rRegId = RegManager::R10;
+                    code += emitInst_mem("ldr", "r10", "fp", AVALUE[dynamic_cast<Instruction *>(rhs)].stack_offset);
+                }
                 if (l_val <= 0xffff & l_val >= 0)
                 {
                     code += space + "mov\tr9, " + lname + endl;
-                    code += emitInst_2srcR_1dstR("sub", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
+                    code += emitInst_2srcR_1dstR("sub", regm.toString(dstRegId), "r9", regm.toString(rRegId));
                 }
                 else
                 {
                     code += space + "movw\tr9" + ", #" + to_string(unsigned(l_val & 0xffff)) + endl;
                     code += space + "movt\tr9" + ", #" + to_string(unsigned((l_val >> 16) & 0xffff)) + endl;
-                    code += emitInst_2srcR_1dstR("sub", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
+                    code += emitInst_2srcR_1dstR("sub", regm.toString(dstRegId), "r9", regm.toString(rRegId));
                 }
             }
             else if (rconst)
             {
+                if (lRegId == RegManager::NONE)
+                {
+                    lRegId = RegManager::R10;
+                    code += emitInst_mem("ldr", "r10", "fp", AVALUE[dynamic_cast<Instruction *>(lhs)].stack_offset);
+                }
                 if (r_val <= 0xffff && r_val >= 0)
                 {
                     code += space + "mov\tr9, " + rname + endl;
@@ -629,7 +646,25 @@ namespace backend
                 }
             }
             else
+            {
+                if (lRegId == RegManager::NONE)
+                {
+                    lRegId = RegManager::R9;
+                    code += emitInst_mem("ldr", "r9", "fp", AVALUE[dynamic_cast<Instruction *>(lhs)].stack_offset);
+                }
+                if (rRegId == RegManager::NONE)
+                {
+                    rRegId = RegManager::R10;
+                    code += emitInst_mem("ldr", "r10", "fp", AVALUE[dynamic_cast<Instruction *>(rhs)].stack_offset);
+                }
                 code += emitInst_2srcR_1dstR("sub", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
+            }
+            if (dstRegId == RegManager::R10)
+            {
+                dstRegId = RegManager::NONE;
+                code += emitInst_mem("str", "r10", "fp", bInst->GetLocation());
+                AVALUE[bInst].stack_offset = bInst->GetLocation();
+            }
         }
         else if (bInst->getKind() == Instruction::kMul)
         {
@@ -639,20 +674,30 @@ namespace backend
             }
             if (lconst)
             {
+                if (rRegId == RegManager::NONE)
+                {
+                    rRegId = RegManager::R10;
+                    code += emitInst_mem("ldr", "r10", "fp", AVALUE[dynamic_cast<Instruction *>(rhs)].stack_offset);
+                }
                 if (l_val <= 0xffff & l_val >= 0)
                 {
                     code += space + "mov\tr9, " + lname + endl;
-                    code += emitInst_2srcR_1dstR("mul", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
+                    code += emitInst_2srcR_1dstR("mul", regm.toString(dstRegId), "r9", regm.toString(rRegId));
                 }
                 else
                 {
                     code += space + "movw\tr9" + ", #" + to_string(unsigned(l_val & 0xffff)) + endl;
                     code += space + "movt\tr9" + ", #" + to_string(unsigned((l_val >> 16) & 0xffff)) + endl;
-                    code += emitInst_2srcR_1dstR("mul", regm.toString(dstRegId), string("r9"), regm.toString(rRegId));
+                    code += emitInst_2srcR_1dstR("mul", regm.toString(dstRegId), "r9", regm.toString(rRegId));
                 }
             }
             else if (rconst)
             {
+                if (lRegId == RegManager::NONE)
+                {
+                    lRegId = RegManager::R10;
+                    code += emitInst_mem("ldr", "r10", "fp", AVALUE[dynamic_cast<Instruction *>(lhs)].stack_offset);
+                }
                 if (r_val <= 0xffff && r_val >= 0)
                 {
                     code += space + "mov\tr9, " + rname + endl;
@@ -666,7 +711,19 @@ namespace backend
                 }
             }
             else
+            {
+                if (lRegId == RegManager::NONE)
+                {
+                    lRegId = RegManager::R9;
+                    code += emitInst_mem("ldr", "r9", "fp", AVALUE[dynamic_cast<Instruction *>(lhs)].stack_offset);
+                }
+                if (rRegId == RegManager::NONE)
+                {
+                    rRegId = RegManager::R10;
+                    code += emitInst_mem("ldr", "r10", "fp", AVALUE[dynamic_cast<Instruction *>(rhs)].stack_offset);
+                }
                 code += emitInst_2srcR_1dstR("mul", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
+            }
             if (dstRegId == RegManager::R10)
             {
                 dstRegId = RegManager::NONE;
@@ -875,8 +932,8 @@ namespace backend
             else
             {
                 code += emitInst_2srcR_1dstR("sdiv", "r9", regm.toString(lRegId), regm.toString(rRegId));
-                code += emitInst_2srcR_1dstR("mul", regm.toString(rRegId), "r9", regm.toString(rRegId));
-                code += emitInst_2srcR_1dstR("sub", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
+                code += emitInst_2srcR_1dstR("mul", "r9", "r9", regm.toString(rRegId));
+                code += emitInst_2srcR_1dstR("sub", regm.toString(dstRegId), regm.toString(lRegId), "r9");
                 // code += space + "sdiv\tr" + res + ", " + lname + ", " + rname + endl;
                 // code += space + "mul\t" + rname + ", r" + res + ", " + rname + endl;
                 // code += space + "sub\tr" + res + ", " + lname + ", " + rname + endl;
@@ -909,10 +966,16 @@ namespace backend
                 code += space + "mov\t" + regm.toString(dstRegId) + ", #" + to_string((l_val != r_val) ? 1 : 0) + endl;
             }
         }
-        else if (bInst->getKind() == Instruction::kICmpEQ)
+        else if (bInst->getKind() >= Instruction::kICmpEQ && bInst->getKind() <= Instruction::kICmpGE)
         {
             if (lconst)
-            { // r9 is used to store left immidiate number
+            {
+                if (rRegId == RegManager::NONE)
+                {
+                    rRegId = RegManager::R10;
+                    code += emitInst_mem("ldr", "r10", "fp", AVALUE[dynamic_cast<Instruction *>(rhs)].stack_offset);
+                }
+                // r9 is used to store left immidiate number
                 if (l_val >= 0 && l_val < 0xffff)
                 {
                     code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(l_val));
@@ -927,6 +990,11 @@ namespace backend
             }
             else if (rconst)
             {
+                if (lRegId == RegManager::NONE)
+                {
+                    lRegId = RegManager::R10;
+                    code += emitInst_mem("ldr", "r10", "fp", AVALUE[dynamic_cast<Instruction *>(lhs)].stack_offset);
+                }
                 if (r_val > 0 && r_val < 0xff)
                 {
                     code += space + "cmp\t" + regm.toString(lRegId) + ", " + rname + endl;
@@ -945,193 +1013,18 @@ namespace backend
             }
             else
             {
+                if (lRegId == RegManager::NONE)
+                {
+                    lRegId = RegManager::R9;
+                    code += emitInst_mem("ldr", "r9", "fp", AVALUE[dynamic_cast<Instruction *>(lhs)].stack_offset);
+                }
+                if (rRegId == RegManager::NONE)
+                {
+                    rRegId = RegManager::R10;
+                    code += emitInst_mem("ldr", "r10", "fp", AVALUE[dynamic_cast<Instruction *>(rhs)].stack_offset);
+                }
                 code += space + "cmp\t" + regm.toString(lRegId) + ", " + regm.toString(rRegId) + endl;
             }
-        }
-        else if (bInst->getKind() == Instruction::kICmpGE)
-        {
-            if (lconst)
-            { // r9 is used to store left immidiate number
-                if (l_val >= 0 && l_val < 0xffff)
-                {
-                    code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(l_val));
-                }
-                else
-                {
-                    code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(l_val & 0xffff));
-                    code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((l_val >> 16) & 0xffff));
-                }
-                // code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
-                code += space + "cmp\tr9, " + regm.toString(rRegId) + endl;
-            }
-            else if (rconst)
-            {
-                if (r_val > 0 && r_val < 0xff)
-                {
-                    code += space + "cmp\t" + regm.toString(lRegId) + ", " + rname + endl;
-                }
-                else
-                {
-                    if (r_val > 0 && r_val < 0xffff)
-                        code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(r_val));
-                    else
-                    {
-                        code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(r_val & 0xffff));
-                        code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((r_val >> 16) & 0xffff));
-                    }
-                    code += space + "cmp\t" + regm.toString(lRegId) + ", r9" + endl;
-                }
-            }
-            else
-                code += space + "cmp\t" + regm.toString(lRegId) + ", " + regm.toString(rRegId) + endl;
-        }
-        else if (bInst->getKind() == Instruction::kICmpGT)
-        {
-            if (lconst)
-            { // r9 is used to store left immidiate number
-                if (l_val >= 0 && l_val < 0xffff)
-                {
-                    code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(l_val));
-                }
-                else
-                {
-                    code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(l_val & 0xffff));
-                    code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((l_val >> 16) & 0xffff));
-                }
-                // code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
-                code += space + "cmp\tr9, " + regm.toString(rRegId) + endl;
-            }
-            else if (rconst)
-            {
-                if (r_val > 0 && r_val < 0xff)
-                {
-                    code += space + "cmp\t" + regm.toString(lRegId) + ", " + rname + endl;
-                }
-                else
-                {
-                    if (r_val > 0 && r_val < 0xffff)
-                        code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(r_val));
-                    else
-                    {
-                        code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(r_val & 0xffff));
-                        code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((r_val >> 16) & 0xffff));
-                    }
-                    code += space + "cmp\t" + regm.toString(lRegId) + ", r9" + endl;
-                }
-            }
-            else
-                code += space + "cmp\t" + regm.toString(lRegId) + ", " + regm.toString(rRegId) + endl;
-        }
-        else if (bInst->getKind() == Instruction::kICmpLE)
-        {
-            if (lconst)
-            { // r9 is used to store left immidiate number
-                if (l_val >= 0 && l_val < 0xffff)
-                {
-                    code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(l_val));
-                }
-                else
-                {
-                    code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(l_val & 0xffff));
-                    code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((l_val >> 16) & 0xffff));
-                }
-                // code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
-                code += space + "cmp\tr9, " + regm.toString(rRegId) + endl;
-            }
-            else if (rconst)
-            {
-                if (r_val > 0 && r_val < 0xff)
-                {
-                    code += space + "cmp\t" + regm.toString(lRegId) + ", " + rname + endl;
-                }
-                else
-                {
-                    if (r_val > 0 && r_val < 0xffff)
-                        code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(r_val));
-                    else
-                    {
-                        code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(r_val & 0xffff));
-                        code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((r_val >> 16) & 0xffff));
-                    }
-                    code += space + "cmp\t" + regm.toString(lRegId) + ", r9" + endl;
-                }
-            }
-            else
-                code += space + "cmp\t" + regm.toString(lRegId) + ", " + regm.toString(rRegId) + endl;
-        }
-        else if (bInst->getKind() == Instruction::kICmpLT)
-        {
-            if (lconst)
-            { // r9 is used to store left immidiate number
-                if (l_val >= 0 && l_val < 0xffff)
-                {
-                    code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(l_val));
-                }
-                else
-                {
-                    code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(l_val & 0xffff));
-                    code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((l_val >> 16) & 0xffff));
-                }
-                // code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
-                code += space + "cmp\tr9, " + regm.toString(rRegId) + endl;
-            }
-            else if (rconst)
-            {
-                if (r_val > 0 && r_val < 0xff)
-                {
-                    code += space + "cmp\t" + regm.toString(lRegId) + ", " + rname + endl;
-                }
-                else
-                {
-                    if (r_val > 0 && r_val < 0xffff)
-                        code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(r_val));
-                    else
-                    {
-                        code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(r_val & 0xffff));
-                        code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((r_val >> 16) & 0xffff));
-                    }
-                    code += space + "cmp\t" + regm.toString(lRegId) + ", r9" + endl;
-                }
-            }
-            else
-                code += space + "cmp\t" + regm.toString(lRegId) + ", " + regm.toString(rRegId) + endl;
-        }
-        else if (bInst->getKind() == Instruction::kICmpNE)
-        {
-            if (lconst)
-            { // r9 is used to store left immidiate number
-                if (l_val >= 0 && l_val < 0xffff)
-                {
-                    code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(l_val));
-                }
-                else
-                {
-                    code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(l_val & 0xffff));
-                    code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((l_val >> 16) & 0xffff));
-                }
-                // code += space + "mov\tr" + to_string(instrname) + ", #" + to_string(l_val) + endl;
-                code += space + "cmp\tr9, " + regm.toString(rRegId) + endl;
-            }
-            else if (rconst)
-            {
-                if (r_val > 0 && r_val < 0xff)
-                {
-                    code += space + "cmp\t" + regm.toString(lRegId) + ", " + rname + endl;
-                }
-                else
-                {
-                    if (r_val > 0 && r_val < 0xffff)
-                        code += emitInst_1srcR_1DstR("mov", "r9", "#" + to_string(r_val));
-                    else
-                    {
-                        code += emitInst_1srcR_1DstR("movw", "r9", "#" + to_string(r_val & 0xffff));
-                        code += emitInst_1srcR_1DstR("movt", "r9", "#" + to_string((r_val >> 16) & 0xffff));
-                    }
-                    code += space + "cmp\t" + regm.toString(lRegId) + ", r9" + endl;
-                }
-            }
-            else
-                code += space + "cmp\t" + regm.toString(lRegId) + ", " + regm.toString(rRegId) + endl;
         }
         // 更新RVALUE,AVALUE
         if (!lconst && lhs->GetEnd() <= bInst->GetStart())
@@ -1681,8 +1574,8 @@ namespace backend
             }
             if (dstRegId == RegManager::NONE)
                 dstRegId = RegManager::R9;
-            code += emitInst_1srcR_1DstR("vcvt.s32.f32", regm.toString(srcreg), regm.toString(srcreg));
-            code += emitInst_1srcR_1DstR("vmov", regm.toString(dstRegId), regm.toString(srcreg));
+            code += emitInst_1srcR_1DstR("vcvt.s32.f32", "s14", regm.toString(srcreg));
+            code += emitInst_1srcR_1DstR("vmov", regm.toString(dstRegId), "s14");
             if (dstRegId == RegManager::R9)
             {
                 dstRegId = RegManager::NONE;
@@ -3264,7 +3157,7 @@ namespace backend
                     if (imm < 256)
                         // code += space + "ldr\tr" + to_string(reg_num) + ", [fp, #" + to_string(pos) + "]" + endl;
                         code += emitInst_mem("ldr", regm.toString(dstRegId), "fp", pos);
-                    else if(imm < 65536)
+                    else if (imm < 65536)
                     {
                         code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), "fp", imm / 256 * 256);
                         if (imm % 256 != 0)
@@ -3275,14 +3168,16 @@ namespace backend
                         //     code += space + "sub\tr" + to_string(reg_num) + ", r" + to_string(reg_num) + ", #" + to_string(imm % 256) + endl;
                         // code += space + "ldr\tr" + to_string(reg_num) + ", [r" + to_string(reg_num) + "]" + endl;
                     }
-                    else{
+                    else
+                    {
                         code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), "fp", imm / 4096 * 4096);
-                        if (imm % 4096 != 0){
+                        if (imm % 4096 != 0)
+                        {
                             imm = imm % 4096;
                             code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), regm.toString(dstRegId), imm / 256 * 256);
-                            if(imm % 256 != 0)
-                            code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), regm.toString(dstRegId), imm % 256);
-                            }
+                            if (imm % 256 != 0)
+                                code += emitInst_1srcR_1DstR("sub", regm.toString(dstRegId), regm.toString(dstRegId), imm % 256);
+                        }
                         code += emitInst_mem("ldr", regm.toString(dstRegId), regm.toString(dstRegId));
                     }
                 }
@@ -3573,7 +3468,7 @@ namespace backend
             auto value = dynamic_cast<Instruction *>(retval);
             if (value->getType()->isInt())
             {
-                if (Register[value] == RegManager::NONE)
+                if (AVALUE[value].reg_num == RegManager::NONE)
                     code += emitInst_mem("ldr", "r0", "fp", AVALUE[value].stack_offset);
                 else
                     code += emitInst_1srcR_1DstR("mov", "r0", regm.toString(AVALUE[value].reg_num));

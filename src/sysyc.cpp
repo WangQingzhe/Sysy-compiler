@@ -2,7 +2,7 @@
  * @Description:
  * @Author: 王清哲
  * @Date: 2023-07-29 17:14:14
- * @LastEditTime: 2023-08-04 15:23:55
+ * @LastEditTime: 2023-08-06 01:43:15
  * @LastEditors: 王清哲
  */
 #include "tree/ParseTreeWalker.h"
@@ -51,10 +51,12 @@ int main(int argc, char **argv)
   auto ldCutIR = ldCut.Run();
   if (genir)
   {
+    moduleIR->Print_topology(cout);
+    ldCut.print_IN_OUT(cout);
     ldCutIR->print(cout);
-    //ldCut.print_KILL_GEN(cout);
-    //ldCut.print_IN_OUT(cout);
-    // moduleIR->print(cout);
+    // ldCut.print_KILL_GEN(cout);
+    // ldCut.print_IN_OUT(cout);
+    moduleIR->print(cout);
     return EXIT_SUCCESS;
   }
 

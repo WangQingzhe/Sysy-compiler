@@ -782,8 +782,6 @@ namespace sysy
     char thenname[20];
     sprintf(thenname, "then%d", builder.get_ifcnt());
     auto thenblock = func->addBasicBlock(thenname);
-    current_block->getSuccessors().push_back(thenblock);
-    thenblock->getPredecessors().push_back(current_block);
     // create condbr instr
     // visit thenblock(and elseblock)
     if (ctx->stmt().size() == 1)
@@ -795,20 +793,24 @@ namespace sysy
       sprintf(exitname, "exit%d", builder.get_ifcnt() + builder.get_whilecnt());
       auto exitblock = func->addExitBlock(exitname);
       // auto exitblock = func->addBasicBlock(exitname);
-      exitblock->getPredecessors().push_back(thenblock);
-      thenblock->getSuccessors().push_back(exitblock);
       builder.push_truetarget(thenblock);
       builder.push_falsetarget(exitblock);
       auto cond = any_cast<Value *>(ctx->exp()->accept(this));
-      char flagname[20];
-      sprintf(flagname, "flag%d", builder.get_ifcnt() + builder.get_whilecnt());
       // cond->setName(flagname);
-      current_block->getSuccessors().push_back(exitblock);
-      exitblock->getPredecessors().push_back(current_block);
-      Value *CondBr = builder.createCondBrInst(cond, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
+      current_block = builder.getBasicBlock();
+      auto true_target = builder.get_truetarget();
+      auto false_target = builder.get_falsetarget();
+      current_block->getSuccessors().push_back(true_target);
+      current_block->getSuccessors().push_back(false_target);
+      true_target->getPredecessors().push_back(current_block);
+      false_target->getPredecessors().push_back(current_block);
+      Value *CondBr = builder.createCondBrInst(cond, true_target, false_target, vector<Value *>(), vector<Value *>());
       builder.poptarget();
       builder.setPosition(thenblock, thenblock->begin());
-      visitStmt(ctx->stmt()[0]);
+      visitStmt(ctx->stmt(0));
+      current_block = builder.getBasicBlock();
+      current_block->getSuccessors().push_back(exitblock);
+      exitblock->getPredecessors().push_back(current_block);
       Value *then_br = builder.createUncondBrInst(exitblock, vector<Value *>());
       // setup the instruction insert position
       builder.setPosition(exitblock, exitblock->begin());
@@ -826,23 +828,30 @@ namespace sysy
       sprintf(exitname, "exit%d", builder.get_ifcnt() + builder.get_whilecnt());
       // auto exitblock = func->addBasicBlock(exitname);
       auto exitblock = func->addExitBlock(exitname);
-      exitblock->getPredecessors().push_back(thenblock);
-      thenblock->getSuccessors().push_back(exitblock);
-      current_block->getSuccessors().push_back(elseblock);
-      elseblock->getPredecessors().push_back(current_block);
-      elseblock->getSuccessors().push_back(exitblock);
-      exitblock->getPredecessors().push_back(current_block);
       // generate condition expression
       builder.push_truetarget(thenblock);
       builder.push_falsetarget(elseblock);
       auto cond = any_cast<Value *>(ctx->exp()->accept(this));
-      CondBrInst *CondBr = builder.createCondBrInst(cond, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
+      current_block = builder.getBasicBlock();
+      auto true_target = builder.get_truetarget();
+      auto false_target = builder.get_falsetarget();
+      current_block->getSuccessors().push_back(true_target);
+      current_block->getSuccessors().push_back(false_target);
+      true_target->getPredecessors().push_back(current_block);
+      false_target->getPredecessors().push_back(current_block);
+      CondBrInst *CondBr = builder.createCondBrInst(cond, true_target, false_target, vector<Value *>(), vector<Value *>());
       builder.poptarget();
       builder.setPosition(thenblock, thenblock->begin());
-      visitStmt(ctx->stmt()[0]);
+      visitStmt(ctx->stmt(0));
+      current_block = builder.getBasicBlock();
+      current_block->getSuccessors().push_back(exitblock);
+      exitblock->getPredecessors().push_back(current_block);
       Value *then_br = builder.createUncondBrInst(exitblock, vector<Value *>());
       builder.setPosition(elseblock, elseblock->begin());
-      visitStmt(ctx->stmt()[1]);
+      visitStmt(ctx->stmt(1));
+      current_block = builder.getBasicBlock();
+      current_block->getSuccessors().push_back(exitblock);
+      exitblock->getPredecessors().push_back(current_block);
       Value *else_br = builder.createUncondBrInst(exitblock, vector<Value *>());
       // setup the instruction insert position
       builder.setPosition(exitblock, exitblock->begin());
@@ -860,24 +869,20 @@ namespace sysy
     char headername[20];
     sprintf(headername, "header%d", builder.get_whilecnt());
     auto headerblock = func->addBasicBlock(headername);
-    Value *head_uncondbr = builder.createUncondBrInst(headerblock, vector<Value *>{});
-    builder.setPosition(headerblock, headerblock->begin());
     current_block->getSuccessors().push_back(headerblock);
     headerblock->getPredecessors().push_back(current_block);
+    Value *head_uncondbr = builder.createUncondBrInst(headerblock, vector<Value *>{});
+    builder.setPosition(headerblock, headerblock->begin());
     // uncondbr:current->header
     // Value *Current_uncondbr = builder.createUncondBrInst(headerblock, vector<Value *>());
     // create body basicblock
     char bodyname[20];
     sprintf(bodyname, "body%d", builder.get_whilecnt());
     auto bodyblock = func->addBasicBlock(bodyname);
-    headerblock->getSuccessors().push_back(bodyblock);
-    bodyblock->getPredecessors().push_back(headerblock);
     // create exit basicblock
     char exitname[20];
     sprintf(exitname, "exit%d", builder.get_whilecnt() + builder.get_ifcnt());
     auto exitblock = func->addExitBlock(exitname);
-    headerblock->getSuccessors().push_back(exitblock);
-    exitblock->getPredecessors().push_back(headerblock);
     // push header&exit into loopstack
     builder.pushheader(headerblock);
     builder.pushexit(exitblock);
@@ -885,11 +890,15 @@ namespace sysy
     builder.push_truetarget(bodyblock);
     builder.push_falsetarget(exitblock);
     auto cond = any_cast<Value *>(ctx->exp()->accept(this));
-    // char flagname[20];
-    // sprintf(flagname, "flag%d", builder.get_ifcnt() + builder.get_whilecnt());
-    // cond->setName(flagname);
     // create condbr in header
-    Value *header_condbr = builder.createCondBrInst(cond, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
+    current_block = builder.getBasicBlock();
+    auto true_target = builder.get_truetarget();
+    auto false_target = builder.get_falsetarget();
+    current_block->getSuccessors().push_back(true_target);
+    current_block->getSuccessors().push_back(false_target);
+    true_target->getPredecessors().push_back(current_block);
+    false_target->getPredecessors().push_back(current_block);
+    Value *header_condbr = builder.createCondBrInst(cond, true_target, false_target, vector<Value *>(), vector<Value *>());
     builder.poptarget();
     // generate code in body block
     builder.setPosition(bodyblock, bodyblock->begin());
@@ -897,6 +906,9 @@ namespace sysy
     // pop header&exit from loopstack
     builder.poploop();
     // create uncondbr in body block
+    current_block = builder.getBasicBlock();
+    current_block->getSuccessors().push_back(headerblock);
+    headerblock->getPredecessors().push_back(current_block);
     Value *body_uncondbr = builder.createUncondBrInst(headerblock, vector<Value *>());
     // setup the instruction insert position
     builder.setPosition(exitblock, exitblock->begin());
@@ -905,12 +917,20 @@ namespace sysy
   }
   any SysYIRGenerator::visitBreakStmt(SysYParser::BreakStmtContext *ctx)
   {
-    Value *uncondbr = builder.createUncondBrInst(builder.getExit(), vector<Value *>());
+    auto current_block = builder.getBasicBlock();
+    auto exit_block = builder.getExit();
+    current_block->getSuccessors().push_back(exit_block);
+    exit_block->getPredecessors().push_back(current_block);
+    Value *uncondbr = builder.createUncondBrInst(exit_block, vector<Value *>());
     return uncondbr;
   }
   any SysYIRGenerator::visitContinueStmt(SysYParser::ContinueStmtContext *ctx)
   {
-    Value *uncondbr = builder.createUncondBrInst(builder.getHeader(), vector<Value *>());
+    auto current_block = builder.getBasicBlock();
+    auto header_block = builder.getHeader();
+    current_block->getSuccessors().push_back(header_block);
+    header_block->getPredecessors().push_back(current_block);
+    Value *uncondbr = builder.createUncondBrInst(header_block, vector<Value *>());
     return uncondbr;
   }
   //******************Revised by lyq BEGIN*************************************
@@ -1076,18 +1096,23 @@ namespace sysy
     char rhs_name[20];
     sprintf(rhs_name, "rhs%d", builder.get_rhscnt());
     auto rhs_block = func->addBasicBlock(rhs_name);
-    rhs_block->getPredecessors().push_back(current_block);
-    current_block->getSuccessors().push_back(rhs_block);
     builder.push_truetarget(rhs_block);
     builder.push_falsetarget(builder.get_falsetarget());
     // get lhs value
-    auto lhs = any_cast<Value *>(ctx->exp()[0]->accept(this));
+    auto lhs = any_cast<Value *>(ctx->exp(0)->accept(this));
     // create condbr instr
-    Value *condbr = builder.createCondBrInst(lhs, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
+    current_block = builder.getBasicBlock();
+    auto true_target = builder.get_truetarget();
+    auto false_target = builder.get_falsetarget();
+    current_block->getSuccessors().push_back(true_target);
+    current_block->getSuccessors().push_back(false_target);
+    true_target->getPredecessors().push_back(current_block);
+    false_target->getPredecessors().push_back(current_block);
+    Value *condbr = builder.createCondBrInst(lhs, true_target, false_target, vector<Value *>(), vector<Value *>());
     builder.poptarget();
     // generate code for rhs block
     builder.setPosition(rhs_block, rhs_block->begin());
-    return (ctx->exp()[1]->accept(this));
+    return (ctx->exp(1)->accept(this));
   }
   any SysYIRGenerator::visitOrExp(SysYParser::OrExpContext *ctx)
   {
@@ -1098,73 +1123,132 @@ namespace sysy
     char rhs_name[20];
     sprintf(rhs_name, "rhs%d", builder.get_rhscnt());
     auto rhs_block = func->addBasicBlock(rhs_name);
-    rhs_block->getPredecessors().push_back(current_block);
-    current_block->getSuccessors().push_back(rhs_block);
     builder.push_truetarget(builder.get_truetarget());
     builder.push_falsetarget(rhs_block);
     // get lhs value
-    auto lhs = any_cast<Value *>(ctx->exp()[0]->accept(this));
+    auto lhs = any_cast<Value *>(ctx->exp(0)->accept(this));
     // create condbr instr
-    Value *condbr = builder.createCondBrInst(lhs, builder.get_truetarget(), builder.get_falsetarget(), vector<Value *>(), vector<Value *>());
+    current_block = builder.getBasicBlock();
+    auto true_target = builder.get_truetarget();
+    auto false_target = builder.get_falsetarget();
+    current_block->getSuccessors().push_back(true_target);
+    current_block->getSuccessors().push_back(false_target);
+    true_target->getPredecessors().push_back(current_block);
+    false_target->getPredecessors().push_back(current_block);
+    Value *condbr = builder.createCondBrInst(lhs, true_target, false_target, vector<Value *>(), vector<Value *>());
     builder.poptarget();
     // generate code for rhs block
     builder.setPosition(rhs_block, rhs_block->begin());
-    return (ctx->exp()[1]->accept(this));
+    return (ctx->exp(1)->accept(this));
   }
   any SysYIRGenerator::visitParenExp(SysYParser::ParenExpContext *ctx)
   {
     return ctx->exp()->accept(this);
   }
 
-  void LoadCut::print_KILL_GEN(std::ostream &os) {
+  void LoadCut::print_KILL_GEN(std::ostream &os)
+  {
+    auto functions = OriginModule->getFunctions();
+    for (auto fiter = functions->begin(); fiter != functions->end(); fiter++)
+    {
+      Function *func = fiter->second;
+      if (func->getName() != "getint" && func->getName() != "getch" && func->getName() != "getfloat" && func->getName() != "getarray" && func->getName() != "getfarray" && func->getName() != "putint" && func->getName() != "putch" && func->getName() != "putfloat" && func->getName() != "putarray" && func->getName() != "putfarray" && func->getName() != "starttime" && func->getName() != "stoptime" && func->getName() != "putf")
+      {
+        auto bblist = func->getBasicBlocks();
+        os << "**********" << func->getName() << "**********"
+           << "\n";
+        for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
+        {
+          auto bb = biter->get();
+          os << "$$" << bb->getName() << "$$"
+             << "\n";
+          os << "[KILL]"
+             << "\n";
+          for (auto &k : bb->kill)
+          {
+            os << " " << k.first->getName();
+          }
+          os << "\n";
+          os << "[GEN]"
+             << "\n";
+          for (auto &g : bb->gen)
+          {
+            os << " " << g.second.first->getName() << "->" << g.first->getName();
+          }
+          os << "\n";
+        }
+      }
+    }
+  }
+
+  void LoadCut::print_IN_OUT(std::ostream &os)
+  {
     auto functions = OriginModule->getFunctions();
     for (auto fiter = functions->begin(); fiter != functions->end(); fiter++)
     {
       Function *func = fiter->second;
       auto bblist = func->getBasicBlocks();
-      os << "**********" << func->getName() << "**********" << "\n";
-      for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
+      if (func->getName() != "getint" && func->getName() != "getch" && func->getName() != "getfloat" && func->getName() != "getarray" && func->getName() != "getfarray" && func->getName() != "putint" && func->getName() != "putch" && func->getName() != "putfloat" && func->getName() != "putarray" && func->getName() != "putfarray" && func->getName() != "starttime" && func->getName() != "stoptime" && func->getName() != "putf")
       {
-        auto bb = biter->get();
-        os << "$$" <<  bb->getName() << "$$" << "\n";
-        os << "[KILL]" << "\n";
-        for(auto &k : bb->kill){
-          os <<" "<<k.first->getName();
+        os << "**********" << func->getName() << "**********"
+           << "\n";
+        for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
+        {
+          auto bb = biter->get();
+          os << "$$" << bb->getName() << "$$"
+             << "\n";
+          os << "[IN]"
+             << "\n";
+          for (auto &k : bb->in)
+          {
+            os << " " << k.second.first->getName();
+            auto indices = k.second.second;
+            for (auto indice : indices)
+            {
+              if (isa<ConstantValue>(indice))
+              {
+                os << "[";
+                os << dynamic_cast<ConstantValue *>(indice)->getInt();
+                os << "]";
+              }
+              else
+              {
+                os << "[";
+                os << "%" + indice->getName();
+                os << "]";
+              }
+            }
+            os << "->" << k.first->getName();
+          }
+          os << "\n";
+          os << "[OUT]"
+             << "\n";
+          for (auto &g : bb->out)
+          {
+            os << " " << g.second.first->getName();
+            auto indices = g.second.second;
+            for (auto indice : indices)
+            {
+              if (isa<ConstantValue>(indice))
+              {
+                os << "[";
+                os << dynamic_cast<ConstantValue *>(indice)->getInt();
+                os << "]";
+              }
+              else
+              {
+                os << "[";
+                os << "%" + indice->getName();
+                os << "]";
+              }
+            }
+            os << "->" << g.first->getName();
+          }
+          os << "\n";
         }
-        os << "\n";
-        os << "[GEN]" << "\n";
-        for (auto &g : bb->gen){
-          os << " " << g.second.first->getName() << "->" << g.first->getName();
-        }
-        os << "\n";
       }
     }
   }
-
-void LoadCut::print_IN_OUT(std::ostream &os){
-  auto functions = OriginModule->getFunctions();
-  for (auto fiter = functions->begin(); fiter != functions->end(); fiter++)
-    {
-      Function *func = fiter->second;
-      auto bblist = func->getBasicBlocks();
-      os << "**********" << func->getName() << "**********" << "\n";
-      for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
-      {
-        auto bb = biter->get();
-        os << "$$" <<  bb->getName() << "$$" << "\n";
-        os << "[IN]" << "\n";
-        for(auto &k : bb->in){
-          os <<" "<< k.second.first->getName() << "->" << k.first->getName();
-        }
-        os << "\n";
-        os << "[OUT]" << "\n";
-        for (auto &g : bb->out){
-          os << " " << g.second.first->getName() << "->" << g.first->getName();
-        }
-        os << "\n";
-      }
-    }
-}
 
   Module *LoadCut::Run()
   {
@@ -1216,60 +1300,62 @@ void LoadCut::print_IN_OUT(std::ostream &os){
     //   }
     // }
 
-    //print IN OUT
-    // for (auto fiter = functions->begin(); fiter != functions->end(); fiter++)
-    // {
-    //   Function *func = fiter->second;
-    //   auto bblist = func->getBasicBlocks();
-    //   std::cout << "**********" << func->getName() << "**********" << std::endl;
-    //   for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
-    //   {
-    //     auto bb = biter->get();
-    //     std::cout << "$$" <<  bb->getName() << "$$" << std::endl;
-    //     std::cout << "[IN]" << std::endl;
-    //     for(auto &k : bb->in){
-    //       std::cout <<" "<< k.second.first->getName() << "->" << k.first->getName();
-    //     }
-    //     std::cout << std::endl;
-    //     std::cout << "[OUT]" << std::endl;
-    //     for (auto &g : bb->out){
-    //       std::cout << " " << g.second.first->getName() << "->" << g.first->getName();
-    //     }
-    //     std::cout << std::endl;
-    //   }
-    // }
+    // print IN OUT
+    //  for (auto fiter = functions->begin(); fiter != functions->end(); fiter++)
+    //  {
+    //    Function *func = fiter->second;
+    //    auto bblist = func->getBasicBlocks();
+    //    std::cout << "**********" << func->getName() << "**********" << std::endl;
+    //    for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
+    //    {
+    //      auto bb = biter->get();
+    //      std::cout << "$$" <<  bb->getName() << "$$" << std::endl;
+    //      std::cout << "[IN]" << std::endl;
+    //      for(auto &k : bb->in){
+    //        std::cout <<" "<< k.second.first->getName() << "->" << k.first->getName();
+    //      }
+    //      std::cout << std::endl;
+    //      std::cout << "[OUT]" << std::endl;
+    //      for (auto &g : bb->out){
+    //        std::cout << " " << g.second.first->getName() << "->" << g.first->getName();
+    //      }
+    //      std::cout << std::endl;
+    //    }
+    //  }
     return pModule;
   }
 
-
   void LoadCut::CalKill_Gen(BasicBlock *curbb)
   {
-    for(auto &instriter : curbb->getInstructions())
+    for (auto &instriter : curbb->getInstructions())
     {
       auto instr = instriter.get();
-      if(isa<LoadInst>(instr))
+      if (isa<LoadInst>(instr))
       {
         LoadInst *ldInst = dynamic_cast<LoadInst *>(instr);
         auto pointer = ldInst->getPointer();
         auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
         curbb->gen.push_back({instr, {pointer, indices}});
       }
-      else if(isa<StoreInst>(instr))
+      else if (isa<StoreInst>(instr))
       {
         StoreInst *stInst = dynamic_cast<StoreInst *>(instr);
         auto value = stInst->getValue();
         auto pointer = stInst->getPointer();
         auto indices = vector<Value *>(stInst->getIndices().begin(), stInst->getIndices().end());
         curbb->kill.push_back({pointer, indices});
-        if(isa<Instruction>(value))
+        if (isa<Instruction>(value))
         {
-          for(auto iter = curbb->gen.begin(); iter != curbb->gen.end(); ){
+          for (auto iter = curbb->gen.begin(); iter != curbb->gen.end();)
+          {
             auto ptr = iter->second.first;
             auto idx = iter->second.second;
-            if(ptr == pointer && idx == indices){
+            if (ptr == pointer && idx == indices)
+            {
               iter = curbb->gen.erase(iter);
             }
-            else{
+            else
+            {
               iter++;
             }
           }
@@ -1284,71 +1370,105 @@ void LoadCut::print_IN_OUT(std::ostream &os){
   {
     bool change = true;
     auto bblist = curFunc->getBasicBlocks();
-      if(bblist.empty())
-        return;
-    while(change){
+    if (bblist.empty())
+      return;
+    while (change)
+    {
       change = false;
-      for(auto iter = bblist.begin(); iter != bblist.end(); iter++){
-        BasicBlock* bb = iter->get();
-        set<pair<Instruction *, pair<Value *, vector<Value *>>>> oldin, oldout, temp;
-        //copy(bb->in.begin(), bb->in.end(), oldin.begin());
-        for(auto item : bb->in){
+      for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+      {
+        BasicBlock *bb = iter->get();
+        set<pair<Instruction *, pair<Value *, vector<Value *>>>> oldin, oldout, temp, t;
+        // copy(bb->in.begin(), bb->in.end(), oldin.begin());
+        for (auto item : bb->in)
+        {
           oldin.insert(item);
         }
-        //copy(bb->out.begin(), bb->out.end(), oldout.begin());
-        for(auto item : bb->out){
+        // copy(bb->out.begin(), bb->out.end(), oldout.begin());
+        for (auto item : bb->out)
+        {
           oldout.insert(item);
         }
         bb->in.clear();
         bb->out.clear();
         // cal IN
-        auto pres = bb->getPredecessors(); 
-        if(!pres.empty()){
-          for(int i = 0; i < pres.size(); i++){
-            if(i == 0){
-              //copy(pres[0]->out.begin(), pres[0]->out.end(), temp.begin());
-              for(auto item : pres[0]->out){
+        auto pres = bb->getPredecessors();
+        if (!pres.empty())
+        {
+          for (int i = 0; i < pres.size(); i++)
+          {
+            if (i == 0)
+            {
+              // copy(pres[0]->out.begin(), pres[0]->out.end(), temp.begin());
+              for (auto item : pres[0]->out)
+              {
                 temp.insert(item);
               }
             }
-            else{
-              set_intersection(temp.begin(), temp.end(), pres[i]->in.begin(), pres[i]->in.end(), inserter(temp, temp.begin()));
+            else
+            {
+              // for (auto ii : temp)
+              //   for (auto jj : pres[i]->in)
+              //     if (ii.first == jj.first && ii.second.first == jj.second.first && ii.second.second == jj.second.second)
+              //       t.insert(ii);
+              set_intersection(temp.begin(), temp.end(), pres[i]->out.begin(), pres[i]->out.end(), inserter(t, t.begin()));
+              temp.clear();
+              for (auto item : t)
+              {
+                temp.insert(item);
+              }
+              t.clear();
             }
           }
         }
-        //copy(temp.begin(), temp.end(), bb->in.begin());
-        for (auto item : temp){
+        // copy(temp.begin(), temp.end(), bb->in.begin());
+        for (auto item : temp)
+        {
           bb->in.insert(item);
         }
         // cal OUT
-        for(auto &item : bb->in){
+        for (auto &item : bb->in)
+        {
           bool flag = true;
           auto ptr = item.second.first;
           auto idx = item.second.second;
-          for(auto kill : bb->kill){
-            if(ptr == kill.first && idx == kill.second)
+          for (auto kill : bb->kill)
+          {
+            if (ptr == kill.first && idx == kill.second)
               flag = false;
           }
-          if(flag){
+          if (flag)
+          {
             bb->out.insert(item);
           }
         }
-        for(auto &item : bb->gen){
+        for (auto &item : bb->gen)
+        {
           bb->out.insert(item);
         }
         // Check if changed
-        if(oldin != bb->in || oldout != bb->out)
+        if (oldin != bb->in || oldout != bb->out)
           change = true;
       }
-      
-      //print in out
-      // for(auto iter = bblist.begin(); iter != bblist.end(); iter++)
-      // {
-      //   BasicBlock* bb = iter->get();
-      //   std::cout << bb->getName() << endl;
-      // }
-      
+
+      // print in out
+      //  for(auto iter = bblist.begin(); iter != bblist.end(); iter++)
+      //  {
+      //    BasicBlock* bb = iter->get();
+      //    std::cout << bb->getName() << endl;
+      //  }
     }
+  }
+
+  void LoadCut::OrderBasicBlock(BasicBlock *curbb, Function *curFunc)
+  {
+    if (bbs.find(curbb) != bbs.end())
+      return;
+    auto my_bb = curFunc->addBasicBlock(curbb->getName());
+    curbb->setAlter(my_bb);
+    bbs.insert(curbb);
+    for (auto Sucbb : curbb->getSuccessors())
+      OrderBasicBlock(Sucbb, curFunc);
   }
   void LoadCut::RegenerateIR()
   {
@@ -1357,6 +1477,8 @@ void LoadCut::print_IN_OUT(std::ostream &os){
     for (auto iter = global_values->begin(); iter != global_values->end(); iter++)
     {
       GlobalValue *glbvl = iter->second;
+      auto name = glbvl->getName();
+      auto type = glbvl->getType();
       pModule->addGlobalValue(glbvl);
     }
     // 生成函数
@@ -1369,20 +1491,21 @@ void LoadCut::print_IN_OUT(std::ostream &os){
       auto bblist = func->getBasicBlocks();
       if (bblist.empty())
         continue;
+      bbs.clear();
+      auto entry_block = func->getEntryBlock();
+      OrderBasicBlock(entry_block, myFunc);
+      auto my_entry = myFunc->getEntryBlock();
+      auto entry_args = entry_block->getArguments();
+      for (auto i = entry_args.begin(); i != entry_args.end(); i++)
+      {
+        auto arg = i->get();
+        auto my_arg = my_entry->createArgument(arg->getType(), vector<int>(arg->getDims().begin(), arg->getDims().end()), arg->getName());
+        arg->setAlter(my_arg);
+      }
       for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
       {
         auto bb = iter->get();
-        auto mybb = myFunc->addBasicBlock(bb->getName());
-        if(iter == bblist.begin())
-        {
-          auto entry_args =  bb->getArguments();
-          for(auto i = entry_args.begin();i != entry_args.end();i++)
-          {
-            auto arg = i->get();
-            arg->getDims();
-            mybb->createArgument(arg->getType(),vector<int>(arg->getDims().begin(),arg->getDims().end()),arg->getName());
-          }
-        }
+        auto mybb = dynamic_cast<BasicBlock *>(bb->getAlter());
         builder.setPosition(mybb, mybb->end());
         // 初始化AVALUE
         AVALUE.clear();
@@ -1390,6 +1513,8 @@ void LoadCut::print_IN_OUT(std::ostream &os){
         for (auto p : bb->in)
         {
           Instruction *instr = p.first;
+          if (!instr->hasAlter())
+            continue;
           Value *value = p.second.first;
           vector<Value *> indices = p.second.second;
           AVALUE[value][indices] = instr;
@@ -1412,9 +1537,20 @@ void LoadCut::print_IN_OUT(std::ostream &os){
             // 如果变量不在AVALUE中
             else
             {
+              vector<Value *> my_indices;
               for (int i = 0; i < indices.size(); i++)
-                indices[i] = indices[i]->getAlter();
-              auto my_ldInst = builder.createLoadInst(pointer->getAlter(), indices);
+              {
+                if (isa<LoadInst>(indices[i]))
+                {
+                  auto ldInst = dynamic_cast<LoadInst *>(indices[i]);
+                  auto pointer = ldInst->getPointer();
+                  auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+                  my_indices.push_back(AVALUE[pointer][indices]->getAlter());
+                }
+                else
+                  my_indices.push_back(indices[i]->getAlter());
+              }
+              auto my_ldInst = builder.createLoadInst(pointer->getAlter(), my_indices);
               ldInst->setAlter(my_ldInst);
               AVALUE[pointer][indices] = instr;
               // RVALUE[instr] = pair<Value *, vector<Value *>>(pointer, indices);
@@ -1436,9 +1572,20 @@ void LoadCut::print_IN_OUT(std::ostream &os){
                 if (iter2 != AVALUE[pointer].end())
                   AVALUE[pointer].erase(iter2);
               }
+              vector<Value *> my_indices;
               for (int i = 0; i < indices.size(); i++)
-                indices[i] = indices[i]->getAlter();
-              auto my_stInst = builder.createStoreInst(value->getAlter(), pointer->getAlter(), indices);
+              {
+                if (isa<LoadInst>(indices[i]))
+                {
+                  auto ldInst = dynamic_cast<LoadInst *>(indices[i]);
+                  auto pointer = ldInst->getPointer();
+                  auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+                  my_indices.push_back(AVALUE[pointer][indices]->getAlter());
+                }
+                else
+                  my_indices.push_back(indices[i]->getAlter());
+              }
+              auto my_stInst = builder.createStoreInst(value->getAlter(), pointer->getAlter(), my_indices);
               continue;
             }
             if (isa<LoadInst>(value))
@@ -1447,16 +1594,39 @@ void LoadCut::print_IN_OUT(std::ostream &os){
               auto pre_pointer = ldInst->getPointer();
               auto pre_indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
               auto Vvalue = AVALUE[pre_pointer][pre_indices];
+              vector<Value *> my_indices;
               for (int i = 0; i < indices.size(); i++)
-                indices[i] = indices[i]->getAlter();
-              auto my_stInst = builder.createStoreInst(Vvalue->getAlter(), pointer->getAlter(), indices);
+              {
+                if (isa<LoadInst>(indices[i]))
+                {
+                  auto ldInst = dynamic_cast<LoadInst *>(indices[i]);
+                  auto pointer = ldInst->getPointer();
+                  auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+                  my_indices.push_back(AVALUE[pointer][indices]->getAlter());
+                }
+                else
+                  my_indices.push_back(indices[i]->getAlter());
+              }
+              auto my_stInst = builder.createStoreInst(Vvalue->getAlter(), pointer->getAlter(), my_indices);
+              AVALUE[pointer][indices] = Vvalue;
             }
             else
             {
               AVALUE[pointer][indices] = dynamic_cast<Instruction *>(value);
+              vector<Value *> my_indices;
               for (int i = 0; i < indices.size(); i++)
-                indices[i] = indices[i]->getAlter();
-              auto my_stInst = builder.createStoreInst(value->getAlter(), pointer->getAlter(), indices);
+              {
+                if (isa<LoadInst>(indices[i]))
+                {
+                  auto ldInst = dynamic_cast<LoadInst *>(indices[i]);
+                  auto pointer = ldInst->getPointer();
+                  auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+                  my_indices.push_back(AVALUE[pointer][indices]->getAlter());
+                }
+                else
+                  my_indices.push_back(indices[i]->getAlter());
+              }
+              auto my_stInst = builder.createStoreInst(value->getAlter(), pointer->getAlter(), my_indices);
             }
           }
           else if (isa<BinaryInst>(instr))
@@ -1526,7 +1696,8 @@ void LoadCut::print_IN_OUT(std::ostream &os){
               auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
               retValue = AVALUE[pointer][indices];
             }
-            auto my_rInst = builder.createReturnInst(retValue->getAlter(), mybb);
+            auto my_retValue = retValue ? retValue->getAlter() : nullptr;
+            auto my_rInst = builder.createReturnInst(my_retValue, mybb);
             rInst->setAlter(my_rInst);
           }
           else if (isa<CondBrInst>(instr))

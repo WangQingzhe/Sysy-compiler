@@ -272,6 +272,7 @@ namespace sysy
     int endpoint = 0;
     int location = 0;
     Value *Alter = this;
+    bool has_alter = false;
 
   protected:
     Value(Kind kind, Type *type, const std::string &name = "")
@@ -303,8 +304,13 @@ namespace sysy
     int GetEnd() const { return endpoint; }
     void setLocation(int offset) { location = offset; }
     int GetLocation() const { return location; }
-    void setAlter(Value *alter) { Alter = alter; }
+    void setAlter(Value *alter)
+    {
+      has_alter = true;
+      Alter = alter;
+    }
     Value *getAlter() const { return Alter; }
+    bool hasAlter() const { return has_alter; }
 
   public:
     virtual void print(std::ostream &os) const {};
@@ -1273,6 +1279,29 @@ namespace sysy
       if (result == globals.end())
         return nullptr;
       return result->second;
+    }
+    void Print_topology(std::ostream &os) const
+    {
+      for (auto iter : functions)
+      {
+        auto func = iter.second;
+        if (func->getName() != "getint" && func->getName() != "getch" && func->getName() != "getfloat" && func->getName() != "getarray" && func->getName() != "getfarray" && func->getName() != "putint" && func->getName() != "putch" && func->getName() != "putfloat" && func->getName() != "putarray" && func->getName() != "putfarray" && func->getName() != "starttime" && func->getName() != "stoptime" && func->getName() != "putf")
+        {
+          os << "**************" + func->getName() + "***************\n";
+          for (auto i = func->getBasicBlocks().begin(); i != func->getBasicBlocks().end(); i++)
+          {
+            auto bb = i->get();
+            os << bb->getName() + ":\n\tpreds:";
+            for (auto p : bb->getPredecessors())
+              os << p->getName() + ",";
+            os << "\n\tsuccs:";
+            for (auto s : bb->getSuccessors())
+              os << s->getName() + ",";
+            os << "\n";
+          }
+          os << "************************************\n";
+        }
+      }
     }
 
   public:

@@ -248,9 +248,10 @@ namespace sysy
     map<Value *, map<vector<Value *>, Instruction *>> AVALUE; // 记录每个变量存在哪个虚拟寄存器
     // map<Instruction *, pair<Value *, vector<Value *>>> RVALUE; // 记录虚拟寄存器存储哪个变量
     set<LoadInst *> RVALUE; // 记录虚拟寄存器存储哪个变量
+    set<BasicBlock *> bbs;  // 已经遍历过的基本块
 
   public:
-    LoadCut(Module *OriginModule) : OriginModule(OriginModule) {pModule = new Module();}
+    LoadCut(Module *OriginModule) : OriginModule(OriginModule) { pModule = new Module(); }
 
   public:
     // 计算每个基本块的Kill,Gen集合
@@ -259,6 +260,8 @@ namespace sysy
     void CalIn_Out(Function *curFunc);
     // 重新生成IR
     void RegenerateIR();
+    // 将基本块按照拓扑排序生成
+    void OrderBasicBlock(BasicBlock *, Function *);
     void print_KILL_GEN(std::ostream &os);
     void print_IN_OUT(std::ostream &os);
     Module *Run();
