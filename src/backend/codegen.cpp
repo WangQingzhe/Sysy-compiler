@@ -807,8 +807,10 @@ namespace backend
                     }
                     code += emitInst_2srcR_1dstR("add", "r9", regm.toString(lRegId), "r9");
                     code += emitInst_nosrcR_1DstR("cmp", regm.toString(lRegId), 0);
-                    code += emitInst_2srcR("movlt", regm.toString(lRegId), "r9");
-                    code += emitInst_2srcR_1dstR("asr", regm.toString(dstRegId), regm.toString(lRegId), "#" + to_string(b));
+                    // code += emitInst_2srcR("movlt", regm.toString(lRegId), "r9");
+                    code += emitInst_2srcR("movge", "r9", regm.toString(lRegId));
+
+                    code += emitInst_2srcR_1dstR("asr", regm.toString(dstRegId), "r9", "#" + to_string(b));
                     // code += space + "asr\tr" + res + ", " + lname + ", #" + to_string(b) + endl;
                     if (negflag)
                     {
@@ -884,20 +886,27 @@ namespace backend
                     {
                         // code += space + "and\t" + regm.toString(dstRegId) + ", " + regm.toString(lRegId) + ", #" + to_string(rvalue - 1) + endl;
                         code += emitInst_1srcR_1DstR("and", "r9", "r9", rvalue - 1);
+                        // code += emitInst_1srcR_1DstR("and", regm.toString(lRegId), regm.toString(lRegId), rvalue - 1);
+                        code += emitInst_1srcR_1DstR("mov", "r10", regm.toString(lRegId));
                         code += emitInst_1srcR_1DstR("and", regm.toString(lRegId), regm.toString(lRegId), rvalue - 1);
                         code += emitInst_2srcR_1dstR("rsbpl", regm.toString(dstRegId), "r9", "#0");
+                        code += emitInst_1srcR_1DstR("mov", regm.toString(lRegId), "r10");
                     }
                     else if (rvalue == 256)
                     {
+                        code += emitInst_1srcR_1DstR("mov", "r10", regm.toString(lRegId));
                         code += emitInst_1srcR_1DstR("uxtb", regm.toString(lRegId), regm.toString(lRegId));
                         code += emitInst_1srcR_1DstR("uxtb", "r9", "r9");
                         code += emitInst_2srcR_1dstR("rsbpl", regm.toString(dstRegId), "r9", "#0");
+                        code += emitInst_1srcR_1DstR("mov", regm.toString(lRegId), "r10");
                     }
                     else
                     {
+                        code += emitInst_1srcR_1DstR("mov", "r10", regm.toString(lRegId));
                         code += emitInst_2srcR_1dstR("ubfx", regm.toString(lRegId), regm.toString(lRegId), "#0", shiftnum - 32);
                         code += emitInst_2srcR_1dstR("ubfx", "r9", "r9", "#0", shiftnum - 32);
                         code += emitInst_2srcR_1dstR("rsbpl", regm.toString(dstRegId), "r9", "#0");
+                        code += emitInst_1srcR_1DstR("mov", regm.toString(lRegId), "r10");
                     }
                 }
                 else
