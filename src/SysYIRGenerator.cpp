@@ -805,6 +805,8 @@ namespace sysy
       true_target->getPredecessors().push_back(current_block);
       false_target->getPredecessors().push_back(current_block);
       Value *CondBr = builder.createCondBrInst(cond, true_target, false_target, vector<Value *>(), vector<Value *>());
+      true_target->setDepth(current_block->getDepth() + 1);
+      false_target->setDepth(current_block->getDepth() + 1);
       builder.poptarget();
       builder.setPosition(thenblock, thenblock->begin());
       visitStmt(ctx->stmt(0));
@@ -812,6 +814,7 @@ namespace sysy
       current_block->getSuccessors().push_back(exitblock);
       exitblock->getPredecessors().push_back(current_block);
       Value *then_br = builder.createUncondBrInst(exitblock, vector<Value *>());
+      exitblock->setDepth(current_block->getDepth() + 1);
       // setup the instruction insert position
       builder.setPosition(exitblock, exitblock->begin());
       func->moveExitBlock();
@@ -840,6 +843,8 @@ namespace sysy
       true_target->getPredecessors().push_back(current_block);
       false_target->getPredecessors().push_back(current_block);
       CondBrInst *CondBr = builder.createCondBrInst(cond, true_target, false_target, vector<Value *>(), vector<Value *>());
+      true_target->setDepth(current_block->getDepth() + 1);
+      false_target->setDepth(current_block->getDepth() + 1);
       builder.poptarget();
       builder.setPosition(thenblock, thenblock->begin());
       visitStmt(ctx->stmt(0));
@@ -847,12 +852,14 @@ namespace sysy
       current_block->getSuccessors().push_back(exitblock);
       exitblock->getPredecessors().push_back(current_block);
       Value *then_br = builder.createUncondBrInst(exitblock, vector<Value *>());
+      exitblock->setDepth(current_block->getDepth() + 1);
       builder.setPosition(elseblock, elseblock->begin());
       visitStmt(ctx->stmt(1));
       current_block = builder.getBasicBlock();
       current_block->getSuccessors().push_back(exitblock);
       exitblock->getPredecessors().push_back(current_block);
       Value *else_br = builder.createUncondBrInst(exitblock, vector<Value *>());
+      exitblock->setDepth(current_block->getDepth() + 1);
       // setup the instruction insert position
       builder.setPosition(exitblock, exitblock->begin());
       func->moveExitBlock();
@@ -872,6 +879,7 @@ namespace sysy
     current_block->getSuccessors().push_back(headerblock);
     headerblock->getPredecessors().push_back(current_block);
     Value *head_uncondbr = builder.createUncondBrInst(headerblock, vector<Value *>{});
+    headerblock->setDepth(current_block->getDepth() + 1);
     builder.setPosition(headerblock, headerblock->begin());
     // uncondbr:current->header
     // Value *Current_uncondbr = builder.createUncondBrInst(headerblock, vector<Value *>());
@@ -899,6 +907,8 @@ namespace sysy
     true_target->getPredecessors().push_back(current_block);
     false_target->getPredecessors().push_back(current_block);
     Value *header_condbr = builder.createCondBrInst(cond, true_target, false_target, vector<Value *>(), vector<Value *>());
+    true_target->setDepth(current_block->getDepth() + 1);
+    false_target->setDepth(current_block->getDepth() + 1);
     builder.poptarget();
     // generate code in body block
     builder.setPosition(bodyblock, bodyblock->begin());
@@ -910,6 +920,7 @@ namespace sysy
     current_block->getSuccessors().push_back(headerblock);
     headerblock->getPredecessors().push_back(current_block);
     Value *body_uncondbr = builder.createUncondBrInst(headerblock, vector<Value *>());
+    exitblock->setDepth(current_block->getDepth() + 1);
     // setup the instruction insert position
     builder.setPosition(exitblock, exitblock->begin());
     func->moveExitBlock();
@@ -922,6 +933,7 @@ namespace sysy
     current_block->getSuccessors().push_back(exit_block);
     exit_block->getPredecessors().push_back(current_block);
     Value *uncondbr = builder.createUncondBrInst(exit_block, vector<Value *>());
+    exit_block->setDepth(current_block->getDepth() + 1);
     return uncondbr;
   }
   any SysYIRGenerator::visitContinueStmt(SysYParser::ContinueStmtContext *ctx)
@@ -1109,6 +1121,8 @@ namespace sysy
     true_target->getPredecessors().push_back(current_block);
     false_target->getPredecessors().push_back(current_block);
     Value *condbr = builder.createCondBrInst(lhs, true_target, false_target, vector<Value *>(), vector<Value *>());
+    true_target->setDepth(current_block->getDepth() + 1);
+    false_target->setDepth(current_block->getDepth() + 1);
     builder.poptarget();
     // generate code for rhs block
     builder.setPosition(rhs_block, rhs_block->begin());
@@ -1136,6 +1150,8 @@ namespace sysy
     true_target->getPredecessors().push_back(current_block);
     false_target->getPredecessors().push_back(current_block);
     Value *condbr = builder.createCondBrInst(lhs, true_target, false_target, vector<Value *>(), vector<Value *>());
+    true_target->setDepth(current_block->getDepth() + 1);
+    false_target->setDepth(current_block->getDepth() + 1);
     builder.poptarget();
     // generate code for rhs block
     builder.setPosition(rhs_block, rhs_block->begin());
@@ -1460,15 +1476,40 @@ namespace sysy
     }
   }
 
-  void LoadCut::OrderBasicBlock(BasicBlock *curbb, Function *curFunc)
+  bool LoadCut::BBCmp(BasicBlock *a, BasicBlock *b)
   {
-    if (bbs.find(curbb) != bbs.end())
-      return;
-    auto my_bb = curFunc->addBasicBlock(curbb->getName());
-    curbb->setAlter(my_bb);
-    bbs.insert(curbb);
-    for (auto Sucbb : curbb->getSuccessors())
-      OrderBasicBlock(Sucbb, curFunc);
+    return a->getDepth() < b->getDepth();
+  }
+  void LoadCut::OrderBasicBlock(Function *oldFunc, Function *myFunc)
+  {
+    // 按照深度给基本块排序
+    vector<BasicBlock *> bbs;
+    auto bblist = oldFunc->getBasicBlocks();
+    for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+      bbs.push_back(iter->get());
+    std::sort(bbs.begin(), bbs.end(), BBCmp);
+    for (auto oldbb : bbs)
+    {
+      auto mybb = myFunc->addBasicBlock(oldbb->getName());
+      mybb->setDepth(oldbb->getDepth());
+      oldbb->setAlter(mybb);
+    }
+    // 按照宽度优先遍历基本块
+    // std::queue<BasicBlock *> bbq;
+    // bbq.push(curbb);
+    // BasicBlock *mybb;
+    // while (!bbq.empty())
+    // {
+    //   curbb = bbq.front();
+    //   bbq.pop();
+    //   if (bbs.find(curbb) != bbs.end())
+    //     continue;
+    //   mybb = curFunc->addBasicBlock(curbb->getName());
+    //   curbb->setAlter(mybb);
+    //   bbs.insert(curbb);
+    //   for (auto Sucbb : curbb->getSuccessors())
+    //     bbq.push(Sucbb);
+    // }
   }
   void LoadCut::RegenerateIR()
   {
@@ -1491,9 +1532,8 @@ namespace sysy
       auto bblist = func->getBasicBlocks();
       if (bblist.empty())
         continue;
-      bbs.clear();
+      OrderBasicBlock(func, myFunc);
       auto entry_block = func->getEntryBlock();
-      OrderBasicBlock(entry_block, myFunc);
       auto my_entry = myFunc->getEntryBlock();
       auto entry_args = entry_block->getArguments();
       for (auto i = entry_args.begin(); i != entry_args.end(); i++)
@@ -1670,6 +1710,7 @@ namespace sysy
             auto callInst = dynamic_cast<CallInst *>(instr);
             auto args = callInst->getArguments();
             vector<Value *> my_args;
+            set<Value *> ruined; // 数组参数,则其原来的值可能被破坏
             for (auto iter = args.begin(); iter != args.end(); iter++)
             {
               if (isa<LoadInst>(*iter))
@@ -1678,9 +1719,26 @@ namespace sysy
                 auto pointer = ldInst->getPointer();
                 auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
                 my_args.push_back(AVALUE[pointer][indices]->getAlter());
+                int numdims = 0;
+                if (isa<GlobalValue>(pointer))
+                  numdims = dynamic_cast<GlobalValue *>(pointer)->getNumDims();
+                else if (isa<AllocaInst>(pointer))
+                  numdims = dynamic_cast<AllocaInst *>(pointer)->getNumDims();
+                else if (isa<Argument>(pointer))
+                  numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
+                if (indices.size() < numdims)
+                {
+                  ruined.insert(pointer);
+                }
               }
               else
                 my_args.push_back(iter->getAlter());
+            }
+            for (auto pointer : ruined)
+            {
+              auto iter = AVALUE.find(pointer);
+              if (iter != AVALUE.end())
+                AVALUE.erase(iter);
             }
             auto my_callInst = builder.createCallInst(callInst->getCallee(), my_args);
             callInst->setAlter(my_callInst);
@@ -1730,4 +1788,13 @@ namespace sysy
     }
   }
 
+  void Lifetime::Run()
+  {
+  }
+  void Lifetime::CalUse_Def(BasicBlock *curbb)
+  {
+  }
+  void Lifetime::CalIn_out(Function *curFunc)
+  {
+  }
 } // namespace sysy

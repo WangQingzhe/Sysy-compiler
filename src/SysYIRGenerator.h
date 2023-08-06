@@ -248,7 +248,6 @@ namespace sysy
     map<Value *, map<vector<Value *>, Instruction *>> AVALUE; // 记录每个变量存在哪个虚拟寄存器
     // map<Instruction *, pair<Value *, vector<Value *>>> RVALUE; // 记录虚拟寄存器存储哪个变量
     set<LoadInst *> RVALUE; // 记录虚拟寄存器存储哪个变量
-    set<BasicBlock *> bbs;  // 已经遍历过的基本块
 
   public:
     LoadCut(Module *OriginModule) : OriginModule(OriginModule) { pModule = new Module(); }
@@ -261,9 +260,26 @@ namespace sysy
     // 重新生成IR
     void RegenerateIR();
     // 将基本块按照拓扑排序生成
-    void OrderBasicBlock(BasicBlock *, Function *);
+    void OrderBasicBlock(Function *, Function *);
+    // 将基本块按照深度排序
+    static bool BBCmp(BasicBlock *, BasicBlock *);
     void print_KILL_GEN(std::ostream &os);
     void print_IN_OUT(std::ostream &os);
     Module *Run();
+  };
+
+  // 活跃变量分析
+  class Lifetime
+  {
+  public:
+    Module *pModule;
+    Lifetime(Module *pModule) : pModule(pModule) {}
+
+  public:
+    // 计算每个基本块的use,def集合
+    void CalUse_Def(BasicBlock *);
+    // 计算每个基本块的in,out集合
+    void CalIn_out(Function *);
+    void Run();
   };
 } // namespace sysy

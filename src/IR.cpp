@@ -36,7 +36,7 @@ namespace sysy
   }
   static inline ostream &printBlockName(ostream &os, const BasicBlock *block)
   {
-    return os << '^' << block->getName();
+    return os << '^' << block->getName() << "(" << to_string(block->getDepth()) << ")";
   }
   static inline ostream &printFunctionName(ostream &os, const Function *fn)
   {

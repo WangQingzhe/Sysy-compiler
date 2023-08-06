@@ -14,6 +14,7 @@
 #include <type_traits>
 #include <vector>
 #include <set>
+#include <queue>
 #include <algorithm>
 using std::pair;
 using std::vector;
@@ -448,6 +449,7 @@ namespace sysy
     vector<pair<Value *, vector<Value *>>> kill;
     std::set<pair<Instruction *, pair<Value *, vector<Value *>>>> in;
     std::set<pair<Instruction *, pair<Value *, vector<Value *>>>> out;
+    int depth = 0; // 基本块的深度
 
   protected:
     explicit BasicBlock(Function *parent, const std::string &name = "");
@@ -480,6 +482,8 @@ namespace sysy
       arguments.emplace_back(arg);
       return arguments.back().get();
     };
+    void setDepth(int d) { depth = d > depth ? d : depth; }
+    int getDepth() const { return depth; }
 
   public:
     void print(std::ostream &os) const override;
