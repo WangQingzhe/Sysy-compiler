@@ -449,6 +449,11 @@ namespace sysy
     vector<pair<Value *, vector<Value *>>> kill;
     std::set<pair<Instruction *, pair<Value *, vector<Value *>>>> in;
     std::set<pair<Instruction *, pair<Value *, vector<Value *>>>> out;
+    std::set<Instruction *> LiveIn;
+    std::set<Instruction *> LiveOut;
+    std::set<Instruction *> Use;
+    std::set<Instruction *> Def;
+
     int depth = 0; // 基本块的深度
 
   protected:
@@ -611,6 +616,7 @@ namespace sysy
     }
 
   public:
+    std::set<Instruction *> live; // 该指令后面点的活跃变量
     Kind getKind() const { return kind; }
     BasicBlock *getParent() const { return parent; }
     Function *getFunction() const { return parent->getParent(); }

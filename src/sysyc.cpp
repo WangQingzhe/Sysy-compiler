@@ -2,7 +2,7 @@
  * @Description:
  * @Author: 王清哲
  * @Date: 2023-07-29 17:14:14
- * @LastEditTime: 2023-08-06 16:19:14
+ * @LastEditTime: 2023-08-06 18:47:54
  * @LastEditors: 王清哲
  */
 #include "tree/ParseTreeWalker.h"
@@ -49,6 +49,7 @@ int main(int argc, char **argv)
   // only generate SysY IR code
   LoadCut ldCut(moduleIR);
   auto ldCutIR = ldCut.Run();
+
   if (genir)
   {
     // moduleIR->Print_topology(cout);
