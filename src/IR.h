@@ -616,7 +616,8 @@ namespace sysy
     }
 
   public:
-    std::set<Instruction *> live; // 该指令后面点的活跃变量
+    std::set<Instruction *> front_live; // 该指令前面点的活跃变量
+    std::set<Instruction *> back_live;  // 该指令后面点的活跃变量
     Kind getKind() const { return kind; }
     BasicBlock *getParent() const { return parent; }
     Function *getFunction() const { return parent->getParent(); }
