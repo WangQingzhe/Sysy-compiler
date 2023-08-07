@@ -809,8 +809,14 @@ namespace backend
                     code += emitInst_nosrcR_1DstR("cmp", regm.toString(lRegId), 0);
                     // code += emitInst_2srcR("movlt", regm.toString(lRegId), "r9");
                     code += emitInst_2srcR("movge", "r9", regm.toString(lRegId));
-
-                    code += emitInst_2srcR_1dstR("asr", regm.toString(dstRegId), "r9", "#" + to_string(b));
+                    if (dstRegId != RegManager::NONE)
+                        code += emitInst_2srcR_1dstR("asr", regm.toString(dstRegId), "r9", "#" + to_string(b));
+                    else
+                    {
+                        AVALUE[bInst].stack_offset = bInst->GetLocation();
+                        code += emitInst_2srcR_1dstR("asr", "r9", "r9", "#" + to_string(b));
+                        code += emitInst_mem("str", "r9", "fp", bInst->GetLocation());
+                    }
                     // code += space + "asr\tr" + res + ", " + lname + ", #" + to_string(b) + endl;
                     if (negflag)
                     {
