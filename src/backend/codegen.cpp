@@ -1166,7 +1166,19 @@ namespace backend
                 }
             }
             else
+            {
+                if (lRegId == RegManager::NONE)
+                {
+                    lRegId = RegManager::S14;
+                    code += emitInst_mem("vldr.32", "s14", "fp", AVALUE[dynamic_cast<Instruction *>(lhs)].stack_offset);
+                }
+                if (rRegId == RegManager::NONE)
+                {
+                    rRegId = RegManager::S15;
+                    code += emitInst_mem("vldr.32", "s15", "fp", AVALUE[dynamic_cast<Instruction *>(rhs)].stack_offset);
+                }
                 code += emitInst_2srcR_1dstR("vadd.f32", regm.toString(dstRegId), regm.toString(lRegId), regm.toString(rRegId));
+            }
             // code += space + "vadd.f32\ts" + res + ", " + lname + ", " + rname + endl;
         }
         else if (bInst->getKind() == Instruction::kFSub)
@@ -3807,7 +3819,16 @@ namespace backend
                         // 若变量未溢出,但被保护在栈上
                         if (AVALUE[value].reg_num == RegManager::NONE)
                         {
-                            code += emitInst_mem("vldr.32", "s14", "fp", AVALUE[value].stack_offset);
+                            int imm = -AVALUE[value].stack_offset;
+                            if (imm < 256)
+                                code += emitInst_mem("vldr.32", "s14", "fp", AVALUE[value].stack_offset);
+                            else
+                            {
+                                code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                                if (imm % 256 != 0)
+                                    code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                                code += emitInst_mem("vldr.32", "s14", "r9");
+                            }
                             code += emitInst_mem("vstr.32", "s14", "sp", para_offset);
                         }
                         // 若变量在寄存器中
