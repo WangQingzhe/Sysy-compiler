@@ -2034,6 +2034,16 @@ namespace backend
                 if (protect_value && protect_value->GetEnd() > stInst->GetStart())
                 {
                     AVALUE[protect_value].reg_num = RegManager::R8;
+                    int imm = -AVALUE[protect_value].stack_offset;
+                    if (imm < 256)
+                        code += emitInst_mem("ldr", "r8", "fp", AVALUE[protect_value].stack_offset);
+                    else
+                    {
+                        code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                        if (imm % 256 != 0)
+                            code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                        code += emitInst_mem("ldr", "r8", "r9");
+                    }
                 }
             }
         }
@@ -2338,6 +2348,7 @@ namespace backend
                 if (protect_value && protect_value->GetEnd() < stInst->GetStart())
                 {
                     AVALUE[protect_value].reg_num = RegManager::R8;
+                    code += emitInst_mem("ldr", "r8", "fp", AVALUE[protect_value].stack_offset);
                 }
             }
         }
@@ -2626,6 +2637,7 @@ namespace backend
                     if (protect_value && protect_value->GetEnd() < stInst->GetStart())
                     {
                         AVALUE[protect_value].reg_num = RegManager::R8;
+                        code += emitInst_mem("ldr", "r8", "fp", AVALUE[protect_value].stack_offset);
                     }
                 }
             }
@@ -2928,6 +2940,7 @@ namespace backend
                     if (protect_value && protect_value->GetEnd() > ldInst->GetStart())
                     {
                         AVALUE[protect_value].reg_num = RegManager::R8;
+                        code += emitInst_mem("ldr", "r8", "fp", AVALUE[protect_value].stack_offset);
                     }
                 }
             }
@@ -3162,6 +3175,7 @@ namespace backend
                     if (protect_value && protect_value->GetEnd() > ldInst->GetStart())
                     {
                         AVALUE[protect_value].reg_num = RegManager::R8;
+                        code += emitInst_mem("ldr", "r8", "fp", AVALUE[protect_value].stack_offset);
                     }
                 }
             }
@@ -3430,6 +3444,7 @@ namespace backend
                     if (protect_value && protect_value->GetEnd() > ldInst->GetStart())
                     {
                         AVALUE[protect_value].reg_num = RegManager::R8;
+                        code += emitInst_mem("ldr", "r8", "fp", AVALUE[protect_value].stack_offset);
                     }
                 }
             }
