@@ -247,7 +247,7 @@ namespace sysy
     IRBuilder builder;                                        // IR生成器
     map<Value *, map<vector<Value *>, Instruction *>> AVALUE; // 记录每个变量存在哪个虚拟寄存器
     // map<Instruction *, pair<Value *, vector<Value *>>> RVALUE; // 记录虚拟寄存器存储哪个变量
-    set<LoadInst *> RVALUE; // 记录虚拟寄存器存储哪个变量
+    set<Value *> RVALUE; // 记录虚拟寄存器存储哪个变量
 
   public:
     LoadCut(Module *OriginModule) : OriginModule(OriginModule) { pModule = new Module(); }

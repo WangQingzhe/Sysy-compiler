@@ -1291,6 +1291,7 @@ namespace sysy
         continue;
       CalIn_Out(func);
     }
+    // print_IN_OUT(os);
     // 重新生成IR
     RegenerateIR();
     // //print KILL GEN
@@ -1376,15 +1377,17 @@ namespace sysy
               iter++;
             }
           }
-          Instruction *V = dynamic_cast<Instruction *>(value);
-          curbb->gen.push_back({V, {pointer, indices}});
+          if (!isa<GlobalValue>(pointer))
+          {
+            Instruction *V = dynamic_cast<Instruction *>(value);
+            curbb->gen.push_back({V, {pointer, indices}});
+          }
         }
       }
       else if (isa<CallInst>(instr))
       {
         auto callInst = dynamic_cast<CallInst *>(instr);
         auto args = callInst->getArguments();
-        set<Value *> ruined; // 数组参数,则其原来的值可能被破坏
         for (auto iter = args.begin(); iter != args.end(); iter++)
         {
           if (isa<LoadInst>(*iter))
@@ -1428,8 +1431,11 @@ namespace sysy
     auto bblist = curFunc->getBasicBlocks();
     if (bblist.empty())
       return;
+    int k = 0;
     while (change)
     {
+      k++;
+      // printf("%d\t", k);
       change = false;
       for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
       {
@@ -1625,7 +1631,7 @@ namespace sysy
               vector<Value *> my_indices;
               for (int i = 0; i < indices.size(); i++)
               {
-                if (isa<LoadInst>(indices[i]))
+                if (RVALUE.find(indices[i]) != RVALUE.end())
                 {
                   auto ldInst = dynamic_cast<LoadInst *>(indices[i]);
                   auto pointer = ldInst->getPointer();
@@ -1637,9 +1643,11 @@ namespace sysy
               }
               auto my_ldInst = builder.createLoadInst(pointer->getAlter(), my_indices);
               ldInst->setAlter(my_ldInst);
-              AVALUE[pointer][indices] = instr;
-              // RVALUE[instr] = pair<Value *, vector<Value *>>(pointer, indices);
-              RVALUE.insert(ldInst);
+              if (!isa<GlobalValue>(pointer))
+              {
+                AVALUE[pointer][indices] = instr;
+                RVALUE.insert(ldInst);
+              }
             }
           }
           else if (isa<StoreInst>(instr))
@@ -1660,7 +1668,7 @@ namespace sysy
               vector<Value *> my_indices;
               for (int i = 0; i < indices.size(); i++)
               {
-                if (isa<LoadInst>(indices[i]))
+                if (RVALUE.find(indices[i]) != RVALUE.end())
                 {
                   auto ldInst = dynamic_cast<LoadInst *>(indices[i]);
                   auto pointer = ldInst->getPointer();
@@ -1673,7 +1681,7 @@ namespace sysy
               auto my_stInst = builder.createStoreInst(value->getAlter(), pointer->getAlter(), my_indices);
               continue;
             }
-            if (isa<LoadInst>(value))
+            if (RVALUE.find(value) != RVALUE.end())
             {
               LoadInst *ldInst = dynamic_cast<LoadInst *>(value);
               auto pre_pointer = ldInst->getPointer();
@@ -1682,7 +1690,7 @@ namespace sysy
               vector<Value *> my_indices;
               for (int i = 0; i < indices.size(); i++)
               {
-                if (isa<LoadInst>(indices[i]))
+                if (RVALUE.find(indices[i]) != RVALUE.end())
                 {
                   auto ldInst = dynamic_cast<LoadInst *>(indices[i]);
                   auto pointer = ldInst->getPointer();
@@ -1693,15 +1701,17 @@ namespace sysy
                   my_indices.push_back(indices[i]->getAlter());
               }
               auto my_stInst = builder.createStoreInst(Vvalue->getAlter(), pointer->getAlter(), my_indices);
-              AVALUE[pointer][indices] = Vvalue;
+              if (!isa<GlobalValue>(pointer))
+                AVALUE[pointer][indices] = Vvalue;
             }
             else
             {
-              AVALUE[pointer][indices] = dynamic_cast<Instruction *>(value);
+              if (!isa<GlobalValue>(pointer))
+                AVALUE[pointer][indices] = dynamic_cast<Instruction *>(value);
               vector<Value *> my_indices;
               for (int i = 0; i < indices.size(); i++)
               {
-                if (isa<LoadInst>(indices[i]))
+                if (RVALUE.find(indices[i]) != RVALUE.end())
                 {
                   auto ldInst = dynamic_cast<LoadInst *>(indices[i]);
                   auto pointer = ldInst->getPointer();
@@ -1719,14 +1729,14 @@ namespace sysy
             auto bInst = dynamic_cast<BinaryInst *>(instr);
             auto lhs = bInst->getLhs();
             auto rhs = bInst->getRhs();
-            if (isa<LoadInst>(lhs))
+            if (RVALUE.find(lhs) != RVALUE.end())
             {
               auto ldInst = dynamic_cast<LoadInst *>(lhs);
               auto pointer = ldInst->getPointer();
               auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
               lhs = AVALUE[pointer][indices];
             }
-            if (isa<LoadInst>(rhs))
+            if (RVALUE.find(rhs) != RVALUE.end())
             {
               auto ldInst = dynamic_cast<LoadInst *>(rhs);
               auto pointer = ldInst->getPointer();
@@ -1740,7 +1750,7 @@ namespace sysy
           {
             auto uInst = dynamic_cast<UnaryInst *>(instr);
             auto hs = uInst->getOperand();
-            if (isa<LoadInst>(hs))
+            if (RVALUE.find(hs) != RVALUE.end())
             {
               auto ldInst = dynamic_cast<LoadInst *>(hs);
               auto pointer = ldInst->getPointer();
@@ -1758,7 +1768,7 @@ namespace sysy
             set<Value *> ruined; // 数组参数,则其原来的值可能被破坏
             for (auto iter = args.begin(); iter != args.end(); iter++)
             {
-              if (isa<LoadInst>(*iter))
+              if (RVALUE.find(*iter) != RVALUE.end())
               {
                 auto ldInst = dynamic_cast<LoadInst *>(*iter);
                 auto pointer = ldInst->getPointer();
@@ -1772,8 +1782,6 @@ namespace sysy
                 else if (isa<Argument>(pointer))
                   numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
                 if (indices.size() < numdims)
-                  ruined.insert(pointer);
-                else if (isa<GlobalValue>(pointer))
                   ruined.insert(pointer);
               }
               else
@@ -1792,7 +1800,7 @@ namespace sysy
           {
             auto rInst = dynamic_cast<ReturnInst *>(instr);
             auto retValue = rInst->getReturnValue();
-            if (retValue && isa<LoadInst>(retValue))
+            if (retValue && RVALUE.find(retValue) != RVALUE.end())
             {
               auto ldInst = dynamic_cast<LoadInst *>(retValue);
               auto pointer = ldInst->getPointer();
@@ -1807,7 +1815,7 @@ namespace sysy
           {
             auto cbInst = dynamic_cast<CondBrInst *>(instr);
             auto cond = cbInst->getCondition();
-            if (isa<LoadInst>(cond))
+            if (RVALUE.find(cond) != RVALUE.end())
             {
               auto ldInst = dynamic_cast<LoadInst *>(cond);
               auto pointer = ldInst->getPointer();
