@@ -280,6 +280,22 @@ namespace sysy
     void CalUse_Def(BasicBlock *);
     // 计算每个基本块的in,out集合
     void CalIn_out(Function *);
-    void Run();
+    void print_USE_DEF(std::ostream &os);
+    void print_Live_IN_OUT(std::ostream &os);
+    Module* Run();
+  };
+
+
+  // DCE
+  class DCE
+  {
+    public:
+    Module *pModule;
+    DCE(Module *pModule) : pModule(pModule) {}
+
+    public:
+    Module *Run();
+    
+
   };
 } // namespace sysy

@@ -58,6 +58,12 @@ int main(int argc, char **argv)
     // ldCut.print_KILL_GEN(cout);
     // ldCut.print_IN_OUT(cout);
     // moduleIR->print(cout);
+    Lifetime lifetime(ldCutIR);
+    Module *ir = lifetime.Run();
+    lifetime.print_USE_DEF(cout);
+    lifetime.print_Live_IN_OUT(cout);
+    DCE dce(ir);
+    Module *ir2 = dce.Run();
     return EXIT_SUCCESS;
   }
 

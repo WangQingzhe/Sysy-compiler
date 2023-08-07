@@ -434,6 +434,7 @@ namespace sysy
   public:
     using inst_list = std::list<std::unique_ptr<Instruction>>;
     using iterator = inst_list::iterator;
+    using reverse_iterator = inst_list::reverse_iterator;
     using arg_list = std::vector<std::unique_ptr<Argument>>;
     using block_list = std::vector<BasicBlock *>;
 
@@ -478,6 +479,8 @@ namespace sysy
     block_list &getSuccessors() { return successors; }
     iterator begin() { return instructions.begin(); }
     iterator end() { return instructions.end(); }
+    reverse_iterator rbegin() { return instructions.rbegin(); }
+    reverse_iterator rend() { return instructions.rend(); }
     iterator terminator() { return std::prev(end()); }
     Argument *createArgument(Type *type, const std::vector<int> &dims = {}, const std::string &name = "")
     // Argument *createArgument(Type *type, const std::string &name = "")
