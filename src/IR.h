@@ -447,6 +447,7 @@ namespace sysy
   public:
     vector<pair<Instruction *, pair<Value *, vector<Value *>>>> gen;
     vector<pair<Value *, vector<Value *>>> kill;
+    vector<Value *> killptr;
     std::set<pair<Instruction *, pair<Value *, vector<Value *>>>> in;
     std::set<pair<Instruction *, pair<Value *, vector<Value *>>>> out;
     std::set<Instruction *> LiveIn;

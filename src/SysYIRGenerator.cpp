@@ -1351,7 +1351,8 @@ namespace sysy
         LoadInst *ldInst = dynamic_cast<LoadInst *>(instr);
         auto pointer = ldInst->getPointer();
         auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
-        curbb->gen.push_back({instr, {pointer, indices}});
+        if (!isa<GlobalValue>(pointer))
+          curbb->gen.push_back({instr, {pointer, indices}});
       }
       else if (isa<StoreInst>(instr))
       {
@@ -1377,6 +1378,45 @@ namespace sysy
           }
           Instruction *V = dynamic_cast<Instruction *>(value);
           curbb->gen.push_back({V, {pointer, indices}});
+        }
+      }
+      else if (isa<CallInst>(instr))
+      {
+        auto callInst = dynamic_cast<CallInst *>(instr);
+        auto args = callInst->getArguments();
+        set<Value *> ruined; // 数组参数,则其原来的值可能被破坏
+        for (auto iter = args.begin(); iter != args.end(); iter++)
+        {
+          if (isa<LoadInst>(*iter))
+          {
+            auto ldInst = dynamic_cast<LoadInst *>(*iter);
+            auto pointer = ldInst->getPointer();
+            auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+            int numdims = 0;
+            if (isa<GlobalValue>(pointer))
+              numdims = dynamic_cast<GlobalValue *>(pointer)->getNumDims();
+            else if (isa<AllocaInst>(pointer))
+              numdims = dynamic_cast<AllocaInst *>(pointer)->getNumDims();
+            else if (isa<Argument>(pointer))
+              numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
+            if (indices.size() < numdims)
+            {
+              curbb->killptr.push_back(pointer);
+              for (auto iter = curbb->gen.begin(); iter != curbb->gen.end();)
+              {
+                auto ptr = iter->second.first;
+                auto idx = iter->second.second;
+                if (ptr == pointer)
+                {
+                  iter = curbb->gen.erase(iter);
+                }
+                else
+                {
+                  iter++;
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -1451,6 +1491,11 @@ namespace sysy
           for (auto kill : bb->kill)
           {
             if (ptr == kill.first && idx == kill.second)
+              flag = false;
+          }
+          for (auto killptr : bb->killptr)
+          {
+            if (ptr == killptr)
               flag = false;
           }
           if (flag)
@@ -1727,9 +1772,9 @@ namespace sysy
                 else if (isa<Argument>(pointer))
                   numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
                 if (indices.size() < numdims)
-                {
                   ruined.insert(pointer);
-                }
+                else if (isa<GlobalValue>(pointer))
+                  ruined.insert(pointer);
               }
               else
                 my_args.push_back(iter->getAlter());
