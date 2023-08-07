@@ -3756,6 +3756,11 @@ namespace backend
                 }
                 // 保护原来存在R0-R3的变量
                 RegId reg_num = regm.ConvertToR(int_num);
+                if (!isa<ConstantValue>(arg) && AVALUE[dynamic_cast<Instruction *>(arg)].reg_num == reg_num)
+                {
+                    int_num++;
+                    continue;
+                }
                 if (RVALUE.find(reg_num) != RVALUE.end() && RVALUE[reg_num])
                 {
                     protect_cnt++;
@@ -3863,6 +3868,11 @@ namespace backend
                 }
                 // 保护原来存在S0-S3的变量
                 RegId reg_num = regm.ConvertToS(float_num);
+                if (!isa<ConstantValue>(arg) && AVALUE[dynamic_cast<Instruction *>(arg)].reg_num == reg_num)
+                {
+                    float_num++;
+                    continue;
+                }
                 if (RVALUE.find(reg_num) != RVALUE.end() && RVALUE[reg_num])
                 {
                     protect_cnt++;
