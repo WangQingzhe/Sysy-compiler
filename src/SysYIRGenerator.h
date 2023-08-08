@@ -250,6 +250,7 @@ namespace sysy
     set<Value *> RVALUE;            // 记录虚拟寄存器存储哪个变量
     map<Function *, bool> havecall; // 记录每个函数内是否有函数调用
     bool hascall;                   // 记录当前函数是否有函数调用
+    set<string> libfunc = {"getint", "getch", "getfloat", "getarray", "getfarray", "putint", "putch", "putfloat", "putarray", "putfarray", "starttime", "stoptime", "putf"};
 
   public:
     LoadCut(Module *OriginModule) : OriginModule(OriginModule)
@@ -264,6 +265,7 @@ namespace sysy
     void CalIn_Out(Function *curFunc);
     // 重新生成IR
     void RegenerateIR();
+    // void RegenerateIR(std::ostream &os);
     // 将基本块按照拓扑排序生成
     void OrderBasicBlock(Function *, Function *);
     // 将基本块按照深度排序
@@ -271,6 +273,7 @@ namespace sysy
     void print_KILL_GEN(std::ostream &os);
     void print_IN_OUT(std::ostream &os);
     Module *Run();
+    // Module *Run(std::ostream &os);
   };
 
   // 活跃变量分析

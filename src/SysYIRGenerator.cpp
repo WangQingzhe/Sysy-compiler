@@ -1285,10 +1285,16 @@ namespace sysy
           auto instrType = instr->getKind();
           if (instrType == Instruction::Kind::kCall)
           {
-            havecall[func] = true;
-            break;
+            auto callee = dynamic_cast<CallInst *>(instr.get())->getCallee();
+            if (libfunc.find(callee->getName()) == libfunc.end())
+            {
+              havecall[func] = true;
+              break;
+            }
           }
         }
+        if (havecall[func])
+          break;
       }
     }
     // 计算kill集,gen集合
@@ -1602,6 +1608,11 @@ namespace sysy
     {
       Function *func = iter->second;
       hascall = havecall[func];
+      // os << func->getName() << ":";
+      // if (hascall)
+      //   os << "hascall\n";
+      // else
+      //   os << "nocall\n";
       Function *myFunc = pModule->createFunction(func->getName(), func->getType());
       RVALUE.clear();
       auto bblist = func->getBasicBlocks();
@@ -1788,6 +1799,7 @@ namespace sysy
           {
             auto callInst = dynamic_cast<CallInst *>(instr);
             auto args = callInst->getArguments();
+            auto callee = callInst->getCallee();
             vector<Value *> my_args;
             set<Value *> ruined; // 数组参数,则其原来的值可能被破坏
             for (auto iter = args.begin(); iter != args.end(); iter++)
@@ -1817,6 +1829,37 @@ namespace sysy
               if (iter != AVALUE.end())
                 AVALUE.erase(iter);
             }
+            // for (auto iter = RVALUE.begin(); iter != RVALUE.end();)
+            // {
+            //   auto ldInst = dynamic_cast<LoadInst *>(*iter);
+            //   auto pointer = ldInst->getPointer();
+            //   if (ruined.find(pointer) != ruined.end())
+            //     iter = RVALUE.erase(iter);
+            //   else
+            //     iter++;
+            // }
+            // if (libfunc.find(callee->getName()) == libfunc.end())
+            // {
+            //   // 函数调用删除AVALUE中的全局变量
+            //   for (auto iter1 = AVALUE.begin(); iter1 != AVALUE.end();)
+            //   {
+            //     auto pointer = iter1->first;
+            //     if (isa<GlobalValue>(pointer))
+            //       iter1 = AVALUE.erase(iter1);
+            //     else
+            //       iter1++;
+            //   }
+            //   // 删除RVALUE中的全局变量
+            //   for (auto iter = RVALUE.begin(); iter != RVALUE.end();)
+            //   {
+            //     auto ldInst = dynamic_cast<LoadInst *>(*iter);
+            //     auto pointer = ldInst->getPointer();
+            //     if (isa<GlobalValue>(pointer))
+            //       iter = RVALUE.erase(iter);
+            //     else
+            //       iter++;
+            //   }
+            // }
             auto my_callInst = builder.createCallInst(callInst->getCallee(), my_args);
             callInst->setAlter(my_callInst);
           }
