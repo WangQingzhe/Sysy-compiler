@@ -247,10 +247,15 @@ namespace sysy
     IRBuilder builder;                                        // IR生成器
     map<Value *, map<vector<Value *>, Instruction *>> AVALUE; // 记录每个变量存在哪个虚拟寄存器
     // map<Instruction *, pair<Value *, vector<Value *>>> RVALUE; // 记录虚拟寄存器存储哪个变量
-    set<Value *> RVALUE; // 记录虚拟寄存器存储哪个变量
+    set<Value *> RVALUE;            // 记录虚拟寄存器存储哪个变量
+    map<Function *, bool> havecall; // 记录每个函数内是否有函数调用
+    bool hascall;                   // 记录当前函数是否有函数调用
 
   public:
-    LoadCut(Module *OriginModule) : OriginModule(OriginModule) { pModule = new Module(); }
+    LoadCut(Module *OriginModule) : OriginModule(OriginModule)
+    {
+      pModule = new Module();
+    }
 
   public:
     // 计算每个基本块的Kill,Gen集合
@@ -282,20 +287,17 @@ namespace sysy
     void CalIn_out(Function *);
     void print_USE_DEF(std::ostream &os);
     void print_Live_IN_OUT(std::ostream &os);
-    Module* Run();
+    Module *Run();
   };
-
 
   // DCE
   class DCE
   {
-    public:
+  public:
     Module *pModule;
     DCE(Module *pModule) : pModule(pModule) {}
 
-    public:
+  public:
     Module *Run();
-    
-
   };
 } // namespace sysy
