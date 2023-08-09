@@ -276,34 +276,6 @@ namespace sysy
     // Module *Run(std::ostream &os);
   };
 
-  // 活跃变量分析
-  class Lifetime
-  {
-  public:
-    Module *pModule;
-    Lifetime(Module *pModule) : pModule(pModule) {}
-
-  public:
-    // 计算每个基本块的use,def集合
-    void CalUse_Def(BasicBlock *);
-    // 计算每个基本块的in,out集合
-    void CalIn_out(Function *);
-    void print_USE_DEF(std::ostream &os);
-    void print_Live_IN_OUT(std::ostream &os);
-    Module *Run();
-  };
-
-  // DCE
-  class DCE
-  {
-  public:
-    Module *pModule;
-    DCE(Module *pModule) : pModule(pModule) {}
-
-  public:
-    Module *Run();
-  };
-
   // 公共子表达式删除
   class CommonExp
   {
@@ -329,4 +301,34 @@ namespace sysy
     // Module *Run();
     Module *Run(std::ostream &os);
   };
+
+  // 活跃变量分析
+  class Lifetime
+  {
+  public:
+    Module *pModule;
+    Lifetime(Module *pModule) : pModule(pModule) {}
+
+  public:
+    // 计算每个基本块的use,def集合
+    void CalUse_Def(BasicBlock *);
+    // 计算每个基本块的in,out集合
+    void CalIn_out(Function *);
+    void print_USE_DEF(std::ostream &os);
+    void print_Live_IN_OUT(std::ostream &os);
+    Module* Run();
+  };
+
+  // DCE
+  class DCE
+  {
+    public:
+    Module *pModule;
+    DCE(Module *pModule) : pModule(pModule) {}
+
+    public:
+    Module *Run();
+  };
+
+
 } // namespace sysy

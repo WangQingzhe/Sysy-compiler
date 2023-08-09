@@ -671,4 +671,121 @@ namespace sysy
     return dyncast<Function>(getOperand(0));
   }
 
+  void Module::print_live(std::ostream &os) const
+  {
+    for (auto iter : globals)
+    {
+      auto glbvl = iter.second;
+      os << *glbvl << '\n';
+    }
+    for (auto iter : functions)
+    {
+      auto func = iter.second;
+      if (func->getName() != "getint" && func->getName() != "getch" && func->getName() != "getfloat" && func->getName() != "getarray" && func->getName() != "getfarray" && func->getName() != "putint" && func->getName() != "putch" && func->getName() != "putfloat" && func->getName() != "putarray" && func->getName() != "putfarray" && func->getName() != "starttime" && func->getName() != "stoptime" && func->getName() != "putf")
+        func->print_live(os);
+        os << '\n';
+    }
+  }
+
+  void Function::print_live(std::ostream &os) const
+  {
+    auto returnType = getReturnType();
+    auto paramTypes = getParamTypes();
+    os << *returnType << ' ';
+    printFunctionName(os, this) << '(';
+    auto b = paramTypes.begin(), e = paramTypes.end();
+    if (b != e)
+    {
+      os << *(*b);
+      for (auto type : make_range(std::next(b), e))
+        os << ", " << *type;
+    }
+    os << ") {\n";
+    for (auto &bb : getBasicBlocks())
+    {
+      bb->print_live(os);
+      os << '\n';
+    }
+    os << "}";
+  }
+  
+ 
+  void BasicBlock::print_live(std::ostream &os) const
+  {
+    assert(hasName());
+    os << "  ";
+    printBlockName(os, this);
+    auto args = getArguments();
+    auto b = args.begin(), e = args.end();
+    if (b != e)
+    {
+      os << '(';
+      // printVarName(os, b->get()) << ": " << *b->get()->getType();
+      (*b).get()->print(os);
+
+      for (auto &arg : make_range(std::next(b), e))
+      {
+        os << ", ";
+        // printVarName(os, arg.get()) << ": " << *arg->getType();
+        arg.get()->print(os);
+      }
+      os << ')';
+    }
+    os << ":\n";
+    for (auto &inst : instructions)
+    {
+      os << endl;
+      os << "    " <<"[front live] ";
+      for(auto &i : inst.get()->front_live){
+        os << "%" << i->getName() << " ";
+      }
+      for(auto &i : inst.get()->front_vlive){
+        os << "%" <<i.first->getName();
+        auto indices = i.second;
+        for (auto indice : indices)
+        {
+          if (isa<ConstantValue>(indice))
+          {
+            os << "[";
+            os << dynamic_cast<ConstantValue *>(indice)->getInt();
+            os << "]";
+          }
+          else
+          {
+            os << "[";
+            os << "%" << indice->getName();
+            os << "]";
+          }
+        }
+      }
+      os << endl;
+      os << "    " << *inst << '\n';
+      os << "    " <<"[back live] ";
+      for(auto &i : inst.get()->back_live){
+        os << "%" << i->getName() << " ";
+      }
+      for(auto &i : inst.get()->back_vlive){
+        os << "%" <<i.first->getName();
+        auto indices = i.second;
+        for (auto indice : indices)
+        {
+          if (isa<ConstantValue>(indice))
+          {
+            os << "[";
+            os << dynamic_cast<ConstantValue *>(indice)->getInt();
+            os << "]";
+          }
+          else
+          {
+            os << "[";
+            os << "%" << indice->getName();
+            os << "]";
+          }
+        }
+      }
+      os << endl;
+    }
+  }
+
+
 } // namespace sysy

@@ -457,13 +457,14 @@ namespace sysy
     std::set<Instruction *> LiveOut;
     std::set<Instruction *> Use;
     std::set<Instruction *> Def;
+    std::set<pair<Value *, vector<Value *>>> vLiveIn, vLiveOut, vUse, vDef;
     // CommonExp
-    std::set<pair<Instruction *, pair<Instruction::Kind, pair<Value *, Value *>>>> BinaryEval;
-    std::set<pair<Instruction *, pair<Instruction::Kind, pair<Value *, Value *>>>> BinaryIn;
-    std::set<pair<Instruction *, pair<Instruction::Kind, pair<Value *, Value *>>>> BinaryOut;
-    std::set<pair<Instruction *, pair<Instruction::Kind, Value *>>> UnaryEval;
-    std::set<pair<Instruction *, pair<Instruction::Kind, Value *>>> UnaryIn;
-    std::set<pair<Instruction *, pair<Instruction::Kind, Value *>>> UnaryOut;
+    std::set<pair<Instruction *, pair<Value::Kind, pair<Value *, Value *>>>> BinaryEval;
+    std::set<pair<Instruction *, pair<Value::Kind, pair<Value *, Value *>>>> BinaryIn;
+    std::set<pair<Instruction *, pair<Value::Kind, pair<Value *, Value *>>>> BinaryOut;
+    std::set<pair<Instruction *, pair<Value::Kind, Value *>>> UnaryEval;
+    std::set<pair<Instruction *, pair<Value::Kind, Value *>>> UnaryIn;
+    std::set<pair<Instruction *, pair<Value::Kind, Value *>>> UnaryOut;
 
     int depth = 0; // 基本块的深度
 
@@ -505,6 +506,7 @@ namespace sysy
 
   public:
     void print(std::ostream &os) const override;
+    void print_live(std::ostream &os) const;
   }; // class BasicBlock
 
   //! User is the abstract base type of `Value` types which use other `Value` as
@@ -631,6 +633,8 @@ namespace sysy
   public:
     std::set<Instruction *> front_live; // 该指令前面点的活跃变量
     std::set<Instruction *> back_live;  // 该指令后面点的活跃变量
+    std::set<pair<Value *, vector<Value *>>> front_vlive; // 该指令前面点的活跃变量
+    std::set<pair<Value *, vector<Value *>>> back_vlive;  // 该指令后面点的活跃变量
     Kind getKind() const { return kind; }
     BasicBlock *getParent() const { return parent; }
     Function *getFunction() const { return parent->getParent(); }
@@ -1121,6 +1125,7 @@ namespace sysy
 
   public:
     void print(std::ostream &os) const override;
+    void print_live(std::ostream &os) const;
   }; // class Function
 
   // class ArrayValue : public User {
@@ -1330,6 +1335,7 @@ namespace sysy
 
   public:
     void print(std::ostream &os) const;
+    void print_live(std::ostream &os) const;
 
   public:
     std::map<std::string, Function *> *getFunctions()
