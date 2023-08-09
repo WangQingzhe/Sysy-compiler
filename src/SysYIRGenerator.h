@@ -325,7 +325,7 @@ namespace sysy
     void CalEval(BasicBlock *curbb);
     // 计算每个BB的In,Out集合
     void CalIn_Out(Function *curFunc);
-    void Regenerate();
+    void RegenerateIR();
     // Module *Run();
     Module *Run(std::ostream &os);
   };
