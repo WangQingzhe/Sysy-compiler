@@ -303,4 +303,26 @@ namespace sysy
   public:
     Module *Run();
   };
+
+  // 公共子表达式删除
+  class CommonExp
+  {
+  public:
+    Module *OriginModule;
+    Module *pModule;
+    IRBuilder builder;
+    map<Value *, Value *> Alter;
+    map<Instruction::Kind, map<set<Value *>, Instruction *>> bInsts;
+    map<Instruction::Kind, map<pair<Value *, Value *>, Instruction *>> OrderbInsts;
+    map<Instruction::Kind, map<Value *, Instruction *>> uInsts;
+
+  public:
+    CommonExp(Module *OriginModule) : OriginModule(OriginModule)
+    {
+      pModule = new Module();
+    }
+    void Regenerate();
+    // Module *Run();
+    Module *Run(std::ostream &os);
+  };
 } // namespace sysy
