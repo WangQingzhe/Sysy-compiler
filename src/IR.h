@@ -446,15 +446,24 @@ namespace sysy
     block_list predecessors;
 
   public:
+    // LoadCut
     vector<pair<Instruction *, pair<Value *, vector<Value *>>>> gen;
     vector<pair<Value *, vector<Value *>>> kill;
     vector<Value *> killptr;
     std::set<pair<Instruction *, pair<Value *, vector<Value *>>>> in;
     std::set<pair<Instruction *, pair<Value *, vector<Value *>>>> out;
+    // Live
     std::set<Instruction *> LiveIn;
     std::set<Instruction *> LiveOut;
     std::set<Instruction *> Use;
     std::set<Instruction *> Def;
+    // CommonExp
+    std::set<pair<Instruction *, pair<Instruction::Kind, pair<Value *, Value *>>>> BinaryEval;
+    std::set<pair<Instruction *, pair<Instruction::Kind, pair<Value *, Value *>>>> BinaryIn;
+    std::set<pair<Instruction *, pair<Instruction::Kind, pair<Value *, Value *>>>> BinaryOut;
+    std::set<pair<Instruction *, pair<Instruction::Kind, Value *>>> UnaryEval;
+    std::set<pair<Instruction *, pair<Instruction::Kind, Value *>>> UnaryIn;
+    std::set<pair<Instruction *, pair<Instruction::Kind, Value *>>> UnaryOut;
 
     int depth = 0; // 基本块的深度
 

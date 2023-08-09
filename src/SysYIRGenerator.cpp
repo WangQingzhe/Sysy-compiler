@@ -2268,7 +2268,35 @@ namespace sysy
   // Module *CommonExp::Run()
   Module *CommonExp::Run(std::ostream &os)
   {
-    // 生成全局变量
+    auto functions = OriginModule->getFunctions();
+    // 计算Eval集合
+    for (auto iter = functions->begin(); iter != functions->end(); iter++)
+    {
+      Function *func = iter->second;
+      auto bblist = func->getBasicBlocks();
+      if (bblist.empty())
+        continue;
+      for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+      {
+        auto bb = iter->get();
+        CalEval(bb);
+      }
+    }
+    // 计算In,Out集合
+    for (auto iter = functions->begin(); iter != functions->end(); iter++)
+    {
+      Function *func = iter->second;
+      auto bblist = func->getBasicBlocks();
+      if (bblist.empty())
+        continue;
+      CalIn_Out(func);
+    }
+    // 重新生成IR
+    RegenerateIR();
+    return pModule;
+  }
+  void CommonExp::RegenerateIR()
+  { // 生成全局变量
     auto global_values = OriginModule->getGlobalValues();
     for (auto iter = global_values->begin(); iter != global_values->end(); iter++)
     {
@@ -2336,12 +2364,12 @@ namespace sysy
             {
               if (bInsts.find(instrType) != bInsts.end() && bInsts[instrType].find({lhs, rhs}) != bInsts[instrType].end())
               {
-                os << "%" << bInst->getName() << "cut\n";
+                // os << "%" << bInst->getName() << "cut\n";
                 Alter[bInst] = bInsts[instrType][{lhs, rhs}];
               }
               else
               {
-                os << "%" << bInst->getName() << "keep\n";
+                // os << "%" << bInst->getName() << "keep\n";
                 auto my_bInst = builder.createBinaryInst(instrType, instr->getType(), lhs->getAlter(), rhs->getAlter());
                 bInst->setAlter(my_bInst);
                 bInsts[instrType][{lhs, rhs}] = bInst;
@@ -2351,12 +2379,12 @@ namespace sysy
             {
               if (OrderbInsts.find(instrType) != OrderbInsts.end() && OrderbInsts[instrType].find({lhs, rhs}) != OrderbInsts[instrType].end())
               {
-                os << "%" << bInst->getName() << "cut\n";
+                // os << "%" << bInst->getName() << "cut\n";
                 Alter[bInst] = OrderbInsts[instrType][{lhs, rhs}];
               }
               else
               {
-                os << "%" << bInst->getName() << "keep\n";
+                // os << "%" << bInst->getName() << "keep\n";
                 auto my_bInst = builder.createBinaryInst(instrType, instr->getType(), lhs->getAlter(), rhs->getAlter());
                 bInst->setAlter(my_bInst);
                 OrderbInsts[instrType][{lhs, rhs}] = bInst;
@@ -2464,9 +2492,18 @@ namespace sysy
         }
       }
     }
-    return pModule;
   }
-  void CommonExp::Regenerate()
+  void CommonExp::CalEval(BasicBlock *curbb)
+  {
+    for (auto &instriter : curbb->getInstructions())
+    {
+      auto instr = instriter.get();
+      if (isa<BinaryInst>(instr))
+      {
+      }
+    }
+  }
+  void CommonExp::CalIn_Out(Function *curFunc)
   {
   }
 } // namespace sysy
