@@ -2,7 +2,7 @@
  * @Description:
  * @Author: 王清哲
  * @Date: 2023-07-29 17:14:14
- * @LastEditTime: 2023-08-07 11:22:06
+ * @LastEditTime: 2023-08-10 18:35:13
  * @LastEditors: 王清哲
  */
 #include "tree/ParseTreeWalker.h"
@@ -50,25 +50,37 @@ int main(int argc, char **argv)
   LoadCut ldCut(moduleIR);
   auto ldCutIR = ldCut.Run();
 
+  // if (strcmp(argv[2], "ir1") == 0)
+  //   ldCutIR->print(cout);
+  DCE dce(ldCutIR);
+  auto DceIR = dce.Run();
+  // if (strcmp(argv[2], "ir2") == 0)
+  // DceIR->print(cout);
+
   if (genir)
   {
+    DceIR->print(cout);
+    // DceIR->print(cout);
     // moduleIR->Print_topology(cout);
     // ldCut.print_IN_OUT(cout);
-    ldCutIR->print(cout);
+    // if (strcmp(argv[2], "ir2") == 0)
+    // ldCutIR->print(cout);
+    // else if (strcmp(argv[2], "ir1") == 0)
+    // DceIR->print(cout);
     // ldCut.print_KILL_GEN(cout);
     // ldCut.print_IN_OUT(cout);
     // moduleIR->print(cout);
-    Lifetime lifetime(ldCutIR);
-    Module *ir = lifetime.Run();
-    lifetime.print_USE_DEF(cout);
-    lifetime.print_Live_IN_OUT(cout);
-    DCE dce(ir);
-    Module *ir2 = dce.Run();
+    // Lifetime lifetime(ldCutIR);
+    // Module *ir = lifetime.Run();
+    // lifetime.print_USE_DEF(cout);
+    // lifetime.print_Live_IN_OUT(cout);
+    // DCE dce(ir);
+    // Module *ir2 = dce.Run();
     return EXIT_SUCCESS;
   }
 
   // CodeGen codegen(moduleIR);
-  CodeGen codegen(ldCutIR);
+  CodeGen codegen(DceIR);
   string asmCode = codegen.code_gen();
   cout << asmCode << endl;
   ;

@@ -683,7 +683,7 @@ namespace sysy
       auto func = iter.second;
       if (func->getName() != "getint" && func->getName() != "getch" && func->getName() != "getfloat" && func->getName() != "getarray" && func->getName() != "getfarray" && func->getName() != "putint" && func->getName() != "putch" && func->getName() != "putfloat" && func->getName() != "putarray" && func->getName() != "putfarray" && func->getName() != "starttime" && func->getName() != "stoptime" && func->getName() != "putf")
         func->print_live(os);
-        os << '\n';
+      os << '\n';
     }
   }
 
@@ -708,8 +708,7 @@ namespace sysy
     }
     os << "}";
   }
-  
- 
+
   void BasicBlock::print_live(std::ostream &os) const
   {
     assert(hasName());
@@ -735,57 +734,62 @@ namespace sysy
     for (auto &inst : instructions)
     {
       os << endl;
-      os << "    " <<"[front live] ";
-      for(auto &i : inst.get()->front_live){
+      os << "    "
+         << "[front live] ";
+      for (auto &i : inst.get()->front_live)
+      {
         os << "%" << i->getName() << " ";
       }
-      for(auto &i : inst.get()->front_vlive){
-        os << "%" <<i.first->getName();
-        auto indices = i.second;
-        for (auto indice : indices)
-        {
-          if (isa<ConstantValue>(indice))
-          {
-            os << "[";
-            os << dynamic_cast<ConstantValue *>(indice)->getInt();
-            os << "]";
-          }
-          else
-          {
-            os << "[";
-            os << "%" << indice->getName();
-            os << "]";
-          }
-        }
+      for (auto &i : inst.get()->front_vlive)
+      {
+        os << "%" << i->getName();
+        // auto indices = i.second;
+        // for (auto indice : indices)
+        // {
+        //   if (isa<ConstantValue>(indice))
+        //   {
+        //     os << "[";
+        //     os << dynamic_cast<ConstantValue *>(indice)->getInt();
+        //     os << "]";
+        //   }
+        //   else
+        //   {
+        //     os << "[";
+        //     os << "%" << indice->getName();
+        //     os << "]";
+        //   }
+        // }
       }
       os << endl;
       os << "    " << *inst << '\n';
-      os << "    " <<"[back live] ";
-      for(auto &i : inst.get()->back_live){
+      os << "    "
+         << "[back live] ";
+      for (auto &i : inst.get()->back_live)
+      {
         os << "%" << i->getName() << " ";
       }
-      for(auto &i : inst.get()->back_vlive){
-        os << "%" <<i.first->getName();
-        auto indices = i.second;
-        for (auto indice : indices)
-        {
-          if (isa<ConstantValue>(indice))
-          {
-            os << "[";
-            os << dynamic_cast<ConstantValue *>(indice)->getInt();
-            os << "]";
-          }
-          else
-          {
-            os << "[";
-            os << "%" << indice->getName();
-            os << "]";
-          }
-        }
+      for (auto &i : inst.get()->back_vlive)
+      {
+        os << "%" << i->getName();
+        // auto indices = i.second;
+        // for (auto indice : indices)
+        // {
+        //   if (isa<ConstantValue>(indice))
+        //   {
+        //     os << "[";
+        //     os << dynamic_cast<ConstantValue *>(indice)->getInt();
+        //     os << "]";
+        //   }
+        //   else
+        //   {
+        //     os << "[";
+        //     os << "%" << indice->getName();
+        //     os << "]";
+        //   }
+        // }
       }
       os << endl;
     }
   }
-
 
 } // namespace sysy

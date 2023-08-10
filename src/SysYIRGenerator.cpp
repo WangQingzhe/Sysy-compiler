@@ -1966,7 +1966,12 @@ namespace sysy
         curbb->Use.erase(instr);
         auto pointer = ldInst->getPointer();
         auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
-        curbb->vUse.insert({pointer, indices});
+        curbb->vUse.insert(pointer);
+        for (auto indice : indices)
+        {
+          if (isa<Instruction>(indice))
+            curbb->Use.insert(dynamic_cast<Instruction *>(indice));
+        }
         break;
       }
 
@@ -1982,8 +1987,13 @@ namespace sysy
           Instruction *t = dynamic_cast<Instruction *>(value);
           curbb->Use.insert(t);
         }
-        curbb->vDef.insert({pointer, indices});
-        curbb->vUse.erase({pointer, indices});
+        curbb->vDef.insert(pointer);
+        curbb->vUse.erase(pointer);
+        for (auto indice : indices)
+        {
+          if (isa<Instruction>(indice))
+            curbb->Use.insert(dynamic_cast<Instruction *>(indice));
+        }
         break;
       }
 
@@ -2115,7 +2125,7 @@ namespace sysy
       {
         BasicBlock *bb = iter->get();
         std::set<Instruction *> oldlive_in, temp, t;
-        std::set<pair<Value *, vector<Value *>>> oldvlive_in, vtemp, vt;
+        std::set<Value *> oldvlive_in, vtemp, vt;
         temp.clear();
         vtemp.clear();
         t.clear();
@@ -2240,23 +2250,22 @@ namespace sysy
           }
           for (auto &i : bb->vUse)
           {
-            os << "%" << i.first->getName();
-            auto indices = i.second;
-            for (auto indice : indices)
-            {
-              if (isa<ConstantValue>(indice))
-              {
-                os << "[";
-                os << dynamic_cast<ConstantValue *>(indice)->getInt();
-                os << "]";
-              }
-              else
-              {
-                os << "[";
-                os << "%" << indice->getName();
-                os << "]";
-              }
-            }
+            os << "%" << i->getName();
+            // for (auto indice : indices)
+            // {
+            //   if (isa<ConstantValue>(indice))
+            //   {
+            //     os << "[";
+            //     os << dynamic_cast<ConstantValue *>(indice)->getInt();
+            //     os << "]";
+            //   }
+            //   else
+            //   {
+            //     os << "[";
+            //     os << "%" << indice->getName();
+            //     os << "]";
+            //   }
+            // }
             os << " ";
           }
 
@@ -2269,23 +2278,23 @@ namespace sysy
           }
           for (auto &i : bb->vDef)
           {
-            os << "%" << i.first->getName();
-            auto indices = i.second;
-            for (auto indice : indices)
-            {
-              if (isa<ConstantValue>(indice))
-              {
-                os << "[";
-                os << dynamic_cast<ConstantValue *>(indice)->getInt();
-                os << "]";
-              }
-              else
-              {
-                os << "[";
-                os << "%" << indice->getName();
-                os << "]";
-              }
-            }
+            os << "%" << i->getName();
+            // auto indices = i.second;
+            // for (auto indice : indices)
+            // {
+            //   if (isa<ConstantValue>(indice))
+            //   {
+            //     os << "[";
+            //     os << dynamic_cast<ConstantValue *>(indice)->getInt();
+            //     os << "]";
+            //   }
+            //   else
+            //   {
+            //     os << "[";
+            //     os << "%" << indice->getName();
+            //     os << "]";
+            //   }
+            // }
             cout << " ";
           }
           os << "\n";
@@ -2318,23 +2327,23 @@ namespace sysy
           }
           for (auto &i : bb->vLiveIn)
           {
-            os << "%" << i.first->getName();
-            auto indices = i.second;
-            for (auto indice : indices)
-            {
-              if (isa<ConstantValue>(indice))
-              {
-                os << "[";
-                os << dynamic_cast<ConstantValue *>(indice)->getInt();
-                os << "]";
-              }
-              else
-              {
-                os << "[";
-                os << "%" << indice->getName();
-                os << "]";
-              }
-            }
+            os << "%" << i->getName();
+            // auto indices = i.second;
+            // for (auto indice : indices)
+            // {
+            //   if (isa<ConstantValue>(indice))
+            //   {
+            //     os << "[";
+            //     os << dynamic_cast<ConstantValue *>(indice)->getInt();
+            //     os << "]";
+            //   }
+            //   else
+            //   {
+            //     os << "[";
+            //     os << "%" << indice->getName();
+            //     os << "]";
+            //   }
+            // }
             os << " ";
           }
           os << "\n";
@@ -2346,23 +2355,23 @@ namespace sysy
           }
           for (auto &i : bb->vLiveOut)
           {
-            os << "%" << i.first->getName();
-            auto indices = i.second;
-            for (auto indice : indices)
-            {
-              if (isa<ConstantValue>(indice))
-              {
-                os << "[";
-                os << dynamic_cast<ConstantValue *>(indice)->getInt();
-                os << "]";
-              }
-              else
-              {
-                os << "[";
-                os << "%" << indice->getName();
-                os << "]";
-              }
-            }
+            os << "%" << i->getName();
+            // auto indices = i.second;
+            // for (auto indice : indices)
+            // {
+            //   if (isa<ConstantValue>(indice))
+            //   {
+            //     os << "[";
+            //     os << dynamic_cast<ConstantValue *>(indice)->getInt();
+            //     os << "]";
+            //   }
+            //   else
+            //   {
+            //     os << "[";
+            //     os << "%" << indice->getName();
+            //     os << "]";
+            //   }
+            // }
             os << " ";
           }
           os << "\n";
@@ -2375,7 +2384,7 @@ namespace sysy
   {
     auto functions = pModule->getFunctions();
     std::set<Instruction *> live;
-    std::set<pair<Value *, vector<Value *>>> vlive;
+    std::set<Value *> vlive;
     int cnt = 0;
     // DCE for every functions
     for (auto fiter = functions->begin(); fiter != functions->end(); fiter++)
@@ -2439,7 +2448,12 @@ namespace sysy
                 break;
               }
               live.erase(instr);
-              vlive.insert({pointer, indices});
+              vlive.insert(pointer);
+              for (auto indice : indices)
+              {
+                if (isa<Instruction>(indice))
+                  live.insert(dynamic_cast<Instruction *>(indice));
+              }
               break;
             }
 
@@ -2450,7 +2464,7 @@ namespace sysy
               auto value = stInst->getValue();
               auto pointer = stInst->getPointer();
               auto indices = vector<Value *>(stInst->getIndices().begin(), stInst->getIndices().end());
-              if (vlive.count({pointer, indices}) == 0 && !isa<GlobalValue>(pointer))
+              if (vlive.count(pointer) == 0 && !isa<GlobalValue>(pointer) && indices.size() == 0)
               {
                 bb->getInstructions().erase(--iiter.base());
                 change = true;
@@ -2458,11 +2472,17 @@ namespace sysy
                 cnt++;
                 break;
               }
-              vlive.erase({pointer, indices});
+              if (indices.size() == 0)
+                vlive.erase(pointer);
               if (isa<Instruction>(value))
               {
                 Instruction *t = dynamic_cast<Instruction *>(value);
                 live.insert(t);
+              }
+              for (auto indice : indices)
+              {
+                if (isa<Instruction>(indice))
+                  live.insert(dynamic_cast<Instruction *>(indice));
               }
               break;
             }
@@ -2554,18 +2574,18 @@ namespace sysy
               CallInst *callInst = dynamic_cast<CallInst *>(instr);
               if (!callInst->getType()->isVoid())
               {
-                if (live.count(instr) == 0)
-                {
-                  bb->getInstructions().erase(--iiter.base());
-                  change = true;
-                  iiter--;
-                  cnt++;
-                  break;
-                }
-                else
-                {
-                  live.erase(instr);
-                }
+                // if (live.count(instr) == 0)
+                // {
+                //   bb->getInstructions().erase(--iiter.base());
+                //   change = true;
+                //   iiter--;
+                //   cnt++;
+                //   break;
+                // }
+                // else
+                // {
+                live.erase(instr);
+                // }
               }
               auto args = callInst->getArguments();
               for (auto arg : args)

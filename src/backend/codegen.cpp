@@ -242,6 +242,8 @@ namespace backend
                 }
                 else if (instrType == Value::Kind::kAlloca)
                 {
+                    auto alloca_inst = dynamic_cast<AllocaInst *>(instr.get());
+                    alloca_inst->setStart(instr_num);
                 }
                 else if (instrType == Value::Kind::kLoad)
                 {
@@ -1652,19 +1654,174 @@ namespace backend
         {
             int imm = -localVarStOffset[aInst];
             if (imm < 256)
-                code += space + "sub\tr3, fp, #" + to_string(imm) + endl;
+                code += space + "sub\tr9, fp, #" + to_string(imm) + endl;
             else
             {
-                code += space + "sub\tr3, fp, #" + to_string(imm / 256 * 256) + endl;
+                code += space + "sub\tr9, fp, #" + to_string(imm / 256 * 256) + endl;
                 if (imm % 256 != 0)
-                    code += space + "sub\tr3, r3, #" + to_string(imm % 256) + endl;
+                    code += space + "sub\tr9, r9, #" + to_string(imm % 256) + endl;
             }
             if (num >= 18)
             {
+                int protect_offset = 0;
+                int protect_cnt = 0;
+                set<Instruction *> protect_value; // 记录所有需要释放的被保护变量
+                if (RVALUE.find(RegManager::R2) != RVALUE.end() && RVALUE[RegManager::R2])
+                {
+                    protect_cnt++;
+                    auto protect_value = RVALUE[RegManager::R2];
+                    int imm = -(protect_reg_offset + protect_offset);
+                    if (imm < 256)
+                        code += emitInst_mem("str", "r2", "fp", protect_reg_offset + protect_offset);
+                    else
+                    {
+                        code += emitInst_1srcR_1DstR("sub", "r10", "fp", imm / 256 * 256);
+                        if (imm % 256 != 0)
+                            code += emitInst_1srcR_1DstR("sub", "r10", "r10", imm % 256);
+                        code += emitInst_mem("str", "r2", "r10");
+                    }
+                    AVALUE[protect_value].reg_num = RegManager::NONE;
+                    AVALUE[protect_value].stack_offset = protect_reg_offset + protect_offset;
+                    protect_offset -= 4;
+                }
                 code += space + "mov\tr2, #" + to_string(4 * num) + endl;
+                if (RVALUE.find(RegManager::R1) != RVALUE.end() && RVALUE[RegManager::R1])
+                {
+                    protect_cnt++;
+                    auto protect_value = RVALUE[RegManager::R1];
+                    int imm = -(protect_reg_offset + protect_offset);
+                    if (imm < 256)
+                        code += emitInst_mem("str", "r1", "fp", protect_reg_offset + protect_offset);
+                    else
+                    {
+                        code += emitInst_1srcR_1DstR("sub", "r10", "fp", imm / 256 * 256);
+                        if (imm % 256 != 0)
+                            code += emitInst_1srcR_1DstR("sub", "r10", "r10", imm % 256);
+                        code += emitInst_mem("str", "r1", "r10");
+                    }
+                    AVALUE[protect_value].reg_num = RegManager::NONE;
+                    AVALUE[protect_value].stack_offset = protect_reg_offset + protect_offset;
+                    protect_offset -= 4;
+                }
                 code += space + "mov\tr1, #0" + endl;
-                code += space + "mov\tr0, r3" + endl;
+                if (RVALUE.find(RegManager::R0) != RVALUE.end() && RVALUE[RegManager::R0])
+                {
+                    protect_cnt++;
+                    auto protect_value = RVALUE[RegManager::R0];
+                    int imm = -(protect_reg_offset + protect_offset);
+                    if (imm < 256)
+                        code += emitInst_mem("str", "r0", "fp", protect_reg_offset + protect_offset);
+                    else
+                    {
+                        code += emitInst_1srcR_1DstR("sub", "r10", "fp", imm / 256 * 256);
+                        if (imm % 256 != 0)
+                            code += emitInst_1srcR_1DstR("sub", "r10", "r10", imm % 256);
+                        code += emitInst_mem("str", "r0", "r10");
+                    }
+                    AVALUE[protect_value].reg_num = RegManager::NONE;
+                    AVALUE[protect_value].stack_offset = protect_reg_offset + protect_offset;
+                    protect_offset -= 4;
+                }
+                code += space + "mov\tr0, r9" + endl;
+                // 2.保护其他活跃变量
+                auto bbs = curFunc->getBasicBlocks();
+                bool PreValue = true; // 判断活跃区间的起点是否在alloca指令之前
+                for (auto iter = bbs.begin(); iter != bbs.end(); ++iter)
+                {
+                    auto bb = iter->get();
+                    for (auto &instr : bb->getInstructions())
+                    {
+                        // code += "%" + instr->getName() + " " + regm.toString(Register[instr.get()]) + "\n";
+                        if (instr->GetStart() >= aInst->GetStart())
+                        {
+                            PreValue = false;
+                            break;
+                        }
+                        auto instrType = instr->getKind();
+                        // 只考虑能产生新变量的指令,这样就相当于从小到大遍历所有变量
+                        if ((instrType == Value::Kind::kCall && !instr->getType()->isVoid()) || instrType == Value::Kind::kLoad || instr->isBinary() || instr->isUnary())
+                        {
+                            // code += "%" + instr->getName() + "end:" + to_string(instr->GetEnd()) + endl;
+                            // code += "%" + callInst->getName() + "start:" + to_string(callInst->GetStart()) + endl;
+                            // 若区间在call指令后不再活跃,不用保护
+                            if (instr->GetEnd() <= aInst->GetStart())
+                                continue;
+                            // 若区间在栈上,不用保护
+                            if (Register[instr.get()] == RegManager::NONE)
+                                continue;
+                            protect_value.insert(instr.get());
+                            // 若区间已被保护,不用再生成store指令
+                            if (AVALUE[instr.get()].reg_num == RegManager::NONE)
+                                continue;
+                            // 若区间在call指令后仍然活跃,需要保护
+                            int imm = -(protect_reg_offset + protect_offset);
+                            if (instr->getType()->isInt())
+                            {
+                                if (imm < 256)
+                                    code += emitInst_mem("str", regm.toString(AVALUE[instr.get()].reg_num), "fp", protect_reg_offset + protect_offset);
+                                else
+                                {
+                                    code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                                    if (imm % 256 != 0)
+                                        code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                                    code += emitInst_mem("str", regm.toString(AVALUE[instr.get()].reg_num), "r9");
+                                }
+                            }
+                            else
+                            {
+                                if (imm < 256)
+                                    code += emitInst_mem("vstr.32", regm.toString(AVALUE[instr.get()].reg_num), "fp", protect_reg_offset + protect_offset);
+                                else
+                                {
+                                    code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                                    if (imm % 256 != 0)
+                                        code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                                    code += emitInst_mem("vstr.32", regm.toString(AVALUE[instr.get()].reg_num), "r9");
+                                }
+                            }
+                            AVALUE[instr.get()].reg_num = RegManager::NONE;
+                            AVALUE[instr.get()].stack_offset = protect_reg_offset + protect_offset;
+                            protect_offset -= 4;
+                            protect_cnt++;
+                        }
+                    }
+                    if (!PreValue)
+                        break;
+                }
+                max_protect = max_protect > protect_cnt ? max_protect : protect_cnt;
                 code += space + "bl\tmemset" + endl;
+                // 将保护区释放回变量的寄存器
+                for (auto value : protect_value)
+                {
+                    // code += regm.toString(Register[value]) + " " + to_string(AVALUE[value].stack_offset) + endl;
+                    int imm = -AVALUE[value].stack_offset;
+                    if (value->getType()->isInt())
+                    {
+                        if (imm < 256)
+                            code += emitInst_mem("ldr", regm.toString(Register[value]), "fp", AVALUE[value].stack_offset);
+                        else
+                        {
+                            code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                            if (imm % 256 != 0)
+                                code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                            code += emitInst_mem("ldr", regm.toString(Register[value]), "r9");
+                        }
+                    }
+                    else if (value->getType()->isFloat())
+                    {
+                        if (imm < 256)
+                            code += emitInst_mem("vldr.32", regm.toString(Register[value]), "fp", AVALUE[value].stack_offset);
+                        else
+                        {
+                            code += emitInst_1srcR_1DstR("sub", "r9", "fp", imm / 256 * 256);
+                            if (imm % 256 != 0)
+                                code += emitInst_1srcR_1DstR("sub", "r9", "r9", imm % 256);
+                            code += emitInst_mem("vldr.32", regm.toString(Register[value]), "r9");
+                        }
+                    }
+                    AVALUE[value].reg_num = Register[value];
+                    RVALUE[Register[value]] = value;
+                }
                 haveCall = true;
             }
             // else if (num % 4 == 0)
@@ -1684,7 +1841,7 @@ namespace backend
                 code += space + "vmov.i32\td18, #0\t@ v8qi" + endl;
                 for (int i = 0; i < num / 2; i++)
                 {
-                    code += space + "vstr\td18, [r3, #" + to_string(i * 8) + "]" + endl;
+                    code += space + "vstr\td18, [r9, #" + to_string(i * 8) + "]" + endl;
                 }
             }
             else
@@ -1693,9 +1850,9 @@ namespace backend
                 code += space + "vmov.i32\td18, #0\t@ v8qi" + endl;
                 for (i = 0; i < num / 2; i++)
                 {
-                    code += space + "vstr\td18, [r3, #" + to_string(i * 8) + "]" + endl;
+                    code += space + "vstr\td18, [r9, #" + to_string(i * 8) + "]" + endl;
                 }
-                code += space + "vstr\td18, [r3, #" + to_string(i * 8 - 4) + "]" + endl;
+                code += space + "vstr\td18, [r9, #" + to_string(i * 8 - 4) + "]" + endl;
             }
         }
         dstRegId = RegManager::NONE;

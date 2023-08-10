@@ -457,7 +457,7 @@ namespace sysy
     std::set<Instruction *> LiveOut;
     std::set<Instruction *> Use;
     std::set<Instruction *> Def;
-    std::set<pair<Value *, vector<Value *>>> vLiveIn, vLiveOut, vUse, vDef;
+    std::set<Value *> vLiveIn, vLiveOut, vUse, vDef;
     // CommonExp
     std::set<pair<Instruction *, pair<Value::Kind, pair<Value *, Value *>>>> BinaryEval;
     std::set<pair<Instruction *, pair<Value::Kind, pair<Value *, Value *>>>> BinaryIn;
@@ -633,8 +633,8 @@ namespace sysy
   public:
     std::set<Instruction *> front_live; // 该指令前面点的活跃变量
     std::set<Instruction *> back_live;  // 该指令后面点的活跃变量
-    std::set<pair<Value *, vector<Value *>>> front_vlive; // 该指令前面点的活跃变量
-    std::set<pair<Value *, vector<Value *>>> back_vlive;  // 该指令后面点的活跃变量
+    std::set<Value *> front_vlive;      // 该指令前面点的活跃变量
+    std::set<Value *> back_vlive;       // 该指令后面点的活跃变量
     Kind getKind() const { return kind; }
     BasicBlock *getParent() const { return parent; }
     Function *getFunction() const { return parent->getParent(); }
