@@ -276,32 +276,6 @@ namespace sysy
     // Module *Run(std::ostream &os);
   };
 
-  // 公共子表达式删除
-  class CommonExp
-  {
-  public:
-    Module *OriginModule;
-    Module *pModule;
-    IRBuilder builder;
-    map<Value *, Value *> Alter;
-    map<Instruction::Kind, map<set<Value *>, Instruction *>> bInsts;
-    map<Instruction::Kind, map<pair<Value *, Value *>, Instruction *>> OrderbInsts;
-    map<Instruction::Kind, map<Value *, Instruction *>> uInsts;
-
-  public:
-    CommonExp(Module *OriginModule) : OriginModule(OriginModule)
-    {
-      pModule = new Module();
-    }
-    // 计算BB产生的可用表达式
-    void CalEval(BasicBlock *curbb);
-    // 计算每个BB的In,Out集合
-    void CalIn_Out(Function *curFunc);
-    void RegenerateIR();
-    // Module *Run();
-    Module *Run(std::ostream &os);
-  };
-
   // 活跃变量分析
   class Lifetime
   {
@@ -316,19 +290,46 @@ namespace sysy
     void CalIn_out(Function *);
     void print_USE_DEF(std::ostream &os);
     void print_Live_IN_OUT(std::ostream &os);
-    Module* Run();
+    Module *Run();
   };
 
   // DCE
   class DCE
   {
-    public:
+  public:
     Module *pModule;
     DCE(Module *pModule) : pModule(pModule) {}
 
-    public:
+  public:
     Module *Run();
   };
 
+  // 公共子表达式删除
+  class CommonExp
+  {
+  public:
+    Module *OriginModule;
+    Module *pModule;
+    Module *ppModule;
+    IRBuilder builder;
+    map<Value *, Value *> Alter;
+    map<Instruction::Kind, map<set<Value *>, Instruction *>> bInsts;
+    map<Instruction::Kind, map<pair<Value *, Value *>, Instruction *>> OrderbInsts;
+    map<Instruction::Kind, map<Value *, Instruction *>> uInsts;
 
+  public:
+    CommonExp(Module *OriginModule) : OriginModule(OriginModule)
+    {
+      pModule = new Module();
+      ppModule = new Module();
+    }
+    // 计算BB产生的可用表达式
+    void CalEval(BasicBlock *curbb, int pass);
+    // 计算每个BB的In,Out集合
+    void CalIn_Out(Function *curFunc);
+    // 重新生成IR
+    void RegenerateIR();
+    Module *Run();
+    // Module *Run(std::ostream &os);
+  };
 } // namespace sysy

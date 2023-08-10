@@ -1911,11 +1911,8 @@ namespace sysy
       }
     }
   }
- 
- 
- 
- 
-  Module* Lifetime::Run()
+
+  Module *Lifetime::Run()
   {
     // cal Use and Def
     auto functions = pModule->getFunctions();
@@ -1923,7 +1920,7 @@ namespace sysy
     {
       Function *func = fiter->second;
       auto bblist = func->getBasicBlocks();
-      if(bblist.empty() || !(func->getName() != "getint" && func->getName() != "getch" && func->getName() != "getfloat" && func->getName() != "getarray" && func->getName() != "getfarray" && func->getName() != "putint" && func->getName() != "putch" && func->getName() != "putfloat" && func->getName() != "putarray" && func->getName() != "putfarray" && func->getName() != "starttime" && func->getName() != "stoptime" && func->getName() != "putf"))
+      if (bblist.empty() || !(func->getName() != "getint" && func->getName() != "getch" && func->getName() != "getfloat" && func->getName() != "getarray" && func->getName() != "getfarray" && func->getName() != "putint" && func->getName() != "putch" && func->getName() != "putfloat" && func->getName() != "putarray" && func->getName() != "putfarray" && func->getName() != "starttime" && func->getName() != "stoptime" && func->getName() != "putf"))
         continue;
       for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
       {
@@ -1945,164 +1942,163 @@ namespace sysy
     {
       Function *func = fiter->second;
       auto bblist = func->getBasicBlocks();
-      if(bblist.empty() || !(func->getName() != "getint" && func->getName() != "getch" && func->getName() != "getfloat" && func->getName() != "getarray" && func->getName() != "getfarray" && func->getName() != "putint" && func->getName() != "putch" && func->getName() != "putfloat" && func->getName() != "putarray" && func->getName() != "putfarray" && func->getName() != "starttime" && func->getName() != "stoptime" && func->getName() != "putf"))
+      if (bblist.empty() || !(func->getName() != "getint" && func->getName() != "getch" && func->getName() != "getfloat" && func->getName() != "getarray" && func->getName() != "getfarray" && func->getName() != "putint" && func->getName() != "putch" && func->getName() != "putfloat" && func->getName() != "putarray" && func->getName() != "putfarray" && func->getName() != "starttime" && func->getName() != "stoptime" && func->getName() != "putf"))
         continue;
       CalIn_out(func);
     }
     return pModule;
   }
 
-
   void Lifetime::CalUse_Def(BasicBlock *curbb)
   {
-   // auto Instrs = curbb->getInstructions();
-    for(auto iiter = curbb->rbegin(); iiter != curbb->rend(); iiter++)
+    // auto Instrs = curbb->getInstructions();
+    for (auto iiter = curbb->rbegin(); iiter != curbb->rend(); iiter++)
     {
       auto instr = iiter->get();
       auto instrType = instr->getKind();
       switch (instrType)
       {
-        //Load Instr
-        case Instruction::kLoad:
-        {
-          LoadInst *ldInst = dynamic_cast<LoadInst *>(instr);
-          curbb->Def.insert(instr);
-          curbb->Use.erase(instr);
-          auto pointer = ldInst->getPointer();
-          auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
-          curbb->vUse.insert({pointer, indices});
-          break;
-        }
-      
-        //Store Instr
-        case Instruction::kStore:
-        {
-          StoreInst *stInst = dynamic_cast<StoreInst *>(instr);
-          auto value = stInst->getValue();
-          auto pointer = stInst->getPointer();
-          auto indices = vector<Value *>(stInst->getIndices().begin(), stInst->getIndices().end());
-          if (isa<Instruction>(value))
-          {
-            Instruction *t = dynamic_cast<Instruction *>(value);
-            curbb->Use.insert(t);
-          }
-          curbb->vDef.insert({pointer, indices});
-          curbb->vUse.erase({pointer, indices});
-          break;
-        }
-
-        //Binary Instr
-        case Instruction::kICmpEQ:
-        case Instruction::kICmpGE:
-        case Instruction::kICmpGT:
-        case Instruction::kICmpLE:
-        case Instruction::kICmpLT:
-        case Instruction::kICmpNE:
-        case Instruction::kAdd:
-        case Instruction::kMul:
-        case Instruction::kSub:
-        case Instruction::kDiv:
-        case Instruction::kRem:
-        case Instruction::kFAdd:
-        case Instruction::kFSub:
-        case Instruction::kFMul:
-        case Instruction::kFDiv:
-        case Instruction::kFRem:
-        case Instruction::kFCmpEQ:
-        case Instruction::kFCmpNE:
-        case Instruction::kFCmpLT:
-        case Instruction::kFCmpGT:
-        case Instruction::kFCmpLE:
-        case Instruction::kFCmpGE:
-        {
-          curbb->Def.insert(instr);
-          curbb->Use.erase(instr);
-          BinaryInst *bInst = dynamic_cast<BinaryInst *>(instr);
-          auto lhs = bInst->getLhs();
-          auto rhs = bInst->getRhs();
-          if (isa<Instruction>(lhs))
-          {
-            Instruction *t = dynamic_cast<Instruction *>(lhs);
-            curbb->Use.insert(t);
-          }
-          if (isa<Instruction>(rhs))
-          {
-            Instruction *t = dynamic_cast<Instruction *>(rhs);
-            curbb->Use.insert(t);
-          }
-          break;
-        }
-
-        //Unary Instr
-        case Instruction::kFNeg:
-        case Instruction::kFtoI:
-        case Instruction::kNeg:
-        case Instruction::kNot:
-        case Instruction::kItoF:
-        {
-          curbb->Def.insert(instr);
-          curbb->Use.erase(instr);
-          UnaryInst *unaryInst = dynamic_cast<UnaryInst *>(instr);
-          auto val = unaryInst->getOperand();
-          if (isa<Instruction>(val))
-          {
-            Instruction *t = dynamic_cast<Instruction *>(val);
-            curbb->Use.insert(t);
-          }
-          break;
-        }
-
-        //Call Instr
-        case Instruction::kCall:
-        {
-          CallInst *callInst = dynamic_cast<CallInst *>(instr);
-          if (!callInst->getType()->isVoid())
-          {
-            curbb->Def.insert(instr);
-            curbb->Use.erase(instr);
-          }
-          break;
-        }
-
-        //Return Instr
-        case Instruction::kReturn:
-        {
-          ReturnInst *retInst = dynamic_cast<ReturnInst *>(instr);
-          auto retval = retInst->getReturnValue();
-          if (retval != nullptr){
-              Instruction *t = dynamic_cast<Instruction *>(retval);
-              curbb->Use.insert(t);
-            }
-          break;
-        }
-
-        //CondBr Instr
-        case Instruction::kCondBr:
-        {
-          CondBrInst *condbrInst = dynamic_cast<CondBrInst *>(instr);
-          auto cond = condbrInst->getCondition();
-          if (isa<Instruction>(cond))
-          {
-            Instruction *t = dynamic_cast<Instruction *>(cond);
-            curbb->Use.insert(t);
-            curbb->Use.insert(t);
-          }
-          break;
-        }
-
-        // no use reg instruction
-        case Instruction::kAlloca:
-        case Instruction::kBr:
-        {
-          break;
-        }
-        default:
-        {
-          assert(1);
-          break;
-        }
+      // Load Instr
+      case Instruction::kLoad:
+      {
+        LoadInst *ldInst = dynamic_cast<LoadInst *>(instr);
+        curbb->Def.insert(instr);
+        curbb->Use.erase(instr);
+        auto pointer = ldInst->getPointer();
+        auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+        curbb->vUse.insert({pointer, indices});
+        break;
       }
 
+      // Store Instr
+      case Instruction::kStore:
+      {
+        StoreInst *stInst = dynamic_cast<StoreInst *>(instr);
+        auto value = stInst->getValue();
+        auto pointer = stInst->getPointer();
+        auto indices = vector<Value *>(stInst->getIndices().begin(), stInst->getIndices().end());
+        if (isa<Instruction>(value))
+        {
+          Instruction *t = dynamic_cast<Instruction *>(value);
+          curbb->Use.insert(t);
+        }
+        curbb->vDef.insert({pointer, indices});
+        curbb->vUse.erase({pointer, indices});
+        break;
+      }
+
+      // Binary Instr
+      case Instruction::kICmpEQ:
+      case Instruction::kICmpGE:
+      case Instruction::kICmpGT:
+      case Instruction::kICmpLE:
+      case Instruction::kICmpLT:
+      case Instruction::kICmpNE:
+      case Instruction::kAdd:
+      case Instruction::kMul:
+      case Instruction::kSub:
+      case Instruction::kDiv:
+      case Instruction::kRem:
+      case Instruction::kFAdd:
+      case Instruction::kFSub:
+      case Instruction::kFMul:
+      case Instruction::kFDiv:
+      case Instruction::kFRem:
+      case Instruction::kFCmpEQ:
+      case Instruction::kFCmpNE:
+      case Instruction::kFCmpLT:
+      case Instruction::kFCmpGT:
+      case Instruction::kFCmpLE:
+      case Instruction::kFCmpGE:
+      {
+        curbb->Def.insert(instr);
+        curbb->Use.erase(instr);
+        BinaryInst *bInst = dynamic_cast<BinaryInst *>(instr);
+        auto lhs = bInst->getLhs();
+        auto rhs = bInst->getRhs();
+        if (isa<Instruction>(lhs))
+        {
+          Instruction *t = dynamic_cast<Instruction *>(lhs);
+          curbb->Use.insert(t);
+        }
+        if (isa<Instruction>(rhs))
+        {
+          Instruction *t = dynamic_cast<Instruction *>(rhs);
+          curbb->Use.insert(t);
+        }
+        break;
+      }
+
+      // Unary Instr
+      case Instruction::kFNeg:
+      case Instruction::kFtoI:
+      case Instruction::kNeg:
+      case Instruction::kNot:
+      case Instruction::kItoF:
+      {
+        curbb->Def.insert(instr);
+        curbb->Use.erase(instr);
+        UnaryInst *unaryInst = dynamic_cast<UnaryInst *>(instr);
+        auto val = unaryInst->getOperand();
+        if (isa<Instruction>(val))
+        {
+          Instruction *t = dynamic_cast<Instruction *>(val);
+          curbb->Use.insert(t);
+        }
+        break;
+      }
+
+      // Call Instr
+      case Instruction::kCall:
+      {
+        CallInst *callInst = dynamic_cast<CallInst *>(instr);
+        if (!callInst->getType()->isVoid())
+        {
+          curbb->Def.insert(instr);
+          curbb->Use.erase(instr);
+        }
+        break;
+      }
+
+      // Return Instr
+      case Instruction::kReturn:
+      {
+        ReturnInst *retInst = dynamic_cast<ReturnInst *>(instr);
+        auto retval = retInst->getReturnValue();
+        if (retval != nullptr)
+        {
+          Instruction *t = dynamic_cast<Instruction *>(retval);
+          curbb->Use.insert(t);
+        }
+        break;
+      }
+
+      // CondBr Instr
+      case Instruction::kCondBr:
+      {
+        CondBrInst *condbrInst = dynamic_cast<CondBrInst *>(instr);
+        auto cond = condbrInst->getCondition();
+        if (isa<Instruction>(cond))
+        {
+          Instruction *t = dynamic_cast<Instruction *>(cond);
+          curbb->Use.insert(t);
+          curbb->Use.insert(t);
+        }
+        break;
+      }
+
+      // no use reg instruction
+      case Instruction::kAlloca:
+      case Instruction::kBr:
+      {
+        break;
+      }
+      default:
+      {
+        assert(1);
+        break;
+      }
+      }
     }
   }
   void Lifetime::CalIn_out(Function *curFunc)
@@ -2112,29 +2108,29 @@ namespace sysy
     if (bblist.empty())
       return;
     int loop = 0;
-    while(change)
+    while (change)
     {
       change = false;
       for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
       {
         BasicBlock *bb = iter->get();
         std::set<Instruction *> oldlive_in, temp, t;
-        std::set<pair<Value *, vector<Value *>>>oldvlive_in, vtemp, vt;
+        std::set<pair<Value *, vector<Value *>>> oldvlive_in, vtemp, vt;
         temp.clear();
         vtemp.clear();
         t.clear();
         vt.clear();
-        for(auto item : bb->LiveIn)
+        for (auto item : bb->LiveIn)
         {
           oldlive_in.insert(item);
         }
-        for(auto item : bb->vLiveIn)
+        for (auto item : bb->vLiveIn)
         {
           oldvlive_in.insert(item);
         }
         bb->LiveOut.clear();
         bb->vLiveOut.clear();
-        //Cal Live Out
+        // Cal Live Out
         auto succs = bb->getSuccessors();
         if (bb->getNumSuccessors() > 0)
         {
@@ -2212,7 +2208,7 @@ namespace sysy
         std::set_union(vtemp.begin(), vtemp.end(), bb->vUse.begin(), bb->vUse.end(), inserter(bb->vLiveIn, bb->vLiveIn.begin()));
         vtemp.clear();
         // Check if changed
-        if (bb->LiveIn != oldlive_in || bb->vLiveIn != oldvlive_in )
+        if (bb->LiveIn != oldlive_in || bb->vLiveIn != oldvlive_in)
           change = true;
       }
       loop++;
@@ -2244,7 +2240,7 @@ namespace sysy
           }
           for (auto &i : bb->vUse)
           {
-            os << "%" <<i.first->getName();
+            os << "%" << i.first->getName();
             auto indices = i.second;
             for (auto indice : indices)
             {
@@ -2261,7 +2257,7 @@ namespace sysy
                 os << "]";
               }
             }
-            os  << " ";
+            os << " ";
           }
 
           os << "\n";
@@ -2273,7 +2269,7 @@ namespace sysy
           }
           for (auto &i : bb->vDef)
           {
-            os << "%" <<i.first->getName();
+            os << "%" << i.first->getName();
             auto indices = i.second;
             for (auto indice : indices)
             {
@@ -2320,9 +2316,9 @@ namespace sysy
           {
             os << "%" << k->getName() << " ";
           }
-          for(auto &i : bb->vLiveIn)
+          for (auto &i : bb->vLiveIn)
           {
-            os << "%" <<i.first->getName();
+            os << "%" << i.first->getName();
             auto indices = i.second;
             for (auto indice : indices)
             {
@@ -2350,7 +2346,7 @@ namespace sysy
           }
           for (auto &i : bb->vLiveOut)
           {
-            os << "%" <<i.first->getName();
+            os << "%" << i.first->getName();
             auto indices = i.second;
             for (auto indice : indices)
             {
@@ -2381,28 +2377,28 @@ namespace sysy
     std::set<Instruction *> live;
     std::set<pair<Value *, vector<Value *>>> vlive;
     int cnt = 0;
-    //DCE for every functions
+    // DCE for every functions
     for (auto fiter = functions->begin(); fiter != functions->end(); fiter++)
     {
       Function *func = fiter->second;
       auto bblist = func->getBasicBlocks();
-      if(bblist.empty())
+      if (bblist.empty())
         continue;
       bool change = true;
-      while(change)
+      while (change)
       {
         change = false;
-        //live var analyze for BasicBlocks
+        // live var analyze for BasicBlocks
         Lifetime lifetime(pModule);
         pModule = lifetime.Run();
 
-        //live var analyze for Instructions
+        // live var analyze for Instructions
         for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
         {
-          BasicBlock* bb = biter->get();
+          BasicBlock *bb = biter->get();
           live.clear();
           vlive.clear();
-          for(auto item : bb->LiveOut)
+          for (auto item : bb->LiveOut)
           {
             live.insert(item);
           }
@@ -2428,205 +2424,216 @@ namespace sysy
             }
             switch (instrType)
             {
-              //Load Instr
-              case Instruction::kLoad:
+            // Load Instr
+            case Instruction::kLoad:
+            {
+              LoadInst *ldInst = dynamic_cast<LoadInst *>(instr);
+              auto pointer = ldInst->getPointer();
+              auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+              if (live.count(instr) == 0)
               {
-                LoadInst *ldInst = dynamic_cast<LoadInst *>(instr);
-                auto pointer = ldInst->getPointer();
-                auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
-                if(live.count(instr) == 0){
-                  bb->getInstructions().erase(--iiter.base());
-                  iiter--;cnt++;
-                  change = true;
-                  break;
-                }
+                bb->getInstructions().erase(--iiter.base());
+                iiter--;
+                cnt++;
+                change = true;
+                break;
+              }
+              live.erase(instr);
+              vlive.insert({pointer, indices});
+              break;
+            }
+
+            // Store Instr
+            case Instruction::kStore:
+            {
+              StoreInst *stInst = dynamic_cast<StoreInst *>(instr);
+              auto value = stInst->getValue();
+              auto pointer = stInst->getPointer();
+              auto indices = vector<Value *>(stInst->getIndices().begin(), stInst->getIndices().end());
+              if (vlive.count({pointer, indices}) == 0 && !isa<GlobalValue>(pointer))
+              {
+                bb->getInstructions().erase(--iiter.base());
+                change = true;
+                iiter--;
+                cnt++;
+                break;
+              }
+              vlive.erase({pointer, indices});
+              if (isa<Instruction>(value))
+              {
+                Instruction *t = dynamic_cast<Instruction *>(value);
+                live.insert(t);
+              }
+              break;
+            }
+
+            // Binary Instr
+            case Instruction::kICmpEQ:
+            case Instruction::kICmpGE:
+            case Instruction::kICmpGT:
+            case Instruction::kICmpLE:
+            case Instruction::kICmpLT:
+            case Instruction::kICmpNE:
+            case Instruction::kAdd:
+            case Instruction::kMul:
+            case Instruction::kSub:
+            case Instruction::kDiv:
+            case Instruction::kRem:
+            case Instruction::kFAdd:
+            case Instruction::kFSub:
+            case Instruction::kFMul:
+            case Instruction::kFDiv:
+            case Instruction::kFRem:
+            case Instruction::kFCmpEQ:
+            case Instruction::kFCmpNE:
+            case Instruction::kFCmpLT:
+            case Instruction::kFCmpGT:
+            case Instruction::kFCmpLE:
+            case Instruction::kFCmpGE:
+            {
+              if (live.count(instr) == 0)
+              {
+                bb->getInstructions().erase(--iiter.base());
+                change = true;
+                iiter--;
+                cnt++;
+                break;
+              }
+              else
+              {
                 live.erase(instr);
-                vlive.insert({pointer, indices});
+              }
+              BinaryInst *bInst = dynamic_cast<BinaryInst *>(instr);
+              auto lhs = bInst->getLhs();
+              auto rhs = bInst->getRhs();
+              if (isa<Instruction>(lhs))
+              {
+                Instruction *t = dynamic_cast<Instruction *>(lhs);
+                live.insert(t);
+              }
+              if (isa<Instruction>(rhs))
+              {
+                Instruction *t = dynamic_cast<Instruction *>(rhs);
+                live.insert(t);
+              }
+              break;
+            }
+
+            // Unary Instr
+            case Instruction::kFNeg:
+            case Instruction::kFtoI:
+            case Instruction::kNeg:
+            case Instruction::kNot:
+            case Instruction::kItoF:
+            {
+              if (live.count(instr) == 0)
+              {
+                bb->getInstructions().erase(--iiter.base());
+                change = true;
+                iiter--;
+                cnt++;
                 break;
               }
-
-              //Store Instr
-              case Instruction::kStore:
+              else
               {
-                StoreInst *stInst = dynamic_cast<StoreInst *>(instr);
-                auto value = stInst->getValue();
-                auto pointer = stInst->getPointer();
-                auto indices = vector<Value *>(stInst->getIndices().begin(), stInst->getIndices().end());
-                if(vlive.count({pointer, indices}) == 0 && !isa<GlobalValue>(pointer))
+                live.erase(instr);
+              }
+              UnaryInst *unaryInst = dynamic_cast<UnaryInst *>(instr);
+              auto val = unaryInst->getOperand();
+              if (isa<Instruction>(val))
+              {
+                Instruction *t = dynamic_cast<Instruction *>(val);
+                live.insert(t);
+              }
+              break;
+            }
+
+            // Call Instr
+            case Instruction::kCall:
+            {
+              CallInst *callInst = dynamic_cast<CallInst *>(instr);
+              if (!callInst->getType()->isVoid())
+              {
+                if (live.count(instr) == 0)
                 {
                   bb->getInstructions().erase(--iiter.base());
                   change = true;
-                  iiter--;cnt++;
+                  iiter--;
+                  cnt++;
                   break;
                 }
-                vlive.erase({pointer, indices});
-                if (isa<Instruction>(value))
+                else
                 {
-                  Instruction *t = dynamic_cast<Instruction *>(value);
-                  live.insert(t);
-                }
-                break;
-              }
-
-
-              //Binary Instr
-              case Instruction::kICmpEQ:
-              case Instruction::kICmpGE:
-              case Instruction::kICmpGT:
-              case Instruction::kICmpLE:
-              case Instruction::kICmpLT:
-              case Instruction::kICmpNE:
-              case Instruction::kAdd:
-              case Instruction::kMul:
-              case Instruction::kSub:
-              case Instruction::kDiv:
-              case Instruction::kRem:
-              case Instruction::kFAdd:
-              case Instruction::kFSub:
-              case Instruction::kFMul:
-              case Instruction::kFDiv:
-              case Instruction::kFRem:
-              case Instruction::kFCmpEQ:
-              case Instruction::kFCmpNE:
-              case Instruction::kFCmpLT:
-              case Instruction::kFCmpGT:
-              case Instruction::kFCmpLE:
-              case Instruction::kFCmpGE:
-              {
-                if(live.count(instr) == 0){
-                  bb->getInstructions().erase(--iiter.base());
-                  change = true;
-                  iiter--;cnt++;
-                  break;
-                }
-                else{
                   live.erase(instr);
                 }
-                BinaryInst *bInst = dynamic_cast<BinaryInst *>(instr);
-                auto lhs = bInst->getLhs();
-                auto rhs = bInst->getRhs();
-                if (isa<Instruction>(lhs))
+              }
+              auto args = callInst->getArguments();
+              for (auto arg : args)
+              {
+                if (isa<Instruction>(arg))
                 {
-                  Instruction *t = dynamic_cast<Instruction *>(lhs);
+                  Instruction *t = dynamic_cast<Instruction *>(arg);
                   live.insert(t);
                 }
-                if (isa<Instruction>(rhs))
+              }
+              break;
+            }
+
+            // Return Instr
+            case Instruction::kReturn:
+            {
+              ReturnInst *retInst = dynamic_cast<ReturnInst *>(instr);
+              auto retval = retInst->getReturnValue();
+              if (retval != nullptr)
+              {
+                if (isa<Instruction>(retval))
                 {
-                  Instruction *t = dynamic_cast<Instruction *>(rhs);
+                  Instruction *t = dynamic_cast<Instruction *>(retval);
                   live.insert(t);
                 }
-                break;
               }
+              break;
+            }
 
-              //Unary Instr
-              case Instruction::kFNeg:
-              case Instruction::kFtoI:
-              case Instruction::kNeg:
-              case Instruction::kNot:
-              case Instruction::kItoF:
+            // CondBr Instr
+            case Instruction::kCondBr:
+            {
+              CondBrInst *condbrInst = dynamic_cast<CondBrInst *>(instr);
+              auto cond = condbrInst->getCondition();
+              if (isa<Instruction>(cond))
               {
-                if(live.count(instr) == 0){
-                  bb->getInstructions().erase(--iiter.base());
-                  change = true;
-                  iiter--;cnt++;
-                  break;
-                }
-                else{
-                  live.erase(instr);
-                }
-                UnaryInst *unaryInst = dynamic_cast<UnaryInst *>(instr);
-                auto val = unaryInst->getOperand();
-                if (isa<Instruction>(val))
-                {
-                  Instruction *t = dynamic_cast<Instruction *>(val);
-                  live.insert(t);
-                }
-                break;
-              }   
+                Instruction *t = dynamic_cast<Instruction *>(cond);
+                live.insert(t);
+              }
+              break;
+            }
 
-              //Call Instr
-              case Instruction::kCall:
-              {
-                CallInst *callInst = dynamic_cast<CallInst *>(instr);
-                if (!callInst->getType()->isVoid())
-                {
-                  if(live.count(instr) == 0){
-                    bb->getInstructions().erase(--iiter.base());
-                    change = true;
-                    iiter--;cnt++;
-                    break;
-                  }
-                  else{
-                    live.erase(instr);
-                  }
-                }
-                auto args = callInst->getArguments();
-                for (auto arg : args)
-                {
-                  if (isa<Instruction>(arg))
-                  {
-                    Instruction *t = dynamic_cast<Instruction *>(arg);
-                    live.insert(t);
-                  }
-                }
-                break;
-              }      
-
-              //Return Instr
-              case Instruction::kReturn:
-              {
-                ReturnInst *retInst = dynamic_cast<ReturnInst *>(instr);
-                auto retval = retInst->getReturnValue();
-                if (retval != nullptr){
-                  if (isa<Instruction>(retval))
-                  {
-                    Instruction *t = dynamic_cast<Instruction *>(retval);
-                    live.insert(t);
-                  }
-                }
-                break;
-              }
-
-              //CondBr Instr
-              case Instruction::kCondBr:
-              {
-                CondBrInst *condbrInst = dynamic_cast<CondBrInst *>(instr);
-                auto cond = condbrInst->getCondition();
-                if (isa<Instruction>(cond))
-                {
-                  Instruction *t = dynamic_cast<Instruction *>(cond);
-                  live.insert(t);
-                }
-                break;
-              }
-
-              
-              case Instruction::kAlloca:
-              {
-                // Value *var = dynamic_cast<Value *>(instr);
-                // bool flag = false;
-                // for (auto &i : vlive)
-                // {
-                //   if(i.first == var)
-                //     flag = true;
-                // }
-                // if (!flag)
-                // {
-                //   bb->getInstructions().erase(--iiter.base());
-                //   change = true;
-                // }
-                break;
-              }
-              //no use reg instruction
-              case Instruction::kBr:
-              {
-                break;
-              }
-              default:
-              {
-                assert(1);
-                break;
-              }
+            case Instruction::kAlloca:
+            {
+              // Value *var = dynamic_cast<Value *>(instr);
+              // bool flag = false;
+              // for (auto &i : vlive)
+              // {
+              //   if(i.first == var)
+              //     flag = true;
+              // }
+              // if (!flag)
+              // {
+              //   bb->getInstructions().erase(--iiter.base());
+              //   change = true;
+              // }
+              break;
+            }
+            // no use reg instruction
+            case Instruction::kBr:
+            {
+              break;
+            }
+            default:
+            {
+              assert(1);
+              break;
+            }
             }
             for (auto item : live)
             {
@@ -2636,26 +2643,26 @@ namespace sysy
             {
               instr->front_vlive.insert(item);
             }
-            if(change){
+            if (change)
+            {
               continue;
               // break;
             }
           }
-          //if this instr is deleted, break the loop and recalculate the live var
-          if(change){
+          // if this instr is deleted, break the loop and recalculate the live var
+          if (change)
+          {
             break;
           }
         }
       }
     }
-    std::cout << "DCE delete [" << cnt << "] Instr" << std::endl;
+    // std::cout << "DCE delete [" << cnt << "] Instr" << std::endl;
     return pModule;
   }
 
-
-
-  // Module *CommonExp::Run()
-  Module *CommonExp::Run(std::ostream &os)
+  Module *CommonExp::Run()
+  // Module *CommonExp::Run(std::ostream &os)
   {
     auto functions = OriginModule->getFunctions();
     // 计算Eval集合
@@ -2668,7 +2675,34 @@ namespace sysy
       for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
       {
         auto bb = iter->get();
-        CalEval(bb);
+        CalEval(bb, 1);
+      }
+    }
+    // 计算In,Out集合
+    for (auto iter = functions->begin(); iter != functions->end(); iter++)
+    {
+      Function *func = iter->second;
+      auto bblist = func->getBasicBlocks();
+      if (bblist.empty())
+        continue;
+      CalIn_Out(func);
+    }
+    // 重新生成IR
+    RegenerateIR();
+    OriginModule = pModule;
+    pModule = ppModule;
+    functions = OriginModule->getFunctions();
+    // 计算Eval集合
+    for (auto iter = functions->begin(); iter != functions->end(); iter++)
+    {
+      Function *func = iter->second;
+      auto bblist = func->getBasicBlocks();
+      if (bblist.empty())
+        continue;
+      for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+      {
+        auto bb = iter->get();
+        CalEval(bb, 2);
       }
     }
     // 计算In,Out集合
@@ -2690,8 +2724,6 @@ namespace sysy
     for (auto iter = global_values->begin(); iter != global_values->end(); iter++)
     {
       GlobalValue *glbvl = iter->second;
-      auto name = glbvl->getName();
-      auto type = glbvl->getType();
       pModule->addGlobalValue(glbvl);
     }
     // 生成函数
@@ -2734,6 +2766,24 @@ namespace sysy
         Alter.clear();
         bInsts.clear();
         uInsts.clear();
+        // 接收BinaryIn集合
+        for (auto p : bb->BinaryIn)
+        {
+          Instruction *instr = p.first;
+          if (!instr->hasAlter())
+            continue;
+          auto instrType = p.second.first;
+          auto lhs = p.second.second.first;
+          auto rhs = p.second.second.second;
+          if (instrType == Instruction::Kind::kAdd || instrType == Instruction::Kind::kMul || instrType == Instruction::Kind::kFAdd || instrType == Instruction::Kind::kFMul)
+          {
+            bInsts[instrType][{lhs, rhs}] = instr;
+          }
+          else if (instrType == Instruction::Kind::kSub || instrType == Instruction::Kind::kDiv || instrType == Instruction::Kind::kRem || instrType == Instruction::Kind::kFSub || instrType == Instruction::Kind::kFDiv || instrType == Instruction::Kind::kFRem)
+          {
+            OrderbInsts[instrType][{lhs, rhs}] = instr;
+          }
+        }
         for (auto iter = bb->begin(); iter != bb->end(); iter++)
         {
           auto instr = iter->get();
@@ -2791,9 +2841,9 @@ namespace sysy
             auto hs = uInst->getOperand();
             if (Alter.find(hs) != Alter.end())
               hs = Alter[hs];
-            if (uInsts.find(instrType) != uInsts.end() && uInsts[instrType].find(hs) != uInsts[instrType].end())
-              Alter[uInst] = uInsts[instrType][hs];
-            else
+            // if (uInsts.find(instrType) != uInsts.end() && uInsts[instrType].find(hs) != uInsts[instrType].end())
+            //   Alter[uInst] = uInsts[instrType][hs];
+            // else
             {
               auto my_uInst = builder.createUnaryInst(instrType, instr->getType(), hs->getAlter());
               uInst->setAlter(my_uInst);
@@ -2882,17 +2932,118 @@ namespace sysy
       }
     }
   }
-  void CommonExp::CalEval(BasicBlock *curbb)
+  void CommonExp::CalEval(BasicBlock *curbb, int pass)
   {
     for (auto &instriter : curbb->getInstructions())
     {
       auto instr = instriter.get();
+      auto instrType = instriter->getKind();
       if (isa<BinaryInst>(instr))
       {
+        auto bInst = dynamic_cast<BinaryInst *>(instr);
+        auto lhs = bInst->getLhs();
+        auto rhs = bInst->getRhs();
+        bool lflag = false, rflag = false;
+        if (isa<LoadInst>(lhs) || isa<ConstantValue>(lhs))
+          lflag = true;
+        if (isa<LoadInst>(rhs) || isa<ConstantValue>(rhs))
+          rflag = true;
+        if (pass == 2)
+        {
+          lflag = true;
+          rflag = true;
+        }
+        if (lflag && rflag && ((instrType >= 0 && instrType <= 4) || (instrType >= 14 && instrType <= 18)))
+          curbb->BinaryEval.insert({bInst, {instrType, {lhs, rhs}}});
       }
+      // else if (isa<UnaryInst>(instr))
+      // {
+      //   auto uInst = dynamic_cast<UnaryInst *>(instr);
+      //   auto hs = uInst->getOperand();
+      //   if (isa<LoadInst>(hs) || isa<ConstantValue>(hs))
+      //     curbb->UnaryEval.insert({uInst, {instrType, hs}});
+      // }
     }
   }
   void CommonExp::CalIn_Out(Function *curFunc)
   {
+    bool change = true;
+    auto bblist = curFunc->getBasicBlocks();
+    if (bblist.empty())
+      return;
+    int k = 0;
+    while (change)
+    {
+      k++;
+      // printf("%d\t", k);
+      change = false;
+      for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+      {
+        BasicBlock *bb = iter->get();
+        set<pair<Instruction *, pair<Instruction::Kind, pair<Value *, Value *>>>> olduin, oldbin, olduout, oldbout, temp, t;
+        // copy(bb->in.begin(), bb->in.end(), oldin.begin());
+        for (auto item : bb->BinaryIn)
+        {
+          oldbin.insert(item);
+        }
+        // copy(bb->out.begin(), bb->out.end(), oldout.begin());
+        for (auto item : bb->BinaryOut)
+        {
+          oldbout.insert(item);
+        }
+        bb->BinaryIn.clear();
+        bb->BinaryOut.clear();
+        // cal IN
+        auto pres = bb->getPredecessors();
+        if (!pres.empty())
+        {
+          for (int i = 0; i < pres.size(); i++)
+          {
+            if (i == 0)
+            {
+              // copy(pres[0]->out.begin(), pres[0]->out.end(), temp.begin());
+              for (auto item : pres[0]->BinaryOut)
+              {
+                temp.insert(item);
+              }
+            }
+            else
+            {
+              set_intersection(temp.begin(), temp.end(), pres[i]->BinaryOut.begin(), pres[i]->BinaryOut.end(), inserter(t, t.begin()));
+              temp.clear();
+              for (auto item : t)
+              {
+                temp.insert(item);
+              }
+              t.clear();
+            }
+          }
+        }
+        // copy(temp.begin(), temp.end(), bb->in.begin());
+        for (auto item : temp)
+        {
+          bb->BinaryIn.insert(item);
+        }
+        // cal OUT
+        for (auto &item : bb->BinaryIn)
+        {
+          bb->BinaryOut.insert(item);
+        }
+        for (auto &item : bb->BinaryEval)
+        {
+          bb->BinaryOut.insert(item);
+        }
+        // Check if changed
+        if (oldbin != bb->BinaryIn || oldbout != bb->BinaryOut)
+          change = true;
+      }
+
+      // print in out
+      //  for(auto iter = bblist.begin(); iter != bblist.end(); iter++)
+      //  {
+      //    BasicBlock* bb = iter->get();
+      //    std::cout << bb->getName() << endl;
+      //  }
+    }
   }
 } // namespace sysy
