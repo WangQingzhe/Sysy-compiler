@@ -332,4 +332,20 @@ namespace sysy
     Module *Run();
     // Module *Run(std::ostream &os);
   };
+
+  // 必经节点分析
+  class Dom
+  {
+  public:
+    Module *pModule;
+    Dom(Module *pModule) : pModule(pModule) {}
+    set<BasicBlock *> Allbbs;
+
+  public:
+    // 计算函数内所有基本块的必经节点
+    void CalDom(Function *);
+    Module *Run();
+    // Module *Run(std::ostream &);
+    void PRINT_DOM(std::ostream &os);
+  };
 } // namespace sysy

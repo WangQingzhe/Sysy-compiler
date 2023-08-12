@@ -465,8 +465,9 @@ namespace sysy
     std::set<pair<Instruction *, pair<Value::Kind, Value *>>> UnaryEval;
     std::set<pair<Instruction *, pair<Value::Kind, Value *>>> UnaryIn;
     std::set<pair<Instruction *, pair<Value::Kind, Value *>>> UnaryOut;
-
-    int depth = 0; // 基本块的深度
+    // Dom
+    std::set<BasicBlock *> dom; // 基本块的必经节点集合
+    int depth = 0;              // 基本块的深度
 
   protected:
     explicit BasicBlock(Function *parent, const std::string &name = "");

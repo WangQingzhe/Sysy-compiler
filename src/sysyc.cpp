@@ -2,7 +2,7 @@
  * @Description:
  * @Author: 王清哲
  * @Date: 2023-07-29 17:14:14
- * @LastEditTime: 2023-08-10 18:35:13
+ * @LastEditTime: 2023-08-11 17:33:08
  * @LastEditors: 王清哲
  */
 #include "tree/ParseTreeWalker.h"
@@ -47,40 +47,55 @@ int main(int argc, char **argv)
   generator.visitModule(moduleAST);
   auto moduleIR = generator.get();
   // only generate SysY IR code
+  if (strcmp(argv[2], "ir") == 0)
+  {
+    cout << "Module\n";
+    moduleIR->print(cout);
+    return 0;
+  }
   LoadCut ldCut(moduleIR);
   auto ldCutIR = ldCut.Run();
-
-  // if (strcmp(argv[2], "ir1") == 0)
-  //   ldCutIR->print(cout);
-  DCE dce(ldCutIR);
-  auto DceIR = dce.Run();
-  // if (strcmp(argv[2], "ir2") == 0)
-  // DceIR->print(cout);
-
+  if (strcmp(argv[2], "ir1") == 0)
+  {
+    cout << "ldCut\n";
+    ldCutIR->print(cout);
+    return 0;
+  }
+  CommonExp CmExp(ldCutIR);
+  auto CmExpIR = CmExp.Run();
+  if (strcmp(argv[2], "ir2") == 0)
+  {
+    Dom dom(CmExpIR);
+    dom.Run();
+    dom.PRINT_DOM(cout);
+    cout << "CmExp\n";
+    CmExpIR->print(cout);
+    return EXIT_SUCCESS;
+  }
+  // DCE dce(CmExpIR);
+  // auto DceIR = dce.Run();
+  // if (strcmp(argv[2], "ir3") == 0)
+  // {
+  //   cout << "Dce\n";
+  //   DceIR->print(cout);
+  //   return EXIT_SUCCESS;
+  // }
+  LoadCut ldCut2(CmExpIR);
+  auto ldCutIR2 = ldCut2.Run();
+  if (strcmp(argv[2], "ir3") == 0)
+  {
+    cout << "ldCut2\n";
+    ldCutIR2->print(cout);
+    return EXIT_SUCCESS;
+  }
   if (genir)
   {
-    DceIR->print(cout);
+    // cout << "dce\n";
     // DceIR->print(cout);
-    // moduleIR->Print_topology(cout);
-    // ldCut.print_IN_OUT(cout);
-    // if (strcmp(argv[2], "ir2") == 0)
-    // ldCutIR->print(cout);
-    // else if (strcmp(argv[2], "ir1") == 0)
-    // DceIR->print(cout);
-    // ldCut.print_KILL_GEN(cout);
-    // ldCut.print_IN_OUT(cout);
-    // moduleIR->print(cout);
-    // Lifetime lifetime(ldCutIR);
-    // Module *ir = lifetime.Run();
-    // lifetime.print_USE_DEF(cout);
-    // lifetime.print_Live_IN_OUT(cout);
-    // DCE dce(ir);
-    // Module *ir2 = dce.Run();
     return EXIT_SUCCESS;
   }
 
-  // CodeGen codegen(moduleIR);
-  CodeGen codegen(DceIR);
+  CodeGen codegen(ldCutIR2);
   string asmCode = codegen.code_gen();
   cout << asmCode << endl;
   ;
