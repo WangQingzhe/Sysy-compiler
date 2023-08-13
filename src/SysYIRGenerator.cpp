@@ -1609,7 +1609,6 @@ namespace sysy
             // else
             //   os << "nocall\n";
             Function *myFunc = pModule->createFunction(func->getName(), func->getType());
-            RVALUE.clear();
             auto bblist = func->getBasicBlocks();
             if (bblist.empty())
                 continue;
@@ -1628,8 +1627,9 @@ namespace sysy
                 auto bb = iter->get();
                 auto mybb = dynamic_cast<BasicBlock *>(bb->getAlter());
                 builder.setPosition(mybb, mybb->end());
-                // 初始化AVALUE
+                // 初始化AVALUE,RVALUE
                 AVALUE.clear();
+                RVALUE.clear();
                 // 将In集合中每个虚寄存器-变量对记录在AVALUE中
                 for (auto p : bb->in)
                 {
@@ -1639,6 +1639,7 @@ namespace sysy
                     Value *value = p.second.first;
                     vector<Value *> indices = p.second.second;
                     AVALUE[value][indices] = instr;
+                    RVALUE[instr].insert({value, indices});
                 }
                 // 扫描基本块的全部指令
                 for (auto p : bb->getPredecessors())
@@ -1657,7 +1658,7 @@ namespace sysy
                         if (AVALUE.find(pointer) != AVALUE.end() && AVALUE[pointer].find(indices) != AVALUE[pointer].end())
                         {
                             // RVALUE[instr] = pair<Value *, vector<Value *>>(pointer, indices);
-                            RVALUE.insert(ldInst);
+                            RVALUE[instr].insert({pointer, indices});
                         }
                         // 如果变量不在AVALUE中
                         else
@@ -1665,12 +1666,11 @@ namespace sysy
                             vector<Value *> my_indices;
                             for (int i = 0; i < indices.size(); i++)
                             {
-                                if (RVALUE.find(indices[i]) != RVALUE.end())
+                                if (RVALUE.find(indices[i]) != RVALUE.end() && !RVALUE[indices[i]].empty())
                                 {
-                                    auto ldInst = dynamic_cast<LoadInst *>(indices[i]);
-                                    auto pointer = ldInst->getPointer();
-                                    auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
-                                    my_indices.push_back(AVALUE[pointer][indices]->getAlter());
+                                    auto pointer = RVALUE[indices[i]].begin()->first;
+                                    auto indices1 = RVALUE[indices[i]].begin()->second;
+                                    my_indices.push_back(AVALUE[pointer][indices1]->getAlter());
                                 }
                                 else
                                     my_indices.push_back(indices[i]->getAlter());
@@ -1680,7 +1680,7 @@ namespace sysy
                             if (!isa<GlobalValue>(pointer) || !hascall)
                             {
                                 AVALUE[pointer][indices] = instr;
-                                RVALUE.insert(ldInst);
+                                RVALUE[ldInst].insert({pointer, indices});
                             }
                         }
                     }
@@ -1690,8 +1690,15 @@ namespace sysy
                         auto value = stInst->getValue();
                         auto pointer = stInst->getPointer();
                         auto indices = vector<Value *>(stInst->getIndices().begin(), stInst->getIndices().end());
+                        // 将变量原来所在虚拟寄存器（如有）对应该变量的项去掉
+                        if (AVALUE.find(pointer) != AVALUE.end() && AVALUE[pointer].find(indices) != AVALUE[pointer].end())
+                        {
+                            auto pre_Value = AVALUE[pointer][indices];
+                            RVALUE[pre_Value].erase(RVALUE[pre_Value].find({pointer, indices}));
+                        }
                         if (isa<ConstantValue>(value))
                         {
+                            // 变量现在不在任何一个虚拟寄存器中
                             auto iter1 = AVALUE.find(pointer);
                             if (iter1 != AVALUE.end())
                             {
@@ -1702,12 +1709,12 @@ namespace sysy
                             vector<Value *> my_indices;
                             for (int i = 0; i < indices.size(); i++)
                             {
-                                if (RVALUE.find(indices[i]) != RVALUE.end())
+                                if (RVALUE.find(indices[i]) != RVALUE.end() && !RVALUE[indices[i]].empty())
                                 {
-                                    auto ldInst = dynamic_cast<LoadInst *>(indices[i]);
-                                    auto pointer = ldInst->getPointer();
-                                    auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
-                                    my_indices.push_back(AVALUE[pointer][indices]->getAlter());
+                                    // auto ldInst = dynamic_cast<LoadInst *>(indices[i]);
+                                    auto pointer = RVALUE[indices[i]].begin()->first;
+                                    auto indices1 = RVALUE[indices[i]].begin()->second;
+                                    my_indices.push_back(AVALUE[pointer][indices1]->getAlter());
                                 }
                                 else
                                     my_indices.push_back(indices[i]->getAlter());
@@ -1715,42 +1722,47 @@ namespace sysy
                             auto my_stInst = builder.createStoreInst(value->getAlter(), pointer->getAlter(), my_indices);
                             continue;
                         }
-                        if (RVALUE.find(value) != RVALUE.end())
+                        if (RVALUE.find(value) != RVALUE.end() && !RVALUE[value].empty())
                         {
-                            LoadInst *ldInst = dynamic_cast<LoadInst *>(value);
-                            auto pre_pointer = ldInst->getPointer();
-                            auto pre_indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+                            auto pre_pointer = RVALUE[value].begin()->first;
+                            auto pre_indices = RVALUE[value].begin()->second;
                             auto Vvalue = AVALUE[pre_pointer][pre_indices];
                             vector<Value *> my_indices;
                             for (int i = 0; i < indices.size(); i++)
                             {
-                                if (RVALUE.find(indices[i]) != RVALUE.end())
+                                if (RVALUE.find(indices[i]) != RVALUE.end() && !RVALUE[indices[i]].empty())
                                 {
-                                    auto ldInst = dynamic_cast<LoadInst *>(indices[i]);
-                                    auto pointer = ldInst->getPointer();
-                                    auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
-                                    my_indices.push_back(AVALUE[pointer][indices]->getAlter());
+                                    // auto ldInst = dynamic_cast<LoadInst *>(indices[i]);
+                                    auto pointer = RVALUE[indices[i]].begin()->first;
+                                    auto indices1 = RVALUE[indices[i]].begin()->second;
+                                    my_indices.push_back(AVALUE[pointer][indices1]->getAlter());
                                 }
                                 else
                                     my_indices.push_back(indices[i]->getAlter());
                             }
                             auto my_stInst = builder.createStoreInst(Vvalue->getAlter(), pointer->getAlter(), my_indices);
                             if (!isa<GlobalValue>(pointer) || !hascall)
+                            {
+                                RVALUE[Vvalue].insert({pointer, indices});
                                 AVALUE[pointer][indices] = Vvalue;
+                            }
                         }
                         else
                         {
                             if (!isa<GlobalValue>(pointer) || !hascall)
+                            {
+                                RVALUE[value].insert({pointer, indices});
                                 AVALUE[pointer][indices] = dynamic_cast<Instruction *>(value);
+                            }
                             vector<Value *> my_indices;
                             for (int i = 0; i < indices.size(); i++)
                             {
-                                if (RVALUE.find(indices[i]) != RVALUE.end())
+                                if (RVALUE.find(indices[i]) != RVALUE.end() && !RVALUE[indices[i]].empty())
                                 {
-                                    auto ldInst = dynamic_cast<LoadInst *>(indices[i]);
-                                    auto pointer = ldInst->getPointer();
-                                    auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
-                                    my_indices.push_back(AVALUE[pointer][indices]->getAlter());
+                                    // auto ldInst = dynamic_cast<LoadInst *>(indices[i]);
+                                    auto pointer = RVALUE[indices[i]].begin()->first;
+                                    auto indices1 = RVALUE[indices[i]].begin()->second;
+                                    my_indices.push_back(AVALUE[pointer][indices1]->getAlter());
                                 }
                                 else
                                     my_indices.push_back(indices[i]->getAlter());
@@ -1763,18 +1775,16 @@ namespace sysy
                         auto bInst = dynamic_cast<BinaryInst *>(instr);
                         auto lhs = bInst->getLhs();
                         auto rhs = bInst->getRhs();
-                        if (RVALUE.find(lhs) != RVALUE.end())
+                        if (RVALUE.find(lhs) != RVALUE.end() && !RVALUE[lhs].empty())
                         {
-                            auto ldInst = dynamic_cast<LoadInst *>(lhs);
-                            auto pointer = ldInst->getPointer();
-                            auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+                            auto pointer = RVALUE[lhs].begin()->first;
+                            auto indices = RVALUE[lhs].begin()->second;
                             lhs = AVALUE[pointer][indices];
                         }
-                        if (RVALUE.find(rhs) != RVALUE.end())
+                        if (RVALUE.find(rhs) != RVALUE.end() && !RVALUE[rhs].empty())
                         {
-                            auto ldInst = dynamic_cast<LoadInst *>(rhs);
-                            auto pointer = ldInst->getPointer();
-                            auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+                            auto pointer = RVALUE[rhs].begin()->first;
+                            auto indices = RVALUE[rhs].begin()->second;
                             rhs = AVALUE[pointer][indices];
                         }
                         auto my_bInst = builder.createBinaryInst(bInst->getKind(), bInst->getType(), lhs->getAlter(), rhs->getAlter());
@@ -1786,9 +1796,8 @@ namespace sysy
                         auto hs = uInst->getOperand();
                         if (RVALUE.find(hs) != RVALUE.end())
                         {
-                            auto ldInst = dynamic_cast<LoadInst *>(hs);
-                            auto pointer = ldInst->getPointer();
-                            auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+                            auto pointer = RVALUE[hs].begin()->first;
+                            auto indices = RVALUE[hs].begin()->second;
                             hs = AVALUE[pointer][indices];
                         }
                         auto my_uInst = builder.createUnaryInst(uInst->getKind(), uInst->getType(), hs->getAlter());
@@ -1803,11 +1812,11 @@ namespace sysy
                         set<Value *> ruined; // 数组参数,则其原来的值可能被破坏
                         for (auto iter = args.begin(); iter != args.end(); iter++)
                         {
-                            if (RVALUE.find(*iter) != RVALUE.end())
+                            if (RVALUE.find(*iter) != RVALUE.end() && !RVALUE[*iter].empty())
                             {
                                 auto ldInst = dynamic_cast<LoadInst *>(*iter);
-                                auto pointer = ldInst->getPointer();
-                                auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+                                auto pointer = RVALUE[*iter].begin()->first;
+                                auto indices = RVALUE[*iter].begin()->second;
                                 my_args.push_back(AVALUE[pointer][indices]->getAlter());
                                 int numdims = 0;
                                 if (isa<GlobalValue>(pointer))
@@ -1828,14 +1837,19 @@ namespace sysy
                             if (iter != AVALUE.end())
                                 AVALUE.erase(iter);
                         }
-                        // for (auto iter = RVALUE.begin(); iter != RVALUE.end();)
+                        // for (auto iter1 = RVALUE.begin(); iter1 != RVALUE.end(); iter1++)
                         // {
-                        //   auto ldInst = dynamic_cast<LoadInst *>(*iter);
-                        //   auto pointer = ldInst->getPointer();
-                        //   if (ruined.find(pointer) != ruined.end())
-                        //     iter = RVALUE.erase(iter);
-                        //   else
-                        //     iter++;
+                        //     auto Vvalue = iter1->first;
+                        //     auto values = iter1->second;
+                        //     for (auto iter2 = values.begin(); iter2 != values.end();)
+                        //     {
+                        //         auto pointer = iter2->first;
+                        //         auto indices = iter2->second;
+                        //         if (ruined.find(pointer) != ruined.end())
+                        //             iter2 = RVALUE[Vvalue].erase(RVALUE[Vvalue].find({pointer, indices}));
+                        //         else
+                        //             iter2++;
+                        //     }
                         // }
                         // if (libfunc.find(callee->getName()) == libfunc.end())
                         // {
@@ -1866,11 +1880,11 @@ namespace sysy
                     {
                         auto rInst = dynamic_cast<ReturnInst *>(instr);
                         auto retValue = rInst->getReturnValue();
-                        if (retValue && RVALUE.find(retValue) != RVALUE.end())
+                        if (retValue && RVALUE.find(retValue) != RVALUE.end() && !RVALUE[retValue].empty())
                         {
-                            auto ldInst = dynamic_cast<LoadInst *>(retValue);
-                            auto pointer = ldInst->getPointer();
-                            auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+                            // auto ldInst = dynamic_cast<LoadInst *>(retValue);
+                            auto pointer = RVALUE[retValue].begin()->first;
+                            auto indices = RVALUE[retValue].begin()->second;
                             retValue = AVALUE[pointer][indices];
                         }
                         auto my_retValue = retValue ? retValue->getAlter() : nullptr;
@@ -1881,11 +1895,10 @@ namespace sysy
                     {
                         auto cbInst = dynamic_cast<CondBrInst *>(instr);
                         auto cond = cbInst->getCondition();
-                        if (RVALUE.find(cond) != RVALUE.end())
+                        if (RVALUE.find(cond) != RVALUE.end() && !RVALUE[cond].empty())
                         {
-                            auto ldInst = dynamic_cast<LoadInst *>(cond);
-                            auto pointer = ldInst->getPointer();
-                            auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+                            auto pointer = RVALUE[cond].begin()->first;
+                            auto indices = RVALUE[cond].begin()->second;
                             cond = AVALUE[pointer][indices];
                         }
                         builder.createCondBrInst(cond->getAlter(), cbInst->getThenBlock(), cbInst->getElseBlock(), {}, {});
@@ -2731,7 +2744,8 @@ namespace sysy
         return pModule;
     }
     void CommonExp::RegenerateIR()
-    { // 生成全局变量
+    {
+        // 生成全局变量
         auto global_values = OriginModule->getGlobalValues();
         for (auto iter = global_values->begin(); iter != global_values->end(); iter++)
         {
@@ -3159,6 +3173,8 @@ namespace sysy
                 continue;
             CalIn_Out(func);
         }
+        RegenerateIR();
+        return pModule;
     }
     void ConstSpread::CalIn_Out(Function *curFunc)
     {
@@ -3177,8 +3193,11 @@ namespace sysy
                     continue;
                 BasicBlock *bb = iter->get();
                 set<pair<Instruction *, ConstantValue *>> oldin, oldout, temp, t;
+                set<pair<pair<Value *, vector<Value *>>, ConstantValue *>> oldvin, oldvout, vtemp, vt;
                 oldin.insert(bb->ConstIn.begin(), bb->ConstIn.end());
+                oldvin.insert(bb->vConstIn.begin(), bb->vConstIn.end());
                 oldout.insert(bb->ConstOut.begin(), bb->ConstOut.end());
+                oldvout.insert(bb->vConstOut.begin(), bb->vConstOut.end());
                 // 计算In
                 auto pres = bb->getPredecessors();
                 for (int i = 0; i < pres.size(); i++)
@@ -3193,10 +3212,25 @@ namespace sysy
                         t.clear();
                     }
                 }
+                bb->ConstIn.insert(temp.begin(), temp.end());
+                // 计算vIn
+                for (int i = 0; i < pres.size(); i++)
+                {
+                    if (i == 0)
+                        vtemp.insert(pres[0]->vConstOut.begin(), pres[0]->vConstOut.end());
+                    else
+                    {
+                        set_intersection(vtemp.begin(), vtemp.end(), pres[i]->vConstOut.begin(), pres[i]->vConstOut.end(), inserter(vt, vt.begin()));
+                        vtemp.clear();
+                        vtemp.insert(vt.begin(), vt.end());
+                        vt.clear();
+                    }
+                }
+                bb->vConstIn.insert(vtemp.begin(), vtemp.end());
                 // 计算Out
                 Fs(bb);
 
-                if (oldin != bb->ConstIn || oldout != bb->ConstOut)
+                if (oldin != bb->ConstIn || oldout != bb->ConstOut || oldvin != bb->vConstIn || oldvout != bb->vConstOut)
                     change = true;
             }
         }
@@ -3231,20 +3265,383 @@ namespace sysy
                 auto pointer = stInst->getPointer();
                 auto indices = vector<Value *>(stInst->getIndices().begin(), stInst->getIndices().end());
                 auto value = stInst->getValue();
-                if (isa<ConstantValue>(value))
+                if (isa<ConstantValue>(value) && !isa<GlobalValue>(pointer))
                     vIn[pointer][indices] = dynamic_cast<ConstantValue *>(value);
                 else
                 {
                     Instruction *inst = dynamic_cast<Instruction *>(value);
-                    if (In.find(inst) != In.end())
+                    if (In.find(inst) != In.end() && !isa<GlobalValue>(pointer))
                         vIn[pointer][indices] = In[inst];
+                    else if (vIn.find(pointer) != vIn.end() && vIn[pointer].find(indices) != vIn[pointer].end())
+                        vIn[pointer].erase(vIn[pointer].find(indices));
                 }
             }
             else if (isa<BinaryInst>(instr))
             {
-                        }
+                BinaryInst *bInst = dynamic_cast<BinaryInst *>(instr);
+                auto lhs = bInst->getLhs();
+                auto rhs = bInst->getRhs();
+                if (isa<Instruction>(lhs) && In.find(dynamic_cast<Instruction *>(lhs)) != In.end())
+                    lhs = In[dynamic_cast<Instruction *>(lhs)];
+                if (isa<Instruction>(rhs) && In.find(dynamic_cast<Instruction *>(rhs)) != In.end())
+                    rhs = In[dynamic_cast<Instruction *>(rhs)];
+                if (isa<ConstantValue>(lhs) && isa<ConstantValue>(rhs))
+                {
+                    auto lConst = dynamic_cast<ConstantValue *>(lhs);
+                    auto rConst = dynamic_cast<ConstantValue *>(rhs);
+                    auto kind = bInst->getKind();
+                    Type *type = bInst->getType();
+                    if (type->isInt())
+                    {
+                        int lint = lConst->getInt();
+                        int rint = rConst->getInt();
+                        if (kind == Value::kAdd)
+                            In[bInst] = ConstantValue::get(lint + rint);
+                        else if (kind == Value::kSub)
+                            In[bInst] = ConstantValue::get(lint - rint);
+                        else if (kind == Value::kMul)
+                            In[bInst] = ConstantValue::get(lint * rint);
+                        else if (kind == Value::kDiv)
+                            In[bInst] = ConstantValue::get(lint / rint);
+                        else if (kind == Value::kRem)
+                            In[bInst] = ConstantValue::get(lint % rint);
+                    }
+                    else if (type->isFloat())
+                    {
+                        double ldouble = lConst->getDouble();
+                        double rdouble = rConst->getDouble();
+                        if (kind == Value::kFAdd)
+                            In[bInst] = ConstantValue::get(ldouble + rdouble);
+                        else if (kind == Value::kFSub)
+                            In[bInst] = ConstantValue::get(ldouble - rdouble);
+                        else if (kind == Value::kFMul)
+                            In[bInst] = ConstantValue::get(ldouble * rdouble);
+                        else if (kind == Value::kFDiv)
+                            In[bInst] = ConstantValue::get(ldouble / rdouble);
+                    }
+                }
+            }
             else if (isa<UnaryInst>(instr))
             {
+                UnaryInst *uInst = dynamic_cast<UnaryInst *>(instr);
+                auto hs = uInst->getOperand();
+                if (isa<Instruction>(hs) && In.find(dynamic_cast<Instruction *>(hs)) != In.end())
+                    hs = In[dynamic_cast<Instruction *>(hs)];
+                if (isa<ConstantValue>(hs))
+                {
+                    auto Const = dynamic_cast<ConstantValue *>(hs);
+                    auto kind = uInst->getKind();
+                    Type *type = uInst->getType();
+                    if (kind == Value::kNeg)
+                        In[uInst] = ConstantValue::get(-Const->getInt());
+                    else if (kind == Value::kFNeg)
+                        In[uInst] = ConstantValue::get(-Const->getDouble());
+                    else if (kind == Value::kItoF)
+                        In[uInst] = ConstantValue::get((double)Const->getInt());
+                    else if (kind == Value::kFtoI)
+                        In[uInst] = ConstantValue::get((int)Const->getDouble());
+                }
+            }
+            else if (isa<CallInst>(instr))
+            {
+                CallInst *callInst = dynamic_cast<CallInst *>(instr);
+                auto args = callInst->getArguments();
+                for (auto iter = args.begin(); iter != args.end(); iter++)
+                {
+                    if (isa<LoadInst>(*iter))
+                    {
+                        auto ldInst = dynamic_cast<LoadInst *>(*iter);
+                        auto pointer = ldInst->getPointer();
+                        auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+                        int numdims = 0;
+                        if (isa<GlobalValue>(pointer))
+                            numdims = dynamic_cast<GlobalValue *>(pointer)->getNumDims();
+                        else if (isa<AllocaInst>(pointer))
+                            numdims = dynamic_cast<AllocaInst *>(pointer)->getNumDims();
+                        else if (isa<Argument>(pointer))
+                            numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
+                        if (indices.size() < numdims && vIn.find(pointer) != vIn.end())
+                        {
+                            vIn.erase(vIn.find(pointer));
+                        }
+                    }
+                }
+            }
+        }
+        curbb->ConstOut.clear();
+        curbb->vConstOut.clear();
+        for (auto iter : In)
+        {
+            auto instr = iter.first;
+            auto Const = iter.second;
+            curbb->ConstOut.insert({instr, Const});
+        }
+        for (auto iter1 : vIn)
+        {
+            Value *value = iter1.first;
+            for (auto iter2 : iter1.second)
+            {
+                curbb->vConstOut.insert({{value, iter2.first}, iter2.second});
+            }
+        }
+    }
+    void ConstSpread::RegenerateIR()
+    {
+        // 生成全局变量
+        auto global_values = OriginModule->getGlobalValues();
+        for (auto iter = global_values->begin(); iter != global_values->end(); iter++)
+        {
+            GlobalValue *glbvl = iter->second;
+            pModule->addGlobalValue(glbvl);
+        }
+        // 生成函数
+        auto functions = OriginModule->getFunctions();
+        for (auto iter = functions->begin(); iter != functions->end(); iter++)
+        {
+            Function *func = iter->second;
+            Function *myFunc = pModule->createFunction(func->getName(), func->getType());
+            auto bblist = func->getBasicBlocks();
+            if (bblist.empty())
+                continue;
+            // 生成该函数所有新BB
+            for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+            {
+                BasicBlock *bb = iter->get();
+                BasicBlock *mybb = myFunc->addBasicBlock(bb->getName());
+                bb->setAlter(mybb);
+                mybb->setDepth(bb->getDepth());
+            }
+            for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+            {
+                BasicBlock *bb = iter->get();
+                BasicBlock *mybb = dynamic_cast<BasicBlock *>(bb->getAlter());
+                builder.setPosition(mybb, mybb->end());
+                if (iter == bblist.begin())
+                {
+                    auto entry_args = bb->getArguments();
+                    for (auto i = entry_args.begin(); i != entry_args.end(); i++)
+                    {
+                        auto arg = i->get();
+                        auto my_arg = mybb->createArgument(arg->getType(), vector<int>(arg->getDims().begin(), arg->getDims().end()), arg->getName());
+                        arg->setAlter(my_arg);
+                    }
+                }
+                // 为新BB设置前驱后继关系
+                for (auto p : bb->getPredecessors())
+                    mybb->getPredecessors().push_back(dynamic_cast<BasicBlock *>(p->getAlter()));
+                for (auto s : bb->getSuccessors())
+                    mybb->getSuccessors().push_back(dynamic_cast<BasicBlock *>(s->getAlter()));
+                map<Instruction *, ConstantValue *> In(bb->ConstIn.begin(), bb->ConstIn.end());
+                map<Value *, map<vector<Value *>, ConstantValue *>> vIn;
+                for (auto iter : bb->vConstIn)
+                {
+                    Value *value = iter.first.first;
+                    vector<Value *> indices = iter.first.second;
+                    ConstantValue *Const = iter.second;
+                    vIn[value][indices] = Const;
+                }
+                for (auto iter = bb->begin(); iter != bb->end(); iter++)
+                {
+                    auto instr = iter->get();
+                    if (isa<LoadInst>(instr))
+                    {
+                        LoadInst *ldInst = dynamic_cast<LoadInst *>(instr);
+                        auto pointer = ldInst->getPointer();
+                        auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+                        if (vIn.find(pointer) != vIn.end() && vIn[pointer].find(indices) != vIn[pointer].end())
+                        {
+                            In[ldInst] = vIn[pointer][indices];
+                            instr->setAlter(In[ldInst]);
+                        }
+                        else
+                        {
+                            vector<Value *> my_indices;
+                            for (int i = 0; i < indices.size(); i++)
+                            {
+                                if (isa<Instruction>(indices[i]) && In.find(dynamic_cast<Instruction *>(indices[i])) != In.end())
+                                    my_indices.push_back(In[dynamic_cast<Instruction *>(indices[i])]);
+                                else
+                                    my_indices.push_back(indices[i]->getAlter());
+                            }
+                            auto my_ldInst = builder.createLoadInst(pointer->getAlter(), my_indices);
+                            instr->setAlter(my_ldInst);
+                        }
+                    }
+                    else if (isa<StoreInst>(instr))
+                    {
+                        StoreInst *stInst = dynamic_cast<StoreInst *>(instr);
+                        auto pointer = stInst->getPointer();
+                        auto indices = vector<Value *>(stInst->getIndices().begin(), stInst->getIndices().end());
+                        auto value = stInst->getValue();
+                        if (isa<ConstantValue>(value) && !isa<GlobalValue>(pointer))
+                            vIn[pointer][indices] = dynamic_cast<ConstantValue *>(value);
+                        else
+                        {
+                            Instruction *inst = dynamic_cast<Instruction *>(value);
+                            if (In.find(inst) != In.end() && !isa<GlobalValue>(pointer))
+                            {
+                                vIn[pointer][indices] = In[inst];
+                                value = In[inst];
+                            }
+                            else if (vIn.find(pointer) != vIn.end() && vIn[pointer].find(indices) != vIn[pointer].end())
+                                vIn[pointer].erase(vIn[pointer].find(indices));
+                        }
+                        vector<Value *> my_indices;
+                        for (int i = 0; i < indices.size(); i++)
+                        {
+                            if (isa<Instruction>(indices[i]) && In.find(dynamic_cast<Instruction *>(indices[i])) != In.end())
+                                my_indices.push_back(In[dynamic_cast<Instruction *>(indices[i])]);
+                            else
+                                my_indices.push_back(indices[i]->getAlter());
+                        }
+                        auto my_stInst = builder.createStoreInst(value->getAlter(), pointer->getAlter(), my_indices);
+                    }
+                    else if (isa<BinaryInst>(instr))
+                    {
+                        BinaryInst *bInst = dynamic_cast<BinaryInst *>(instr);
+                        auto lhs = bInst->getLhs();
+                        auto rhs = bInst->getRhs();
+                        if (isa<Instruction>(lhs) && In.find(dynamic_cast<Instruction *>(lhs)) != In.end())
+                            lhs = In[dynamic_cast<Instruction *>(lhs)];
+                        if (isa<Instruction>(rhs) && In.find(dynamic_cast<Instruction *>(rhs)) != In.end())
+                            rhs = In[dynamic_cast<Instruction *>(rhs)];
+                        auto kind = bInst->getKind();
+                        Type *type = bInst->getType();
+                        if (isa<ConstantValue>(lhs) && isa<ConstantValue>(rhs))
+                        {
+                            auto lConst = dynamic_cast<ConstantValue *>(lhs);
+                            auto rConst = dynamic_cast<ConstantValue *>(rhs);
+                            int lint, rint;
+                            double ldouble, rdouble;
+                            if (type->isInt())
+                            {
+                                lint = lConst->getInt();
+                                rint = rConst->getInt();
+                            }
+                            else if (type->isFloat())
+                            {
+                                ldouble = lConst->getDouble();
+                                rdouble = rConst->getDouble();
+                            }
+                            if (kind == Value::kAdd)
+                                In[bInst] = ConstantValue::get(lint + rint);
+                            else if (kind == Value::kSub)
+                                In[bInst] = ConstantValue::get(lint - rint);
+                            else if (kind == Value::kMul)
+                                In[bInst] = ConstantValue::get(lint * rint);
+                            else if (kind == Value::kDiv)
+                                In[bInst] = ConstantValue::get(lint / rint);
+                            else if (kind == Value::kRem)
+                                In[bInst] = ConstantValue::get(lint % rint);
+                            else if (kind == Value::kFAdd)
+                                In[bInst] = ConstantValue::get(ldouble + rdouble);
+                            else if (kind == Value::kFSub)
+                                In[bInst] = ConstantValue::get(ldouble - rdouble);
+                            else if (kind == Value::kFMul)
+                                In[bInst] = ConstantValue::get(ldouble * rdouble);
+                            else if (kind == Value::kFDiv)
+                                In[bInst] = ConstantValue::get(ldouble / rdouble);
+                            if (kind == Value::kAdd || kind == Value::kSub || kind == Value::kMul || kind == Value::kDiv || kind == Value::kRem || kind == Value::kFAdd || kind == Value::kFSub || kind == Value::kFMul || kind == Value::kFDiv)
+                                instr->setAlter(In[bInst]);
+                            else
+                            {
+                                auto my_bInst = builder.createBinaryInst(kind, bInst->getType(), lhs->getAlter(), rhs->getAlter());
+                                instr->setAlter(my_bInst);
+                            }
+                        }
+                        else
+                        {
+                            auto my_bInst = builder.createBinaryInst(kind, bInst->getType(), lhs->getAlter(), rhs->getAlter());
+                            instr->setAlter(my_bInst);
+                        }
+                    }
+                    else if (isa<UnaryInst>(instr))
+                    {
+                        UnaryInst *uInst = dynamic_cast<UnaryInst *>(instr);
+                        auto hs = uInst->getOperand();
+                        auto kind = uInst->getKind();
+                        Type *type = uInst->getType();
+                        if (isa<Instruction>(hs) && In.find(dynamic_cast<Instruction *>(hs)) != In.end())
+                            hs = In[dynamic_cast<Instruction *>(hs)];
+                        if (isa<ConstantValue>(hs))
+                        {
+                            auto Const = dynamic_cast<ConstantValue *>(hs);
+                            if (kind == Value::kNeg)
+                                In[uInst] = ConstantValue::get(-Const->getInt());
+                            else if (kind == Value::kFNeg)
+                                In[uInst] = ConstantValue::get(-Const->getDouble());
+                            else if (kind == Value::kItoF)
+                                In[uInst] = ConstantValue::get((double)Const->getInt());
+                            else if (kind == Value::kFtoI)
+                                In[uInst] = ConstantValue::get((int)Const->getDouble());
+                            instr->setAlter(In[uInst]);
+                        }
+                        else
+                        {
+                            auto my_uInst = builder.createUnaryInst(kind, type, hs->getAlter());
+                            instr->setAlter(my_uInst);
+                        }
+                    }
+                    else if (isa<CallInst>(instr))
+                    {
+                        CallInst *callInst = dynamic_cast<CallInst *>(instr);
+                        auto args = callInst->getArguments();
+                        vector<Value *> my_args;
+                        for (auto iter = args.begin(); iter != args.end(); iter++)
+                        {
+                            if (isa<LoadInst>(*iter))
+                            {
+                                auto ldInst = dynamic_cast<LoadInst *>(*iter);
+                                auto pointer = ldInst->getPointer();
+                                auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+                                int numdims = 0;
+                                if (isa<GlobalValue>(pointer))
+                                    numdims = dynamic_cast<GlobalValue *>(pointer)->getNumDims();
+                                else if (isa<AllocaInst>(pointer))
+                                    numdims = dynamic_cast<AllocaInst *>(pointer)->getNumDims();
+                                else if (isa<Argument>(pointer))
+                                    numdims = dynamic_cast<Argument *>(pointer)->getNumDims();
+                                if (indices.size() < numdims && vIn.find(pointer) != vIn.end())
+                                {
+                                    vIn.erase(vIn.find(pointer));
+                                }
+                            }
+                            my_args.push_back(iter->getAlter());
+                        }
+                        auto my_callInst = builder.createCallInst(callInst->getCallee(), my_args);
+                        instr->setAlter(my_callInst);
+                    }
+                    else if (isa<CondBrInst>(instr))
+                    {
+                        auto cbInst = dynamic_cast<CondBrInst *>(instr);
+                        auto cond = cbInst->getCondition();
+                        if (isa<Instruction>(cond) && In.find(dynamic_cast<Instruction *>(cond)) != In.end())
+                            cond = In[dynamic_cast<Instruction *>(cond)];
+                        builder.createCondBrInst(cond->getAlter(), cbInst->getThenBlock(), cbInst->getElseBlock(), {}, {});
+                    }
+                    else if (isa<UncondBrInst>(instr))
+                    {
+                        auto ucbInst = dynamic_cast<UncondBrInst *>(instr);
+                        builder.createUncondBrInst(ucbInst->getBlock(), {});
+                    }
+                    else if (isa<ReturnInst>(instr))
+                    {
+                        auto rInst = dynamic_cast<ReturnInst *>(instr);
+                        auto retValue = rInst->getReturnValue();
+                        if (retValue && isa<Instruction>(retValue) && In.find(dynamic_cast<Instruction *>(retValue)) != In.end())
+                            retValue = In[dynamic_cast<Instruction *>(retValue)];
+                        auto my_retValue = retValue ? retValue->getAlter() : nullptr;
+                        auto my_rInst = builder.createReturnInst(my_retValue, mybb);
+                        rInst->setAlter(my_rInst);
+                    }
+                    else if (isa<AllocaInst>(instr))
+                    {
+                        auto allocaInst = dynamic_cast<AllocaInst *>(instr);
+                        auto my_dims = vector<Value *>(allocaInst->getDims().begin(), allocaInst->getDims().end());
+                        auto my_allocaInst = builder.createAllocaInst(allocaInst->getType(), my_dims, allocaInst->getName(), allocaInst->Const());
+                        allocaInst->setAlter(my_allocaInst);
+                    }
+                }
             }
         }
     }

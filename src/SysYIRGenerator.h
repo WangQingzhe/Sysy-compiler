@@ -246,8 +246,8 @@ namespace sysy
         Module *pModule;                                          // 新生成的IR
         IRBuilder builder;                                        // IR生成器
         map<Value *, map<vector<Value *>, Instruction *>> AVALUE; // 记录每个变量存在哪个虚拟寄存器
-        // map<Instruction *, pair<Value *, vector<Value *>>> RVALUE; // 记录虚拟寄存器存储哪个变量
-        set<Value *> RVALUE;            // 记录虚拟寄存器存储哪个变量
+        map<Value *, set<pair<Value *, vector<Value *>>>> RVALUE; // 记录虚拟寄存器存储哪个变量
+        // set<Value *> RVALUE;            // 记录虚拟寄存器存储哪个变量
         map<Function *, bool> havecall; // 记录每个函数内是否有函数调用
         bool hascall;                   // 记录当前函数是否有函数调用
         set<string> libfunc = {"getint", "getch", "getfloat", "getarray", "getfarray", "putint", "putch", "putfloat", "putarray", "putfarray", "starttime", "stoptime", "putf"};
@@ -355,6 +355,7 @@ namespace sysy
     public:
         Module *OriginModule;
         Module *pModule;
+        IRBuilder builder;
         ConstSpread(Module *OriginModule) : OriginModule(OriginModule) { pModule = new Module(); }
 
     public:
@@ -363,5 +364,6 @@ namespace sysy
         void CalIn_Out(Function *);
         // 根据每个基本块的In计算Out集合
         void Fs(BasicBlock *);
+        void RegenerateIR();
     };
 } // namespace sysy
