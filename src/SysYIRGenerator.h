@@ -366,4 +366,18 @@ namespace sysy
         void Fs(BasicBlock *);
         void RegenerateIR();
     };
+
+    // 指令组合
+    class InstrCombine
+    {
+    public:
+        Module *OriginModule;
+        Module *pModule;
+        IRBuilder builder;
+        InstrCombine(Module *OriginModule) : OriginModule(OriginModule) { pModule = new Module(); }
+
+    public:
+        Module *Run();
+        void RegenerateIR();
+    };
 } // namespace sysy
