@@ -4192,6 +4192,7 @@ namespace sysy
     Module *Loop::Run()
     {
         CalAccess();
+        return pModule;
     }
     void Loop::CalAccess()
     {
@@ -4205,27 +4206,29 @@ namespace sysy
                 continue;
             stack<BasicBlock *> s;
             map<BasicBlock *, int> vis;
+            // set<BasicBlock *> accessible;
             for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
             {
                 auto bb = biter->get();
-                auto sucs = bb->getSuccessors();
-                if (sucs.empty())
-                    continue;
                 // cout << "bb: " << bb->getName() << endl;
                 // cout << "bb's fitst successor: " << (*suc.begin())->getName() << endl;
-                s.push(*sucs.begin());
                 vis.clear();
-                for (auto biter = sucs.begin(); biter != sucs.end(); biter++)
+                bb->accessible.clear();
+                for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
                 {
-                    vis.insert(map<BasicBlock *, int>::value_type(*biter, 0));
+                    vis.insert(map<BasicBlock *, int>::value_type(biter->get(), 0));
                 }
-                vis[*sucs.begin()] = 1;
+                vis[bb] = 1;
+                s.push(bb);
                 while (!s.empty())
                 {
                     BasicBlock *top = s.top();
                     s.pop();
+                    // cout << (top)->getName() << endl;
                     bb->accessible.insert(top);
                     auto Sucs = top->getSuccessors();
+                    if (Sucs.empty())
+                        continue;
                     for (auto iter = Sucs.begin(); iter != Sucs.end(); iter++)
                     {
                         if (vis[*iter] == 0)
@@ -4253,13 +4256,15 @@ namespace sysy
             {
                 auto bb = biter->get();
                 auto sucs = bb->getSuccessors();
-                cout << "bb: " << bb->getName() << endl;
+                // cout << "basic_block: " << bb->getName() << endl;
+                cout << "accssible set of " << bb->getName() << ":" << endl;
                 // cout << "bb's fitst successor: " << (*suc.begin())->getName() << endl;
                 for (auto acc : bb->accessible)
                 {
                     cout << acc->getName() << " ";
                 }
-                cout << endl;
+                cout << endl
+                     << endl;
             }
         }
     }
