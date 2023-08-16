@@ -400,18 +400,103 @@ namespace sysy
         void GenInlineInstr();
     };
 
-    // 循环
-    class Loop
+    // 识别循环
+    class LoopFind
     {
     public:
         Module *pModule;
-        Loop(Module *pModule) : pModule(pModule) {}
+        set<BasicBlock *> Allbbs;
+        LoopFind(Module *pModule) : pModule(pModule) {}
 
     public:
         Module *Run();
         // 计算每个基本块的可达集合
         void CalAccess();
-        void GetLoop();
         void PRINT_ACCESS(std::ostream &os);
+        // 计算函数内所有基本块的必经节点
+        void CalDom(Function *);
+        void PRINT_DOM(std::ostream &os);
+        void GetLoop();
+    };
+
+    // 循环
+    class Loop
+    {
+    private:
+        Function *parent;
+
+        int loopDepth;
+        Loop *parentLoop;
+        BasicBlock *loopHeader;
+        std::vector<Loop *> subLoops;
+        std::vector<BasicBlock *> blocks;
+
+        std::unordered_set<BasicBlock *> exitingBlocks;
+        std::unordered_set<BasicBlock *> exitBlocks;
+        BasicBlock *latchBlock;
+        BasicBlock *preHeader;
+
+        // std::unordered_map<Instruction *, SCEV> SCEVCheck;
+
+        // PhiInst *indPhi;
+        Instruction *indCondVar;
+        Value *indEnd;
+        Instruction::Kind icmpKind;
+        int tripCount;
+
+    public:
+        Loop(BasicBlock *header);
+
+        Function *getParent() { return parent; }
+
+        void setLoopDepth(int depth) { loopDepth = depth; }
+        int getLoopDepth() { return loopDepth; }
+
+        Loop *getParentLoop() { return parentLoop; }
+        void setParentLoop(Loop *parent) { parentLoop = parent; }
+        std::vector<Loop *> &getSubLoops() { return subLoops; }
+
+        std::vector<BasicBlock *> &getLoopBasicBlocks() { return blocks; }
+        std::unordered_set<BasicBlock *> BBSet;
+
+        BasicBlock *getHeader() { return loopHeader; }
+
+        std::unordered_set<BasicBlock *> &getExitingBlocks() { return exitingBlocks; }
+        std::unordered_set<BasicBlock *> &getExitBlocks() { return exitBlocks; }
+
+        BasicBlock *getLatchBlock() { return latchBlock; }
+        void setLatchBlock(BasicBlock *latch) { latchBlock = latch; }
+
+        BasicBlock *getPreHeader() { return preHeader; }
+        void setPreHeader(BasicBlock *_preHeader) { preHeader = _preHeader; }
+
+        // SCEV &getSCEV(Instruction *instr);
+
+        // bool hasSCEV(Instruction *instr);
+
+        // void registerSCEV(Instruction *instr, SCEV scev);
+
+        // void cleanSCEV() { SCEVCheck.clear(); }
+
+        // using scev_iterator = std::unordered_map<Instruction *, SCEV>::iterator;
+        // iterator_range<scev_iterator> getSCEV() { return make_range(SCEVCheck.begin(), SCEVCheck.end()); }
+
+        // PhiInst *getIndexPhi() { return indPhi; }
+        // void setIndexPhi(PhiInst *phi) { indPhi = phi; }
+
+        Value *getIndexEnd() { return indEnd; }
+        void setIndexEnd(Value *end) { indEnd = end; }
+
+        Instruction *getIndexCondInstr() { return indCondVar; }
+        void setIndexCondInstr(Instruction *instr) { indCondVar = instr; }
+
+        int getTripCount() { return tripCount; }
+        void setTripCount(int c) { tripCount = c; }
+
+        void setICmpKind(Instruction::Kind kind) { icmpKind = kind; }
+
+        Instruction::Kind getICmpKind() { return icmpKind; }
+
+        bool isLoopInvariant(Value *val);
     };
 } // namespace sysy

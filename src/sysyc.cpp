@@ -46,10 +46,8 @@ int main(int argc, char **argv)
     SysYIRGenerator generator;
     generator.visitModule(moduleAST);
     auto moduleIR = generator.get();
-    Dom dom(moduleIR);
-    auto DOM = dom.Run();
-    Loop loop(DOM);
-    auto loopIR = loop.Run();
+    LoopFind loopfind(moduleIR);
+    auto loopfindIR = loopfind.Run();
     // loop.PRINT_ACCESS(cout);
     // Inline Inl(moduleIR);
     // auto InlIR = Inl.Run();
@@ -85,22 +83,24 @@ int main(int argc, char **argv)
     // auto ConSpIR2 = ConSp2.Run();
     // DCE dce2(ConSpIR2);
     // auto DceIR2 = dce2.Run();
-    // auto functions = loopIR->getFunctions();
-    // int i = 0;
-    // // 找出所有回边，<b,a>为由b指向a的边。
-    // vector<pair<BasicBlock *, BasicBlock *>> back_edge;
-    // for (auto iter = functions->begin(); iter != functions->end(); iter++, i++)
-    // {
-    //     cout << iter->first << ":" << endl;
-    //     for (auto loop : iter->second->getLoops())
-    //     {
-    //         for (auto l : loop)
-    //         {
-    //             cout << l->getName() << " ";
-    //         }
-    //         cout << endl;
-    //     }
-    // }
+    auto functions = loopfindIR->getFunctions();
+    int i = 0;
+    // 找出所有回边，<b,a>为由b指向a的边。
+    vector<pair<BasicBlock *, BasicBlock *>> back_edge;
+    for (auto iter = functions->begin(); iter != functions->end(); iter++, i++)
+    {
+        if (iter->second->getBasicBlocks().size() == 0)
+            continue;
+        cout << iter->first << ":" << endl;
+        for (auto loop : iter->second->getLoops())
+        {
+            for (auto l : loop)
+            {
+                cout << l->getName() << " ";
+            }
+            cout << endl;
+        }
+    }
 
     if (genir)
     {

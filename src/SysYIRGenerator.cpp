@@ -3086,95 +3086,6 @@ namespace sysy
             //  }
         }
     }
-    // Dom
-    Module *Dom::Run()
-    {
-        auto functions = pModule->getFunctions();
-        for (auto iter = functions->begin(); iter != functions->end(); iter++)
-        {
-            Function *func = iter->second;
-            auto bblist = func->getBasicBlocks();
-            if (bblist.empty())
-                continue;
-            CalDom(func);
-        }
-        return pModule;
-    }
-    void Dom::CalDom(Function *curFunc)
-    {
-        // 初始化
-        auto bblist = curFunc->getBasicBlocks();
-        Allbbs.clear();
-        for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
-            Allbbs.insert(iter->get());
-        for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
-        {
-            BasicBlock *bb = iter->get();
-            // bb->dom.clear();
-            if (iter == bblist.begin())
-                bb->dom.insert(bb);
-            else
-                bb->dom.insert(Allbbs.begin(), Allbbs.end());
-        }
-        // 求解不动点
-        bool change = true;
-        while (change)
-        {
-            change = false;
-            for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
-            {
-                if (iter == bblist.begin())
-                    continue;
-                BasicBlock *bb = iter->get();
-                set<BasicBlock *> olddom, temp, t;
-                olddom.insert(bb->dom.begin(), bb->dom.end());
-                bb->dom.clear();
-                auto pres = bb->getPredecessors();
-                for (int i = 0; i < pres.size(); i++)
-                {
-                    if (i == 0)
-                        temp.insert(pres[0]->dom.begin(), pres[0]->dom.end());
-                    else
-                    {
-                        set_intersection(temp.begin(), temp.end(), pres[i]->dom.begin(), pres[i]->dom.end(), inserter(t, t.begin()));
-                        temp.clear();
-                        temp.insert(t.begin(), t.end());
-                        t.clear();
-                    }
-                }
-                bb->dom.insert(temp.begin(), temp.end());
-                bb->dom.insert(bb);
-                if (olddom != bb->dom)
-                    change = true;
-            }
-        }
-    }
-    void Dom::PRINT_DOM(std::ostream &os)
-    {
-        auto functions = pModule->getFunctions();
-        for (auto iter = functions->begin(); iter != functions->end(); iter++)
-        {
-            string name = iter->first;
-            auto bblist = iter->second->getBasicBlocks();
-            if (bblist.empty())
-                continue;
-            os << "**********" << name << "**********"
-               << "\n";
-            for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
-            {
-                auto bb = biter->get();
-                os << "$$" << bb->getName() << "$$"
-                   << "\n";
-                os << "[DOM]"
-                   << "\n";
-                for (auto &k : bb->dom)
-                {
-                    os << k->getName() << " ";
-                }
-                os << "\n";
-            }
-        }
-    }
     // ConstSpread
     Module *ConstSpread::Run()
     {
@@ -4187,15 +4098,26 @@ namespace sysy
             }
         }
     }
-
-    // Loop
-    Module *Loop::Run()
+    // LoopFind
+    Module *LoopFind::Run()
     {
+        // 计算必经节点
+        auto functions = pModule->getFunctions();
+        for (auto iter = functions->begin(); iter != functions->end(); iter++)
+        {
+            Function *func = iter->second;
+            auto bblist = func->getBasicBlocks();
+            if (bblist.empty())
+                continue;
+            CalDom(func);
+        }
+        // 计算可达节点集合
         CalAccess();
+        // 计算一个函数内所有循环
         GetLoop();
         return pModule;
     }
-    void Loop::CalAccess()
+    void LoopFind::CalAccess()
     {
         auto functions = pModule->getFunctions();
         int i = 0;
@@ -4242,7 +4164,7 @@ namespace sysy
             }
         }
     }
-    void Loop::GetLoop()
+    void LoopFind::GetLoop()
     {
         auto functions = pModule->getFunctions();
         int i = 0;
@@ -4291,7 +4213,7 @@ namespace sysy
             }
         }
     }
-    void Loop::PRINT_ACCESS(std::ostream &os)
+    void LoopFind::PRINT_ACCESS(std::ostream &os)
     {
         auto functions = pModule->getFunctions();
         int i = 0;
@@ -4315,6 +4237,81 @@ namespace sysy
                 }
                 cout << endl
                      << endl;
+            }
+        }
+    }
+    void LoopFind::CalDom(Function *curFunc)
+    {
+        // 初始化
+        auto bblist = curFunc->getBasicBlocks();
+        Allbbs.clear();
+        for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+            Allbbs.insert(iter->get());
+        for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+        {
+            BasicBlock *bb = iter->get();
+            // bb->dom.clear();
+            if (iter == bblist.begin())
+                bb->dom.insert(bb);
+            else
+                bb->dom.insert(Allbbs.begin(), Allbbs.end());
+        }
+        // 求解不动点
+        bool change = true;
+        while (change)
+        {
+            change = false;
+            for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+            {
+                if (iter == bblist.begin())
+                    continue;
+                BasicBlock *bb = iter->get();
+                set<BasicBlock *> olddom, temp, t;
+                olddom.insert(bb->dom.begin(), bb->dom.end());
+                bb->dom.clear();
+                auto pres = bb->getPredecessors();
+                for (int i = 0; i < pres.size(); i++)
+                {
+                    if (i == 0)
+                        temp.insert(pres[0]->dom.begin(), pres[0]->dom.end());
+                    else
+                    {
+                        set_intersection(temp.begin(), temp.end(), pres[i]->dom.begin(), pres[i]->dom.end(), inserter(t, t.begin()));
+                        temp.clear();
+                        temp.insert(t.begin(), t.end());
+                        t.clear();
+                    }
+                }
+                bb->dom.insert(temp.begin(), temp.end());
+                bb->dom.insert(bb);
+                if (olddom != bb->dom)
+                    change = true;
+            }
+        }
+    }
+    void LoopFind::PRINT_DOM(std::ostream &os)
+    {
+        auto functions = pModule->getFunctions();
+        for (auto iter = functions->begin(); iter != functions->end(); iter++)
+        {
+            string name = iter->first;
+            auto bblist = iter->second->getBasicBlocks();
+            if (bblist.empty())
+                continue;
+            os << "**********" << name << "**********"
+               << "\n";
+            for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
+            {
+                auto bb = biter->get();
+                os << "$$" << bb->getName() << "$$"
+                   << "\n";
+                os << "[DOM]"
+                   << "\n";
+                for (auto &k : bb->dom)
+                {
+                    os << k->getName() << " ";
+                }
+                os << "\n";
             }
         }
     }
