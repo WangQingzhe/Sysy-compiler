@@ -2692,7 +2692,53 @@ namespace sysy
                 }
             }
         }
+        // 找到所有出现过的变量
+        set<Value *> pointers;
+        for (auto fiter = functions->begin(); fiter != functions->end(); fiter++)
+        {
+            Function *func = fiter->second;
+            auto bblist = func->getBasicBlocks();
+            if (bblist.empty())
+                continue;
+            pointers.clear();
+            for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
+            {
+                BasicBlock *bb = biter->get();
+                for (auto iiter = bb->begin(); iiter != bb->end(); iiter++)
+                {
+                    auto instr = iiter->get();
+                    auto instrType = instr->getKind();
+                    if (instrType == Instruction::kLoad)
+                    {
+                        pointers.insert(dynamic_cast<LoadInst *>(instr)->getPointer());
+                    }
+                    else if (instrType == Instruction ::kStore)
+                    {
+                        pointers.insert(dynamic_cast<StoreInst *>(instr)->getPointer());
+                    }
+                }
+            }
+            // DCE for useless allocaInst
+            for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
+            {
+                BasicBlock *bb = biter->get();
+                for (auto iiter = bb->rbegin(); iiter != bb->rend(); iiter++)
+                {
+                    auto instr = iiter->get();
+                    auto instrType = instr->getKind();
+                    if (instrType == Instruction::kAlloca)
+                    {
+                        if (pointers.count(instr) == 0)
+                        {
+                            bb->getInstructions().erase(--iiter.base());
+                            iiter--;
+                        }
+                    }
+                }
+            }
+        }
         // std::cout << "DCE delete [" << cnt << "] Instr" << std::endl;
+
         return pModule;
     }
     // CommonExp

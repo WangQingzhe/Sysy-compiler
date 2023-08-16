@@ -46,8 +46,8 @@ int main(int argc, char **argv)
     SysYIRGenerator generator;
     generator.visitModule(moduleAST);
     auto moduleIR = generator.get();
-    LoopFind loopfind(moduleIR);
-    auto loopfindIR = loopfind.Run();
+    // LoopFind loopfind(moduleIR);
+    // auto loopfindIR = loopfind.Run();
     // loop.PRINT_ACCESS(cout);
     // Inline Inl(moduleIR);
     // auto InlIR = Inl.Run();
@@ -73,8 +73,8 @@ int main(int argc, char **argv)
     //         cout << s->getName() << " ";
     //     cout << "\n";
     // }
-    // DCE dce(InstrCbIR);
-    // auto DceIR = dce.Run();
+    DCE dce(moduleIR);
+    auto DceIR = dce.Run();
     // LoadCut ldCut2(DceIR);
     // auto ldCutIR2 = ldCut2.Run();
     // CommonExp CmExp2(ldCutIR2);
@@ -83,31 +83,31 @@ int main(int argc, char **argv)
     // auto ConSpIR2 = ConSp2.Run();
     // DCE dce2(ConSpIR2);
     // auto DceIR2 = dce2.Run();
-    auto functions = loopfindIR->getFunctions();
-    int i = 0;
-    // 找出所有回边，<b,a>为由b指向a的边。
-    vector<pair<BasicBlock *, BasicBlock *>> back_edge;
-    for (auto iter = functions->begin(); iter != functions->end(); iter++, i++)
-    {
-        if (iter->second->getBasicBlocks().size() == 0)
-            continue;
-        cout << iter->first << ":" << endl;
-        for (auto loop : iter->second->getLoops())
-        {
-            for (auto l : loop)
-            {
-                cout << l->getName() << " ";
-            }
-            cout << endl;
-        }
-    }
+    // auto functions = loopfindIR->getFunctions();
+    // int i = 0;
+    // // 找出所有回边，<b,a>为由b指向a的边。
+    // vector<pair<BasicBlock *, BasicBlock *>> back_edge;
+    // for (auto iter = functions->begin(); iter != functions->end(); iter++, i++)
+    // {
+    //     if (iter->second->getBasicBlocks().size() == 0)
+    //         continue;
+    //     cout << iter->first << ":" << endl;
+    //     for (auto loop : iter->second->getLoops())
+    //     {
+    //         for (auto l : loop)
+    //         {
+    //             cout << l->getName() << " ";
+    //         }
+    //         cout << endl;
+    //     }
+    // }
 
     if (genir)
     {
         if (strcmp(argv[2], "ir") == 0)
         {
             cout << "Dce2\n";
-            moduleIR->print(cout);
+            DceIR->print(cout);
         }
         else if (strcmp(argv[2], "ir1") == 0)
         {
@@ -152,7 +152,7 @@ int main(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-    CodeGen codegen(moduleIR);
+    CodeGen codegen(DceIR);
     string asmCode = codegen.code_gen();
     cout << asmCode << endl;
     ;
