@@ -411,6 +411,7 @@ namespace sysy
         Module *Run();
         // 计算每个基本块的可达集合
         void CalAccess();
+        void GetLoop();
         void PRINT_ACCESS(std::ostream &os);
     };
 } // namespace sysy

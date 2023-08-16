@@ -4192,6 +4192,7 @@ namespace sysy
     Module *Loop::Run()
     {
         CalAccess();
+        GetLoop();
         return pModule;
     }
     void Loop::CalAccess()
@@ -4238,6 +4239,55 @@ namespace sysy
                         }
                     }
                 }
+            }
+        }
+    }
+    void Loop::GetLoop()
+    {
+        auto functions = pModule->getFunctions();
+        int i = 0;
+        // 找出所有回边，<b,a>为由b指向a的边。
+        vector<pair<BasicBlock *, BasicBlock *>> back_edge;
+        for (auto iter = functions->begin(); iter != functions->end(); iter++, i++)
+        {
+            back_edge.clear();
+            auto bblist = iter->second->getBasicBlocks();
+            for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
+            {
+                auto bb = biter->get();
+                auto sucs = bb->getSuccessors();
+                for (auto siter = sucs.begin(); siter != sucs.end(); siter++)
+                {
+                    if (bb->dom.find(*siter) != bb->dom.end())
+                    {
+                        back_edge.push_back(make_pair(bb, (*siter)));
+                    }
+                }
+            }
+            // 找出经过循环首节点的所有节点
+            for (auto be : back_edge)
+            {
+                vector<BasicBlock *> loop;
+                vector<BasicBlock *> pass_snode;
+                pass_snode.clear();
+                auto node = be.first;
+                auto snode = be.second;
+                for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
+                {
+                    auto bb = biter->get();
+                    if (bb->dom.find(snode) != bb->dom.end())
+                    {
+                        pass_snode.push_back(bb);
+                    }
+                }
+                for (auto pnode : pass_snode)
+                {
+                    if (pnode->accessible.find(node) != pnode->accessible.end())
+                    {
+                        loop.push_back(pnode);
+                    }
+                }
+                iter->second->addLoop(loop);
             }
         }
     }

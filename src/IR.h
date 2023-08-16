@@ -1095,6 +1095,7 @@ namespace sysy
         int blockID;
         block_list blocks;
         block_list exit_blocks;
+        vector<vector<BasicBlock *>> loops; // 函数的循环
 
     public:
         Type *getReturnType() const
@@ -1106,6 +1107,11 @@ namespace sysy
             return getType()->as<FunctionType>()->getParamTypes();
         }
         auto getBasicBlocks() const { return make_range(blocks); }
+        auto getLoops() const { return make_range(loops); }
+        void addLoop(vector<BasicBlock *> l)
+        {
+            loops.push_back(l);
+        }
         BasicBlock *getEntryBlock() const { return blocks.front().get(); }
         BasicBlock *addBasicBlock(const std::string &name = "")
         {
