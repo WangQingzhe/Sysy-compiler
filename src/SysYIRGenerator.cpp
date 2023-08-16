@@ -4187,4 +4187,80 @@ namespace sysy
             }
         }
     }
+
+    // Loop
+    Module *Loop::Run()
+    {
+        CalAccess();
+    }
+    void Loop::CalAccess()
+    {
+        auto functions = pModule->getFunctions();
+        int i = 0;
+        for (auto iter = functions->begin(); iter != functions->end(); iter++, i++)
+        {
+            string name = iter->first;
+            auto bblist = iter->second->getBasicBlocks();
+            if (bblist.empty())
+                continue;
+            stack<BasicBlock *> s;
+            map<BasicBlock *, int> vis;
+            for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
+            {
+                auto bb = biter->get();
+                auto sucs = bb->getSuccessors();
+                if (sucs.empty())
+                    continue;
+                // cout << "bb: " << bb->getName() << endl;
+                // cout << "bb's fitst successor: " << (*suc.begin())->getName() << endl;
+                s.push(*sucs.begin());
+                vis.clear();
+                for (auto biter = sucs.begin(); biter != sucs.end(); biter++)
+                {
+                    vis.insert(map<BasicBlock *, int>::value_type(*biter, 0));
+                }
+                vis[*sucs.begin()] = 1;
+                while (!s.empty())
+                {
+                    BasicBlock *top = s.top();
+                    s.pop();
+                    bb->accessible.insert(top);
+                    auto Sucs = top->getSuccessors();
+                    for (auto iter = Sucs.begin(); iter != Sucs.end(); iter++)
+                    {
+                        if (vis[*iter] == 0)
+                        {
+                            s.push(*iter);
+                            vis[*iter] = 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    void Loop::PRINT_ACCESS(std::ostream &os)
+    {
+        auto functions = pModule->getFunctions();
+        int i = 0;
+        for (auto iter = functions->begin(); iter != functions->end(); iter++, i++)
+        {
+            string name = iter->first;
+            auto bblist = iter->second->getBasicBlocks();
+            if (bblist.empty())
+                continue;
+            os << "*******" << name << "*******\n";
+            for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
+            {
+                auto bb = biter->get();
+                auto sucs = bb->getSuccessors();
+                cout << "bb: " << bb->getName() << endl;
+                // cout << "bb's fitst successor: " << (*suc.begin())->getName() << endl;
+                for (auto acc : bb->accessible)
+                {
+                    cout << acc->getName() << " ";
+                }
+                cout << endl;
+            }
+        }
+    }
 } // namespace sysy

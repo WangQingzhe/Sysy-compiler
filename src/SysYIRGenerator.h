@@ -293,7 +293,7 @@ namespace sysy
         Module *Run();
     };
 
-    // DCE
+    // 死代码删除
     class DCE
     {
     public:
@@ -398,5 +398,19 @@ namespace sysy
         void RegenerateIR();
         // 为内联函数生成指令
         void GenInlineInstr();
+    };
+
+    // 循环
+    class Loop
+    {
+    public:
+        Module *pModule;
+        Loop(Module *pModule) : pModule(pModule) {}
+
+    public:
+        Module *Run();
+        // 计算每个基本块的可达集合
+        void CalAccess();
+        void PRINT_ACCESS(std::ostream &os);
     };
 } // namespace sysy

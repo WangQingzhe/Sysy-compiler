@@ -46,16 +46,19 @@ int main(int argc, char **argv)
     SysYIRGenerator generator;
     generator.visitModule(moduleAST);
     auto moduleIR = generator.get();
-    Inline Inl(moduleIR);
-    auto InlIR = Inl.Run();
-    LoadCut ldCut(InlIR);
-    auto ldCutIR = ldCut.Run();
-    CommonExp CmExp(ldCutIR);
-    auto CmExpIR = CmExp.Run();
-    ConstSpread ConSp(CmExpIR);
-    auto ConSpIR = ConSp.Run();
-    InstrCombine InstrCb(ConSpIR);
-    auto InstrCbIR = InstrCb.Run();
+    Loop loop(moduleIR);
+    auto loopIR = loop.Run();
+    loop.PRINT_ACCESS(cout);
+    // Inline Inl(moduleIR);
+    // auto InlIR = Inl.Run();
+    // LoadCut ldCut(InlIR);
+    // auto ldCutIR = ldCut.Run();
+    // CommonExp CmExp(ldCutIR);
+    // auto CmExpIR = CmExp.Run();
+    // ConstSpread ConSp(CmExpIR);
+    // auto ConSpIR = ConSp.Run();
+    // InstrCombine InstrCb(ConSpIR);
+    // auto InstrCbIR = InstrCb.Run();
     // auto func = InstrCbIR->getFunction("main");
     // auto bblist = func->getBasicBlocks();
     // for (auto &iter : bblist)
@@ -70,22 +73,22 @@ int main(int argc, char **argv)
     //         cout << s->getName() << " ";
     //     cout << "\n";
     // }
-    DCE dce(InstrCbIR);
-    auto DceIR = dce.Run();
-    LoadCut ldCut2(DceIR);
-    auto ldCutIR2 = ldCut2.Run();
-    CommonExp CmExp2(ldCutIR2);
-    auto CmExpIR2 = CmExp2.Run();
-    ConstSpread ConSp2(CmExpIR2);
-    auto ConSpIR2 = ConSp2.Run();
-    DCE dce2(ConSpIR2);
-    auto DceIR2 = dce2.Run();
+    // DCE dce(InstrCbIR);
+    // auto DceIR = dce.Run();
+    // LoadCut ldCut2(DceIR);
+    // auto ldCutIR2 = ldCut2.Run();
+    // CommonExp CmExp2(ldCutIR2);
+    // auto CmExpIR2 = CmExp2.Run();
+    // ConstSpread ConSp2(CmExpIR2);
+    // auto ConSpIR2 = ConSp2.Run();
+    // DCE dce2(ConSpIR2);
+    // auto DceIR2 = dce2.Run();
     if (genir)
     {
         if (strcmp(argv[2], "ir") == 0)
         {
             cout << "Dce2\n";
-            DceIR2->print(cout);
+            moduleIR->print(cout);
         }
         else if (strcmp(argv[2], "ir1") == 0)
         {
@@ -130,7 +133,7 @@ int main(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-    CodeGen codegen(DceIR2);
+    CodeGen codegen(moduleIR);
     string asmCode = codegen.code_gen();
     cout << asmCode << endl;
     ;

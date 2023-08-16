@@ -465,8 +465,9 @@ namespace sysy
         std::set<pair<Instruction *, pair<Value::Kind, Value *>>> UnaryEval;
         std::set<pair<Instruction *, pair<Value::Kind, Value *>>> UnaryIn;
         std::set<pair<Instruction *, pair<Value::Kind, Value *>>> UnaryOut;
-        // Dom
-        std::set<BasicBlock *> dom; // 基本块的必经节点集合
+        // Loop
+        std::set<BasicBlock *> dom;        // 基本块的必经节点集合
+        std::set<BasicBlock *> accessible; // 基本块可以到达的节点集合
         // ConstSpread
         std::set<pair<Instruction *, ConstantValue *>> ConstIn;
         std::set<pair<pair<Value *, vector<Value *>>, ConstantValue *>> vConstIn;
