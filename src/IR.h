@@ -1086,6 +1086,7 @@ namespace sysy
 
     public:
         using block_list = std::list<std::unique_ptr<BasicBlock>>;
+        bool Inline = false;
 
     protected:
         Module *parent;

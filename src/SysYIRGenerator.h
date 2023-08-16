@@ -380,4 +380,23 @@ namespace sysy
         Module *Run();
         void RegenerateIR();
     };
+
+    // 函数内联
+    class Inline
+    {
+    public:
+        Module *OriginModule;
+        Module *pModule;
+        Inline(Module *OriginModule) : OriginModule(OriginModule) { pModule = new Module(); }
+        IRBuilder builder;
+
+    public:
+        Module *Run();
+        // 分析函数是否可以内联
+        void AnalyzeFunc(Function *);
+        // 重新生成IR
+        void RegenerateIR();
+        // 为内联函数生成指令
+        void GenInlineInstr();
+    };
 } // namespace sysy

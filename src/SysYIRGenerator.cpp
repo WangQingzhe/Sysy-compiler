@@ -1901,12 +1901,16 @@ namespace sysy
                             auto indices = RVALUE[cond].begin()->second;
                             cond = AVALUE[pointer][indices];
                         }
-                        builder.createCondBrInst(cond->getAlter(), cbInst->getThenBlock(), cbInst->getElseBlock(), {}, {});
+                        BasicBlock *current = builder.getBasicBlock();
+                        BasicBlock *my_then = dynamic_cast<BasicBlock *>(cbInst->getThenBlock()->getAlter());
+                        BasicBlock *my_else = dynamic_cast<BasicBlock *>(cbInst->getElseBlock()->getAlter());
+                        builder.createCondBrInst(cond->getAlter(), my_then, my_else, {}, {});
                     }
                     else if (isa<UncondBrInst>(instr))
                     {
                         auto ucbInst = dynamic_cast<UncondBrInst *>(instr);
-                        builder.createUncondBrInst(ucbInst->getBlock(), {});
+                        auto my_block = dynamic_cast<BasicBlock *>(ucbInst->getBlock()->getAlter());
+                        builder.createUncondBrInst(my_block, {});
                     }
                     else if (isa<AllocaInst>(instr))
                     {
@@ -2069,6 +2073,12 @@ namespace sysy
             case Instruction::kCall:
             {
                 CallInst *callInst = dynamic_cast<CallInst *>(instr);
+                auto args = callInst->getArguments();
+                for (auto arg : args)
+                {
+                    if (isa<Instruction>(arg))
+                        curbb->Use.insert(dynamic_cast<Instruction *>(arg));
+                }
                 if (!callInst->getType()->isVoid())
                 {
                     curbb->Def.insert(instr);
@@ -2940,12 +2950,16 @@ namespace sysy
                         auto cond = cbInst->getCondition();
                         if (Alter.find(cond) != Alter.end())
                             cond = Alter[cond];
-                        builder.createCondBrInst(cond->getAlter(), cbInst->getThenBlock(), cbInst->getElseBlock(), {}, {});
+                        BasicBlock *current = builder.getBasicBlock();
+                        BasicBlock *my_then = dynamic_cast<BasicBlock *>(cbInst->getThenBlock()->getAlter());
+                        BasicBlock *my_else = dynamic_cast<BasicBlock *>(cbInst->getElseBlock()->getAlter());
+                        builder.createCondBrInst(cond->getAlter(), my_then, my_else, {}, {});
                     }
                     else if (isa<UncondBrInst>(instr))
                     {
                         auto ucbInst = dynamic_cast<UncondBrInst *>(instr);
-                        builder.createUncondBrInst(ucbInst->getBlock(), {});
+                        auto my_block = dynamic_cast<BasicBlock *>(ucbInst->getBlock()->getAlter());
+                        builder.createUncondBrInst(my_block, {});
                     }
                     else if (isa<AllocaInst>(instr))
                     {
@@ -3617,12 +3631,15 @@ namespace sysy
                         auto cond = cbInst->getCondition();
                         if (isa<Instruction>(cond) && In.find(dynamic_cast<Instruction *>(cond)) != In.end())
                             cond = In[dynamic_cast<Instruction *>(cond)];
-                        builder.createCondBrInst(cond->getAlter(), cbInst->getThenBlock(), cbInst->getElseBlock(), {}, {});
+                        BasicBlock *my_then = dynamic_cast<BasicBlock *>(cbInst->getThenBlock()->getAlter());
+                        BasicBlock *my_else = dynamic_cast<BasicBlock *>(cbInst->getElseBlock()->getAlter());
+                        builder.createCondBrInst(cond->getAlter(), my_then, my_else, {}, {});
                     }
                     else if (isa<UncondBrInst>(instr))
                     {
                         auto ucbInst = dynamic_cast<UncondBrInst *>(instr);
-                        builder.createUncondBrInst(ucbInst->getBlock(), {});
+                        auto my_block = dynamic_cast<BasicBlock *>(ucbInst->getBlock()->getAlter());
+                        builder.createUncondBrInst(my_block, {});
                     }
                     else if (isa<ReturnInst>(instr))
                     {
@@ -3735,6 +3752,7 @@ namespace sysy
                         Type *type = bInst->getType();
                         auto my_lhs = lhs->getAlter();
                         auto my_rhs = rhs->getAlter();
+                        // (X + C1) + C2 => X + (C1 + C2)
                         if (kind == Value::kAdd && isa<BinaryInst>(my_lhs) && isa<ConstantValue>(my_rhs))
                         {
                             BinaryInst *bLhs = dynamic_cast<BinaryInst *>(my_lhs);
@@ -3753,12 +3771,38 @@ namespace sysy
                                 instr->setAlter(my_bInst);
                             }
                         }
+                        // X + X => X * 2
+                        else if (kind == Value::kAdd && (my_lhs == my_rhs))
+                        {
+                            auto my_bInst = builder.createMulInst(my_lhs, ConstantValue::get(2));
+                            instr->setAlter(my_bInst);
+                        }
+                        // (X * C) + X => X * (C + 1)
+                        else if (kind == Value::kAdd && isa<BinaryInst>(my_lhs) && isa<Instruction>(my_rhs))
+                        {
+                            BinaryInst *bLhs = dynamic_cast<BinaryInst *>(my_lhs);
+                            auto my_kind = bLhs->getKind();
+                            auto llhs = bLhs->getLhs();
+                            auto rlhs = bLhs->getRhs();
+                            if (my_kind == Value::kMul && isa<Instruction>(llhs) && llhs == my_rhs && isa<ConstantValue>(rlhs))
+                            {
+                                int my_const = dynamic_cast<ConstantValue *>(rlhs)->getInt() + 1;
+                                auto my_bInst = builder.createMulInst(llhs, ConstantValue::get(my_const));
+                                instr->setAlter(my_bInst);
+                            }
+                            else
+                            {
+                                auto my_bInst = builder.createAddInst(my_lhs, my_rhs);
+                                instr->setAlter(my_bInst);
+                            }
+                        }
                         else
                         {
                             auto my_bInst = builder.createBinaryInst(kind, bInst->getType(), lhs->getAlter(), rhs->getAlter());
                             instr->setAlter(my_bInst);
                         }
                     }
+
                     else if (isa<UnaryInst>(instr))
                     {
                         UnaryInst *uInst = dynamic_cast<UnaryInst *>(instr);
@@ -3784,12 +3828,15 @@ namespace sysy
                     {
                         auto cbInst = dynamic_cast<CondBrInst *>(instr);
                         auto cond = cbInst->getCondition();
-                        builder.createCondBrInst(cond->getAlter(), cbInst->getThenBlock(), cbInst->getElseBlock(), {}, {});
+                        BasicBlock *my_then = dynamic_cast<BasicBlock *>(cbInst->getThenBlock()->getAlter());
+                        BasicBlock *my_else = dynamic_cast<BasicBlock *>(cbInst->getElseBlock()->getAlter());
+                        builder.createCondBrInst(cond->getAlter(), my_then, my_else, {}, {});
                     }
                     else if (isa<UncondBrInst>(instr))
                     {
                         auto ucbInst = dynamic_cast<UncondBrInst *>(instr);
-                        builder.createUncondBrInst(ucbInst->getBlock(), {});
+                        auto my_block = dynamic_cast<BasicBlock *>(ucbInst->getBlock()->getAlter());
+                        builder.createUncondBrInst(my_block, {});
                     }
                     else if (isa<ReturnInst>(instr))
                     {
@@ -3798,6 +3845,336 @@ namespace sysy
                         auto my_retValue = retValue ? retValue->getAlter() : nullptr;
                         auto my_rInst = builder.createReturnInst(my_retValue, mybb);
                         rInst->setAlter(my_rInst);
+                    }
+                    else if (isa<AllocaInst>(instr))
+                    {
+                        auto allocaInst = dynamic_cast<AllocaInst *>(instr);
+                        auto my_dims = vector<Value *>(allocaInst->getDims().begin(), allocaInst->getDims().end());
+                        auto my_allocaInst = builder.createAllocaInst(allocaInst->getType(), my_dims, allocaInst->getName(), allocaInst->Const());
+                        allocaInst->setAlter(my_allocaInst);
+                    }
+                }
+            }
+        }
+    }
+    // Inline
+    Module *Inline::Run()
+    {
+        auto functions = OriginModule->getFunctions();
+        for (auto iter = functions->begin(); iter != functions->end(); iter++)
+        {
+            Function *func = iter->second;
+            string funcname = iter->first;
+            if (funcname == "getint" || funcname == "getch" || funcname == "getfloat" || funcname == "getarray" || funcname == "getfarray" || funcname == "putint" || funcname == "putch" || funcname == "putfloat" || funcname == "putarray" || funcname == "putfarray" || funcname == "starttime" || funcname == "stoptime" || funcname == "putf")
+                continue;
+            AnalyzeFunc(func);
+        }
+        RegenerateIR();
+        return pModule;
+    }
+    void Inline::AnalyzeFunc(Function *curFunc)
+    {
+        auto bblist = curFunc->getBasicBlocks();
+        bool noCall = true;
+        int instr_cnt = 0;          // 函数内指令个数
+        int ret_cnt = 0;            // 函数内return指令个数
+        int bb_cnt = bblist.size(); // 函数基本块个数
+        auto Entry = curFunc->getEntryBlock();
+        auto args = Entry->getArguments();
+        // 函数的参数不能有数组
+        for (auto iter = args.begin(); iter != args.end(); iter++)
+        {
+            Argument *arg = iter->get();
+            if (arg->getNumDims() > 0)
+            {
+                curFunc->Inline = false;
+                return;
+            }
+        }
+        for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+        {
+            BasicBlock *bb = iter->get();
+            instr_cnt += bb->getNumInstructions();
+            for (auto iter1 = bb->begin(); iter1 != bb->end(); iter1++)
+            {
+                Instruction *instr = iter1->get();
+                if (isa<CallInst>(instr))
+                    noCall = false;
+                else if (isa<ReturnInst>(instr))
+                    ret_cnt++;
+            }
+        }
+        if (noCall && ret_cnt <= 1 && (instr_cnt < 50 || bb_cnt == 1))
+            curFunc->Inline = true;
+        else
+            curFunc->Inline = false;
+    }
+    void Inline::RegenerateIR()
+    {
+        // 生成全局变量
+        auto global_values = OriginModule->getGlobalValues();
+        for (auto iter = global_values->begin(); iter != global_values->end(); iter++)
+        {
+            GlobalValue *glbvl = iter->second;
+            auto name = glbvl->getName();
+            auto type = glbvl->getType();
+            pModule->addGlobalValue(glbvl);
+        }
+        // 生成函数
+        auto functions = OriginModule->getFunctions();
+        int InlineCnt = 0; // 整个module进行内联的次数
+        for (auto iter = functions->begin(); iter != functions->end(); iter++)
+        {
+            Function *func = iter->second;
+            Function *myFunc = pModule->createFunction(func->getName(), func->getType());
+            auto bblist = func->getBasicBlocks();
+            if (bblist.empty())
+                continue;
+            // 生成该函数所有新BB
+            for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+            {
+                BasicBlock *bb = iter->get();
+                BasicBlock *mybb = myFunc->addBasicBlock(bb->getName());
+                bb->setAlter(mybb);
+                mybb->setDepth(bb->getDepth());
+            }
+            int bb_cnt = 0; // 记录新增的基本块个数
+            for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+            {
+                auto bb = iter->get();
+                auto mybb = dynamic_cast<BasicBlock *>(bb->getAlter());
+                mybb->setDepth(mybb->getDepth() + bb_cnt);
+                builder.setPosition(mybb, mybb->end());
+                if (iter == bblist.begin())
+                {
+                    auto entry_args = bb->getArguments();
+                    for (auto i = entry_args.begin(); i != entry_args.end(); i++)
+                    {
+                        auto arg = i->get();
+                        auto my_arg = mybb->createArgument(arg->getType(), vector<int>(arg->getDims().begin(), arg->getDims().end()), arg->getName());
+                        arg->setAlter(my_arg);
+                    }
+                }
+                // 扫描基本块的全部指令
+                for (auto iter = bb->begin(); iter != bb->end(); iter++)
+                {
+                    auto instr = iter->get();
+                    if (isa<LoadInst>(instr))
+                    {
+                        auto ldInst = dynamic_cast<LoadInst *>(instr);
+                        auto pointer = ldInst->getPointer();
+                        auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+                        vector<Value *> my_indices;
+                        for (int i = 0; i < indices.size(); i++)
+                        {
+                            my_indices.push_back(indices[i]->getAlter());
+                        }
+                        auto my_ldInst = builder.createLoadInst(pointer->getAlter(), my_indices);
+                        ldInst->setAlter(my_ldInst);
+                    }
+                    else if (isa<StoreInst>(instr))
+                    {
+                        auto stInst = dynamic_cast<StoreInst *>(instr);
+                        auto value = stInst->getValue();
+                        auto pointer = stInst->getPointer();
+                        auto indices = vector<Value *>(stInst->getIndices().begin(), stInst->getIndices().end());
+                        vector<Value *> my_indices;
+                        for (int i = 0; i < indices.size(); i++)
+                        {
+                            my_indices.push_back(indices[i]->getAlter());
+                        }
+                        auto my_stInst = builder.createStoreInst(value->getAlter(), pointer->getAlter(), my_indices);
+                    }
+                    else if (isa<BinaryInst>(instr))
+                    {
+                        auto bInst = dynamic_cast<BinaryInst *>(instr);
+                        auto lhs = bInst->getLhs();
+                        auto rhs = bInst->getRhs();
+                        auto my_bInst = builder.createBinaryInst(bInst->getKind(), bInst->getType(), lhs->getAlter(), rhs->getAlter());
+                        bInst->setAlter(my_bInst);
+                    }
+                    else if (isa<UnaryInst>(instr))
+                    {
+                        auto uInst = dynamic_cast<UnaryInst *>(instr);
+                        auto hs = uInst->getOperand();
+                        auto my_uInst = builder.createUnaryInst(uInst->getKind(), uInst->getType(), hs->getAlter());
+                        uInst->setAlter(my_uInst);
+                    }
+                    else if (isa<CallInst>(instr))
+                    {
+                        auto callInst = dynamic_cast<CallInst *>(instr);
+                        auto args = callInst->getArguments();
+                        auto callee = callInst->getCallee();
+                        if (callee->Inline == false)
+                        {
+                            vector<Value *> my_args;
+                            for (auto iter = args.begin(); iter != args.end(); iter++)
+                            {
+                                my_args.push_back(iter->getAlter());
+                            }
+                            auto my_callInst = builder.createCallInst(callInst->getCallee(), my_args);
+                            callInst->setAlter(my_callInst);
+                            continue;
+                        }
+                        auto Inlinebbs = callee->getBasicBlocks();
+                        auto InlineEntry = callee->getEntryBlock();
+                        auto InlineArgs = InlineEntry->getArguments();
+                        auto caller_iter = args.begin();
+                        // 将参数转换为本地变量
+                        for (auto iter = InlineArgs.begin(); iter != InlineArgs.end(); iter++)
+                        {
+                            Argument *arg = iter->get();
+                            if (arg->getNumDims() > 0)
+                                continue;
+                            auto my_allocaInst = builder.createAllocaInst(arg->getType(), {}, arg->getName(), false);
+                            arg->setAlter(my_allocaInst);
+                        }
+                        // 传递参数(store)
+                        auto callee_iter = InlineArgs.begin();
+                        for (auto caller_iter = args.begin(); caller_iter != args.end(); caller_iter++)
+                        {
+                            if (callee_iter->get()->getNumDims() > 0)
+                            {
+                                callee_iter++;
+                                continue;
+                            }
+                            auto my_stInst = builder.createStoreInst(caller_iter->getAlter(), callee_iter->get()->getAlter(), {});
+                            callee_iter++;
+                        }
+                        // 生成基本块
+                        int CurDepth = builder.getBasicBlock()->getDepth();
+                        for (auto iter = Inlinebbs.begin(); iter != Inlinebbs.end(); iter++)
+                        {
+                            if (iter == Inlinebbs.begin())
+                                continue;
+                            BasicBlock *bb = iter->get();
+                            string my_name = callee->getName() + to_string(InlineCnt) + "_" + bb->getName();
+                            BasicBlock *mybb = myFunc->addBasicBlock(my_name);
+                            bb->setAlter(mybb);
+                            mybb->setDepth(bb->getDepth() + CurDepth);
+                            bb_cnt++;
+                        }
+                        InlineCnt++;
+                        BasicBlock *exitblock = builder.getBasicBlock();
+                        // 为内联函数生成指令
+                        for (auto iter = Inlinebbs.begin(); iter != Inlinebbs.end(); iter++)
+                        {
+                            auto Inlinebb = iter->get();
+                            if (iter != Inlinebbs.begin())
+                                builder.setPosition(dynamic_cast<BasicBlock *>(Inlinebb->getAlter()), dynamic_cast<BasicBlock *>(Inlinebb->getAlter())->end());
+                            for (auto iter1 = Inlinebb->begin(); iter1 != Inlinebb->end(); iter1++)
+                            {
+                                auto InlineInstr = iter1->get();
+                                if (isa<LoadInst>(InlineInstr))
+                                {
+                                    auto ldInst = dynamic_cast<LoadInst *>(InlineInstr);
+                                    auto pointer = ldInst->getPointer();
+                                    auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+                                    vector<Value *> my_indices;
+                                    for (int i = 0; i < indices.size(); i++)
+                                    {
+                                        my_indices.push_back(indices[i]->getAlter());
+                                    }
+                                    auto my_ldInst = builder.createLoadInst(pointer->getAlter(), my_indices);
+                                    ldInst->setAlter(my_ldInst);
+                                }
+                                else if (isa<StoreInst>(InlineInstr))
+                                {
+                                    auto stInst = dynamic_cast<StoreInst *>(InlineInstr);
+                                    auto value = stInst->getValue();
+                                    auto pointer = stInst->getPointer();
+                                    auto indices = vector<Value *>(stInst->getIndices().begin(), stInst->getIndices().end());
+                                    vector<Value *> my_indices;
+                                    for (int i = 0; i < indices.size(); i++)
+                                    {
+                                        my_indices.push_back(indices[i]->getAlter());
+                                    }
+                                    auto my_stInst = builder.createStoreInst(value->getAlter(), pointer->getAlter(), my_indices);
+                                }
+                                else if (isa<BinaryInst>(InlineInstr))
+                                {
+                                    auto bInst = dynamic_cast<BinaryInst *>(InlineInstr);
+                                    auto lhs = bInst->getLhs();
+                                    auto rhs = bInst->getRhs();
+                                    auto my_bInst = builder.createBinaryInst(bInst->getKind(), bInst->getType(), lhs->getAlter(), rhs->getAlter());
+                                    bInst->setAlter(my_bInst);
+                                }
+                                else if (isa<UnaryInst>(InlineInstr))
+                                {
+                                    auto uInst = dynamic_cast<UnaryInst *>(InlineInstr);
+                                    auto hs = uInst->getOperand();
+                                    auto my_uInst = builder.createUnaryInst(uInst->getKind(), uInst->getType(), hs->getAlter());
+                                    uInst->setAlter(my_uInst);
+                                }
+                                else if (isa<ReturnInst>(InlineInstr))
+                                {
+                                    auto rInst = dynamic_cast<ReturnInst *>(InlineInstr);
+                                    auto retValue = rInst->getReturnValue();
+                                    auto my_retValue = retValue ? retValue->getAlter() : nullptr;
+                                    callInst->setAlter(my_retValue);
+                                    exitblock = builder.getBasicBlock();
+                                }
+                                else if (isa<CondBrInst>(InlineInstr))
+                                {
+                                    auto cbInst = dynamic_cast<CondBrInst *>(InlineInstr);
+                                    auto cond = cbInst->getCondition();
+                                    BasicBlock *current = builder.getBasicBlock();
+                                    BasicBlock *my_then = dynamic_cast<BasicBlock *>(cbInst->getThenBlock()->getAlter());
+                                    BasicBlock *my_else = dynamic_cast<BasicBlock *>(cbInst->getElseBlock()->getAlter());
+                                    current->getSuccessors().push_back(my_then);
+                                    current->getSuccessors().push_back(my_else);
+                                    my_then->getPredecessors().push_back(current);
+                                    my_else->getPredecessors().push_back(current);
+                                    builder.createCondBrInst(cond->getAlter(), my_then, my_else, {}, {});
+                                }
+                                else if (isa<UncondBrInst>(InlineInstr))
+                                {
+                                    auto ucbInst = dynamic_cast<UncondBrInst *>(InlineInstr);
+                                    auto my_block = dynamic_cast<BasicBlock *>(ucbInst->getBlock()->getAlter());
+                                    BasicBlock *current = builder.getBasicBlock();
+                                    current->getSuccessors().push_back(my_block);
+                                    builder.createUncondBrInst(my_block, {});
+                                }
+                                else if (isa<AllocaInst>(InlineInstr))
+                                {
+                                    auto allocaInst = dynamic_cast<AllocaInst *>(InlineInstr);
+                                    auto my_dims = vector<Value *>(allocaInst->getDims().begin(), allocaInst->getDims().end());
+                                    auto my_allocaInst = builder.createAllocaInst(allocaInst->getType(), my_dims, allocaInst->getName(), allocaInst->Const());
+                                    allocaInst->setAlter(my_allocaInst);
+                                }
+                            }
+                        }
+                        builder.setPosition(exitblock, exitblock->end());
+                    }
+                    else if (isa<ReturnInst>(instr))
+                    {
+                        auto rInst = dynamic_cast<ReturnInst *>(instr);
+                        auto retValue = rInst->getReturnValue();
+                        auto my_retValue = retValue ? retValue->getAlter() : nullptr;
+                        auto my_rInst = builder.createReturnInst(my_retValue, mybb);
+                        rInst->setAlter(my_rInst);
+                    }
+                    else if (isa<CondBrInst>(instr))
+                    {
+                        auto cbInst = dynamic_cast<CondBrInst *>(instr);
+                        auto cond = cbInst->getCondition();
+                        BasicBlock *current = builder.getBasicBlock();
+                        BasicBlock *my_then = dynamic_cast<BasicBlock *>(cbInst->getThenBlock()->getAlter());
+                        BasicBlock *my_else = dynamic_cast<BasicBlock *>(cbInst->getElseBlock()->getAlter());
+                        current->getSuccessors().push_back(my_then);
+                        current->getSuccessors().push_back(my_else);
+                        my_then->getPredecessors().push_back(current);
+                        my_else->getPredecessors().push_back(current);
+                        builder.createCondBrInst(cond->getAlter(), my_then, my_else, {}, {});
+                    }
+                    else if (isa<UncondBrInst>(instr))
+                    {
+                        auto ucbInst = dynamic_cast<UncondBrInst *>(instr);
+                        auto my_block = dynamic_cast<BasicBlock *>(ucbInst->getBlock()->getAlter());
+                        BasicBlock *current = builder.getBasicBlock();
+                        current->getSuccessors().push_back(my_block);
+                        my_block->getPredecessors().push_back(current);
+                        builder.createUncondBrInst(my_block, {});
                     }
                     else if (isa<AllocaInst>(instr))
                     {

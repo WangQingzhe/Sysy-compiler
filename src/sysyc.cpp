@@ -46,7 +46,9 @@ int main(int argc, char **argv)
     SysYIRGenerator generator;
     generator.visitModule(moduleAST);
     auto moduleIR = generator.get();
-    LoadCut ldCut(moduleIR);
+    Inline Inl(moduleIR);
+    auto InlIR = Inl.Run();
+    LoadCut ldCut(InlIR);
     auto ldCutIR = ldCut.Run();
     CommonExp CmExp(ldCutIR);
     auto CmExpIR = CmExp.Run();
@@ -54,6 +56,20 @@ int main(int argc, char **argv)
     auto ConSpIR = ConSp.Run();
     InstrCombine InstrCb(ConSpIR);
     auto InstrCbIR = InstrCb.Run();
+    // auto func = InstrCbIR->getFunction("main");
+    // auto bblist = func->getBasicBlocks();
+    // for (auto &iter : bblist)
+    // {
+    //     auto bb = iter.get();
+    //     cout << "***" << bb->getName() << "***\n";
+    //     cout << "pres\n";
+    //     for (auto p : bb->getPredecessors())
+    //         cout << p->getName() << " ";
+    //     cout << "\nsucs\n";
+    //     for (auto s : bb->getSuccessors())
+    //         cout << s->getName() << " ";
+    //     cout << "\n";
+    // }
     DCE dce(InstrCbIR);
     auto DceIR = dce.Run();
     LoadCut ldCut2(DceIR);
@@ -70,6 +86,11 @@ int main(int argc, char **argv)
         {
             cout << "Dce2\n";
             DceIR2->print(cout);
+        }
+        else if (strcmp(argv[2], "ir1") == 0)
+        {
+            cout << "module\n";
+            moduleIR->print(cout);
         }
         // else if (strcmp(argv[2], "ir1") == 0)
         // {
