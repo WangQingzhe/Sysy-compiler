@@ -1272,28 +1272,10 @@ namespace sysy
         {
             Function *func = iter->second;
             havecall[func] = false;
-            auto bblist = func->getBasicBlocks();
-            if (bblist.empty())
+            ModifyGlbvl[func] = false;
+            if (func->getBasicBlocks().empty())
                 continue;
-            for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
-            {
-                auto bb = iter->get();
-                for (auto &instr : bb->getInstructions())
-                {
-                    auto instrType = instr->getKind();
-                    if (instrType == Instruction::Kind::kCall)
-                    {
-                        auto callee = dynamic_cast<CallInst *>(instr.get())->getCallee();
-                        if (libfunc.find(callee->getName()) == libfunc.end())
-                        {
-                            havecall[func] = true;
-                            break;
-                        }
-                    }
-                }
-                if (havecall[func])
-                    break;
-            }
+            AnalyzeFunc(func);
         }
         // 计算kill集,gen集合
         for (auto iter = functions->begin(); iter != functions->end(); iter++)
@@ -1448,6 +1430,50 @@ namespace sysy
                     }
                 }
             }
+        }
+    }
+    void LoadCut::AnalyzeFunc(Function *curFunc)
+    {
+        auto bblist = curFunc->getBasicBlocks();
+        // 判断是否修改全局变量
+        for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+        {
+            BasicBlock *bb = iter->get();
+            for (auto &instr : bb->getInstructions())
+            {
+                auto kind = instr->getKind();
+                if (kind == Instruction::kStore)
+                {
+                    auto stInst = dynamic_cast<StoreInst *>(instr.get());
+                    auto pointer = stInst->getPointer();
+                    if (isa<GlobalValue>(pointer))
+                    {
+                        ModifyGlbvl[curFunc] = true;
+                        break;
+                    }
+                }
+            }
+            if (ModifyGlbvl[curFunc])
+                break;
+        }
+        for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+        {
+            auto bb = iter->get();
+            for (auto &instr : bb->getInstructions())
+            {
+                auto instrType = instr->getKind();
+                if (instrType == Instruction::Kind::kCall)
+                {
+                    auto callee = dynamic_cast<CallInst *>(instr.get())->getCallee();
+                    if (libfunc.find(callee->getName()) == libfunc.end())
+                    {
+                        havecall[curFunc] = true;
+                        break;
+                    }
+                }
+            }
+            if (havecall[curFunc])
+                break;
         }
     }
     void LoadCut::CalIn_Out(Function *curFunc)
@@ -3709,8 +3735,18 @@ namespace sysy
                         Type *type = bInst->getType();
                         auto my_lhs = lhs->getAlter();
                         auto my_rhs = rhs->getAlter();
+                        // X +- 0 => X
+                        if ((kind == Value::kAdd || kind == Value::kSub) && isa<ConstantValue>(my_rhs) && dynamic_cast<ConstantValue *>(my_rhs)->getInt() == 0)
+                        {
+                            instr->setAlter(my_lhs);
+                        }
+                        // 0 + X => X
+                        else if (kind == Value::kAdd && isa<ConstantValue>(my_lhs) && dynamic_cast<ConstantValue *>(my_lhs)->getInt() == 0)
+                        {
+                            instr->setAlter(my_rhs);
+                        }
                         // (X + C1) + C2 => X + (C1 + C2)
-                        if (kind == Value::kAdd && isa<BinaryInst>(my_lhs) && isa<ConstantValue>(my_rhs))
+                        else if (kind == Value::kAdd && isa<BinaryInst>(my_lhs) && isa<ConstantValue>(my_rhs))
                         {
                             BinaryInst *bLhs = dynamic_cast<BinaryInst *>(my_lhs);
                             auto my_kind = bLhs->getKind();
@@ -3750,6 +3786,30 @@ namespace sysy
                             else
                             {
                                 auto my_bInst = builder.createAddInst(my_lhs, my_rhs);
+                                instr->setAlter(my_bInst);
+                            }
+                        }
+                        // (X + C1) - C2 => X + (C1 - C2)
+                        else if (kind == Value::kSub && isa<BinaryInst>(my_lhs) && isa<ConstantValue>(my_rhs))
+                        {
+                            BinaryInst *bLhs = dynamic_cast<BinaryInst *>(my_lhs);
+                            auto my_kind = bLhs->getKind();
+                            auto llhs = bLhs->getLhs();
+                            auto rlhs = bLhs->getRhs();
+                            if (my_kind == Value::kAdd && isa<Instruction>(llhs) && isa<ConstantValue>(rlhs))
+                            {
+                                int my_const = dynamic_cast<ConstantValue *>(rlhs)->getInt() - dynamic_cast<ConstantValue *>(my_rhs)->getInt();
+                                if (my_const == 0)
+                                    instr->setAlter(llhs);
+                                else
+                                {
+                                    auto my_bInst = builder.createAddInst(llhs, ConstantValue::get(my_const));
+                                    instr->setAlter(my_bInst);
+                                }
+                            }
+                            else
+                            {
+                                auto my_bInst = builder.createSubInst(my_lhs, my_rhs);
                                 instr->setAlter(my_bInst);
                             }
                         }
@@ -4360,5 +4420,122 @@ namespace sysy
                 os << "\n";
             }
         }
+    }
+    // LoopUnroll
+    Module *LoopUnroll::Run()
+    {
+        auto functions = pModule->getFunctions();
+        for (auto iter = functions->begin(); iter != functions->end(); iter++)
+        {
+            auto func = iter->second;
+            for (auto loop : func->Loops)
+            {
+                if (IsUnrollable(loop))
+                {
+                    Unroll(loop);
+                }
+            }
+        }
+    }
+    bool LoopUnroll::IsUnrollable(Loop *curLoop)
+    {
+        if (curLoop->getLoopBasicBlocks().size() > 2)
+            return false;
+        BasicBlock *header = curLoop->getHeader();
+        BasicBlock *preheader = curLoop->getPreHeader();
+        auto iter = header->getInstructions().end();
+        iter--;
+        CondBrInst *condbrInst = dynamic_cast<CondBrInst *>(iter->get());
+        auto cond = condbrInst->getCondition();
+        auto kind = cond->getKind();
+        if (kind != Instruction::kICmpLE)
+            return false;
+        auto ltInst = dynamic_cast<BinaryInst *>(cond);
+        auto lhs = ltInst->getLhs();
+        auto rhs = ltInst->getRhs();
+        if (isa<Instruction>(lhs) && isa<ConstantValue>(rhs))
+        {
+            // int iter_cnt = dynamic_cast<ConstantValue *>(rhs)->getInt();
+            return true;
+        }
+        return false;
+    }
+    void LoopUnroll::ModifyIR()
+    {
+    }
+    void LoopUnroll::Unroll(Loop *curLoop)
+    {
+        BasicBlock *header = curLoop->getHeader();
+        BasicBlock *preheader = curLoop->getPreHeader();
+        BasicBlock *body, *exitblock;
+        for (auto s : header->getSuccessors())
+        {
+            if (s->getName()[0] == 'e')
+                exitblock = s;
+            else if (s->getName()[0] == 'b')
+                body = s;
+        }
+        auto iter = header->getInstructions().rbegin();
+        CondBrInst *condbrInst = dynamic_cast<CondBrInst *>(iter->get());
+        auto cond = condbrInst->getCondition();
+        auto kind = cond->getKind();
+        auto ltInst = dynamic_cast<BinaryInst *>(cond);
+        auto lhs = ltInst->getLhs();
+        auto rhs = ltInst->getRhs();
+        int iter_cnt = dynamic_cast<ConstantValue *>(rhs)->getInt();
+        // delete "br ^header" in preheader
+        iter = preheader->getInstructions().rbegin();
+        preheader->getInstructions().erase(--iter.base());
+        // 将body中的指令插入preheader后,iter_cnt遍
+        builder.setPosition(preheader, preheader->end());
+        while (iter_cnt--)
+        {
+            for (auto &iiter : body->getInstructions())
+            {
+                auto instr = iiter.get();
+                if (isa<LoadInst>(instr))
+                {
+                    auto ldInst = dynamic_cast<LoadInst *>(instr);
+                    auto pointer = ldInst->getPointer();
+                    auto indices = vector<Value *>(ldInst->getIndices().begin(), ldInst->getIndices().end());
+                    vector<Value *> my_indices;
+                    for (int i = 0; i < indices.size(); i++)
+                        my_indices.push_back(indices[i]->getAlter());
+                    auto my_ldInst = builder.createLoadInst(pointer->getAlter(), my_indices);
+                    ldInst->setAlter(my_ldInst);
+                }
+                else if (isa<StoreInst>(instr))
+                {
+                    auto stInst = dynamic_cast<StoreInst *>(instr);
+                    auto pointer = stInst->getPointer();
+                    auto value = stInst->getValue();
+                    auto indices = vector<Value *>(stInst->getIndices().begin(), stInst->getIndices().end());
+                    vector<Value *> my_indices;
+                    for (int i = 0; i < indices.size(); i++)
+                        my_indices.push_back(indices[i]->getAlter());
+                    auto my_stInst = builder.createStoreInst(value->getAlter(), pointer->getAlter(), my_indices);
+                }
+                else if (isa<BinaryInst>(instr))
+                {
+                    auto bInst = dynamic_cast<BinaryInst *>(instr);
+                    auto lhs = bInst->getLhs();
+                    auto rhs = bInst->getRhs();
+                    auto my_bInst = builder.createBinaryInst(bInst->getKind(), bInst->getType(), lhs->getAlter(), rhs->getAlter());
+                    bInst->setAlter(my_bInst);
+                }
+            }
+        }
+        // insert "br ^exit" in  preheader
+        auto my_uncondbrInst = builder.createUncondBrInst(exitblock, {});
+        // preheader<->exitblock
+        preheader->getSuccessors().clear();
+        preheader->getSuccessors().push_back(exitblock);
+        exitblock->getPredecessors().clear();
+        exitblock->getPredecessors().push_back(preheader);
+        // clear header&body
+        header->getPredecessors().clear();
+        header->getSuccessors().clear();
+        body->getPredecessors().clear();
+        body->getSuccessors().clear();
     }
 } // namespace sysy

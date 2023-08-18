@@ -248,8 +248,9 @@ namespace sysy
         map<Value *, map<vector<Value *>, Instruction *>> AVALUE; // 记录每个变量存在哪个虚拟寄存器
         map<Value *, set<pair<Value *, vector<Value *>>>> RVALUE; // 记录虚拟寄存器存储哪个变量
         // set<Value *> RVALUE;            // 记录虚拟寄存器存储哪个变量
-        map<Function *, bool> havecall; // 记录每个函数内是否有函数调用
-        bool hascall;                   // 记录当前函数是否有函数调用
+        map<Function *, bool> havecall;    // 记录每个函数内是否有函数调用
+        map<Function *, bool> ModifyGlbvl; // 记录函数是否修改全局变量
+        bool hascall;                      // 记录当前函数是否有函数调用
         set<string> libfunc = {"getint", "getch", "getfloat", "getarray", "getfarray", "putint", "putch", "putfloat", "putarray", "putfarray", "starttime", "stoptime", "putf"};
 
     public:
@@ -270,6 +271,8 @@ namespace sysy
         void OrderBasicBlock(Function *, Function *);
         // 将基本块按照深度排序
         static bool BBCmp(BasicBlock *, BasicBlock *);
+        // 分析函数是否修改了全局变量&是否有函数调用
+        void AnalyzeFunc(Function *);
         void print_KILL_GEN(std::ostream &os);
         void print_IN_OUT(std::ostream &os);
         Module *Run();
@@ -419,84 +422,24 @@ namespace sysy
         void GetLoop();
     };
 
-    // 循环
-    class Loop
+    // 不变量外提
+    class LCM
     {
-    private:
-        Function *parent;
-
-        int loopDepth;
-        Loop *parentLoop;
-        BasicBlock *loopHeader;
-        std::vector<Loop *> subLoops;
-        std::vector<BasicBlock *> blocks;
-
-        std::unordered_set<BasicBlock *> exitingBlocks;
-        std::unordered_set<BasicBlock *> exitBlocks;
-        BasicBlock *latchBlock;
-        BasicBlock *preHeader;
-
-        // std::unordered_map<Instruction *, SCEV> SCEVCheck;
-
-        // PhiInst *indPhi;
-        Instruction *indCondVar;
-        Value *indEnd;
-        Instruction::Kind icmpKind;
-        int tripCount;
+    public:
+    };
+    // 循环展开
+    class LoopUnroll
+    {
+    public:
+        Module *OriginModule;
+        Module *pModule;
+        LoopUnroll(Module *OriginModule) : OriginModule(OriginModule) { pModule = new Module(); }
+        IRBuilder builder;
 
     public:
-        Loop(BasicBlock *header);
-
-        Function *getParent() { return parent; }
-
-        void setLoopDepth(int depth) { loopDepth = depth; }
-        int getLoopDepth() { return loopDepth; }
-
-        Loop *getParentLoop() { return parentLoop; }
-        void setParentLoop(Loop *parent) { parentLoop = parent; }
-        std::vector<Loop *> &getSubLoops() { return subLoops; }
-
-        std::vector<BasicBlock *> &getLoopBasicBlocks() { return blocks; }
-        std::unordered_set<BasicBlock *> BBSet;
-
-        BasicBlock *getHeader() { return loopHeader; }
-
-        std::unordered_set<BasicBlock *> &getExitingBlocks() { return exitingBlocks; }
-        std::unordered_set<BasicBlock *> &getExitBlocks() { return exitBlocks; }
-
-        BasicBlock *getLatchBlock() { return latchBlock; }
-        void setLatchBlock(BasicBlock *latch) { latchBlock = latch; }
-
-        BasicBlock *getPreHeader() { return preHeader; }
-        void setPreHeader(BasicBlock *_preHeader) { preHeader = _preHeader; }
-
-        // SCEV &getSCEV(Instruction *instr);
-
-        // bool hasSCEV(Instruction *instr);
-
-        // void registerSCEV(Instruction *instr, SCEV scev);
-
-        // void cleanSCEV() { SCEVCheck.clear(); }
-
-        // using scev_iterator = std::unordered_map<Instruction *, SCEV>::iterator;
-        // iterator_range<scev_iterator> getSCEV() { return make_range(SCEVCheck.begin(), SCEVCheck.end()); }
-
-        // PhiInst *getIndexPhi() { return indPhi; }
-        // void setIndexPhi(PhiInst *phi) { indPhi = phi; }
-
-        Value *getIndexEnd() { return indEnd; }
-        void setIndexEnd(Value *end) { indEnd = end; }
-
-        Instruction *getIndexCondInstr() { return indCondVar; }
-        void setIndexCondInstr(Instruction *instr) { indCondVar = instr; }
-
-        int getTripCount() { return tripCount; }
-        void setTripCount(int c) { tripCount = c; }
-
-        void setICmpKind(Instruction::Kind kind) { icmpKind = kind; }
-
-        Instruction::Kind getICmpKind() { return icmpKind; }
-
-        bool isLoopInvariant(Value *val);
+        Module *Run();
+        bool IsUnrollable(Loop *curLoop);
+        void ModifyIR();
+        void Unroll(Loop *);
     };
 } // namespace sysy

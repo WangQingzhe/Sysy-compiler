@@ -49,16 +49,18 @@ int main(int argc, char **argv)
     // LoopFind loopfind(moduleIR);
     // auto loopfindIR = loopfind.Run();
     // loop.PRINT_ACCESS(cout);
-    // Inline Inl(moduleIR);
-    // auto InlIR = Inl.Run();
-    // LoadCut ldCut(InlIR);
-    // auto ldCutIR = ldCut.Run();
-    // CommonExp CmExp(ldCutIR);
-    // auto CmExpIR = CmExp.Run();
-    // ConstSpread ConSp(CmExpIR);
-    // auto ConSpIR = ConSp.Run();
-    // InstrCombine InstrCb(ConSpIR);
-    // auto InstrCbIR = InstrCb.Run();
+    // DCE dce0(moduleIR);
+    // dce0.Run();
+    Inline Inl(moduleIR);
+    auto InlIR = Inl.Run();
+    LoadCut ldCut(InlIR);
+    auto ldCutIR = ldCut.Run();
+    CommonExp CmExp(ldCutIR);
+    auto CmExpIR = CmExp.Run();
+    ConstSpread ConSp(CmExpIR);
+    auto ConSpIR = ConSp.Run();
+    InstrCombine InstrCb(ConSpIR);
+    auto InstrCbIR = InstrCb.Run();
     // auto func = InstrCbIR->getFunction("main");
     // auto bblist = func->getBasicBlocks();
     // for (auto &iter : bblist)
@@ -73,16 +75,16 @@ int main(int argc, char **argv)
     //         cout << s->getName() << " ";
     //     cout << "\n";
     // }
-    DCE dce(moduleIR);
+    DCE dce(InstrCbIR);
     auto DceIR = dce.Run();
-    // LoadCut ldCut2(DceIR);
-    // auto ldCutIR2 = ldCut2.Run();
-    // CommonExp CmExp2(ldCutIR2);
-    // auto CmExpIR2 = CmExp2.Run();
-    // ConstSpread ConSp2(CmExpIR2);
-    // auto ConSpIR2 = ConSp2.Run();
-    // DCE dce2(ConSpIR2);
-    // auto DceIR2 = dce2.Run();
+    LoadCut ldCut2(DceIR);
+    auto ldCutIR2 = ldCut2.Run();
+    CommonExp CmExp2(ldCutIR2);
+    auto CmExpIR2 = CmExp2.Run();
+    ConstSpread ConSp2(CmExpIR2);
+    auto ConSpIR2 = ConSp2.Run();
+    DCE dce2(ConSpIR2);
+    auto DceIR2 = dce2.Run();
     // auto functions = loopfindIR->getFunctions();
     // int i = 0;
     // // 找出所有回边，<b,a>为由b指向a的边。
@@ -107,7 +109,7 @@ int main(int argc, char **argv)
         if (strcmp(argv[2], "ir") == 0)
         {
             cout << "Dce2\n";
-            DceIR->print(cout);
+            DceIR2->print(cout);
         }
         else if (strcmp(argv[2], "ir1") == 0)
         {
@@ -152,7 +154,7 @@ int main(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-    CodeGen codegen(DceIR);
+    CodeGen codegen(DceIR2);
     string asmCode = codegen.code_gen();
     cout << asmCode << endl;
     ;
