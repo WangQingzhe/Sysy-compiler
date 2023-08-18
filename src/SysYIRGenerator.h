@@ -420,6 +420,7 @@ namespace sysy
         void CalDom(Function *);
         void PRINT_DOM(std::ostream &os);
         void GetLoop();
+        void PRINT_LOOP(std::ostream &os);
     };
 
     // 不变量外提
@@ -438,8 +439,8 @@ namespace sysy
 
     public:
         Module *Run();
-        bool IsUnrollable(Loop *curLoop);
+        bool IsUnrollable(Loop curLoop);
         void ModifyIR();
-        void Unroll(Loop *);
+        void Unroll(Loop);
     };
 } // namespace sysy

@@ -1089,7 +1089,7 @@ namespace sysy
     public:
         using block_list = std::list<std::unique_ptr<BasicBlock>>;
         bool Inline = false;
-        std::set<Loop *> Loops;
+        std::vector<Loop> Loops;
 
     protected:
         Module *parent;
@@ -1406,9 +1406,39 @@ namespace sysy
         int tripCount;
 
     public:
-        Loop(BasicBlock *header) {}
+        Loop(vector<BasicBlock *> loop, BasicBlock *LatchBlock, BasicBlock *LoopHeader)
+        {
+            blocks = loop;
+            loopHeader = LoopHeader;
+            latchBlock = LatchBlock;
 
-        Function *getParent() { return parent; }
+            for (auto blk : loop) // 计算exiting、exit块
+            {
+                auto sucs = blk->getSuccessors();
+                for (auto siter = sucs.begin(); siter != sucs.end(); siter++)
+                {
+                    auto t = find(blocks.begin(), blocks.end(), (*siter));
+                    if (t == blocks.end())
+                    {
+                        exitingBlocks.insert(blk);
+                        exitBlocks.insert((*siter));
+                    }
+                }
+            }
+        }
+
+        Function *getParent()
+        {
+            return parent;
+        }
+        // void setExitingBlocks(set<BasicBlock *> exitingb)
+        // {
+        //     exitingBlocks = exitingb;
+        // }
+        // void setExitBlocks(set<BasicBlock *> exitb)
+        // {
+        //     exitBlocks = exitb;
+        // }
 
         void setLoopDepth(int depth) { loopDepth = depth; }
         int getLoopDepth() { return loopDepth; }

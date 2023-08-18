@@ -4315,6 +4315,8 @@ namespace sysy
                         loop.push_back(pnode);
                     }
                 }
+                Loop Loop(loop, node, snode);
+                iter->second->Loops.push_back(Loop);
                 iter->second->addLoop(loop);
             }
         }
@@ -4421,6 +4423,46 @@ namespace sysy
             }
         }
     }
+    void LoopFind::PRINT_LOOP(std::ostream &os)
+    {
+        auto functions = pModule->getFunctions();
+        for (auto iter = functions->begin(); iter != functions->end(); iter++)
+        {
+            string name = iter->first;
+            auto bblist = iter->second->getBasicBlocks();
+            if (bblist.empty())
+                continue;
+            os << "**********" << name << "**********"
+               << "\n";
+            // set<Loop *> loops = iter->second->Loops;
+            for (auto loop : iter->second->Loops)
+            {
+                os << "loop's blocks are:" << endl;
+                for (auto b : loop.getLoopBasicBlocks())
+                {
+                    os << b->getName() << " ";
+                }
+                os << endl;
+                os << "loop's header is:" << endl
+                   << loop.getHeader()->getName() << endl;
+                os << "loop's latch is:" << endl
+                   << loop.getLatchBlock()->getName() << endl;
+                os << "loop's exitingblocks are:" << endl;
+                for (auto b : loop.getExitingBlocks())
+                {
+                    os << b->getName() << " ";
+                }
+                os << endl;
+                os << "loop's exitblocks are:" << endl;
+                for (auto b : loop.getExitBlocks())
+                {
+                    os << b->getName() << " ";
+                }
+                os << endl;
+            }
+        }
+    }
+
     // LoopUnroll
     Module *LoopUnroll::Run()
     {
@@ -4437,12 +4479,12 @@ namespace sysy
             }
         }
     }
-    bool LoopUnroll::IsUnrollable(Loop *curLoop)
+    bool LoopUnroll::IsUnrollable(Loop curLoop)
     {
-        if (curLoop->getLoopBasicBlocks().size() > 2)
+        if (curLoop.getLoopBasicBlocks().size() > 2)
             return false;
-        BasicBlock *header = curLoop->getHeader();
-        BasicBlock *preheader = curLoop->getPreHeader();
+        BasicBlock *header = curLoop.getHeader();
+        BasicBlock *preheader = curLoop.getPreHeader();
         auto iter = header->getInstructions().end();
         iter--;
         CondBrInst *condbrInst = dynamic_cast<CondBrInst *>(iter->get());
@@ -4463,10 +4505,10 @@ namespace sysy
     void LoopUnroll::ModifyIR()
     {
     }
-    void LoopUnroll::Unroll(Loop *curLoop)
+    void LoopUnroll::Unroll(Loop curLoop)
     {
-        BasicBlock *header = curLoop->getHeader();
-        BasicBlock *preheader = curLoop->getPreHeader();
+        BasicBlock *header = curLoop.getHeader();
+        BasicBlock *preheader = curLoop.getPreHeader();
         BasicBlock *body, *exitblock;
         for (auto s : header->getSuccessors())
         {
