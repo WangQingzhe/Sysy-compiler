@@ -1425,6 +1425,15 @@ namespace sysy
                     }
                 }
             }
+            // 计算preheader
+            for (auto p : loopHeader->getPredecessors())
+            {
+                if (find(blocks.begin(), blocks.end(), p) == blocks.end())
+                {
+                    preHeader = p;
+                    break;
+                }
+            }
         }
 
         Function *getParent()

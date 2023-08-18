@@ -434,7 +434,7 @@ namespace sysy
     public:
         Module *OriginModule;
         Module *pModule;
-        LoopUnroll(Module *OriginModule) : OriginModule(OriginModule) { pModule = new Module(); }
+        LoopUnroll(Module *OriginModule) : pModule(OriginModule) {}
         IRBuilder builder;
 
     public:

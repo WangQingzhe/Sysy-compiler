@@ -4308,14 +4308,62 @@ namespace sysy
                         pass_snode.push_back(bb);
                     }
                 }
+                // std::cout << "passsnode:" << endl;
+                // for (auto n : pass_snode)
+                // {
+                // std::cout << n->getName() << endl;
+                // }
+                stack<BasicBlock *> s;
+                map<BasicBlock *, int> vis;
                 for (auto pnode : pass_snode)
                 {
-                    if (pnode->accessible.find(node) != pnode->accessible.end())
+                    // std::cout << pnode->getName() << ":\n";
+                    vis.clear();
+                    while (!s.empty())
                     {
-                        loop.push_back(pnode);
+                        s.pop();
                     }
+                    for (auto biter = bblist.begin(); biter != bblist.end(); biter++)
+                    {
+                        vis.insert(map<BasicBlock *, int>::value_type(biter->get(), 0));
+                    }
+                    vis[pnode] = 1;
+                    s.push(pnode);
+                    while (!s.empty())
+                    {
+                        BasicBlock *top = s.top();
+                        s.pop();
+                        // cout << (top)->getName() << endl;
+                        if (top == node)
+                        {
+                            loop.push_back(pnode);
+                            break;
+                        }
+                        if (std::find(pass_snode.begin(), pass_snode.end(), top) == pass_snode.end())
+                        {
+                            break;
+                        }
+                        auto Sucs = top->getSuccessors();
+                        if (Sucs.empty())
+                            continue;
+                        for (auto iter = Sucs.begin(); iter != Sucs.end(); iter++)
+                        {
+                            if (vis[*iter] == 0)
+                            {
+                                s.push(*iter);
+                                vis[*iter] = 1;
+                            }
+                        }
+                    }
+                    // if (pnode->accessible.find(node) != pnode->accessible.end())
+                    // {
+                    //     loop.push_back(pnode);
+                    // }
                 }
+                if (std::find(loop.begin(), loop.end(), snode) == loop.end())
+                    loop.push_back(snode);
                 Loop Loop(loop, node, snode);
+                Loop.parent = iter->second;
                 iter->second->Loops.push_back(Loop);
                 iter->second->addLoop(loop);
             }
@@ -4459,6 +4507,8 @@ namespace sysy
                     os << b->getName() << " ";
                 }
                 os << endl;
+                os << "loop's preheader is:\n";
+                os << loop.getPreHeader()->getName() << endl;
             }
         }
     }
@@ -4474,10 +4524,13 @@ namespace sysy
             {
                 if (IsUnrollable(loop))
                 {
+                    std::cout << "unroll " << loop.getHeader()->getName() << endl;
+                    std::cout << loop.getLoopBasicBlocks().size() << endl;
                     Unroll(loop);
                 }
             }
         }
+        return pModule;
     }
     bool LoopUnroll::IsUnrollable(Loop curLoop)
     {
@@ -4490,7 +4543,7 @@ namespace sysy
         CondBrInst *condbrInst = dynamic_cast<CondBrInst *>(iter->get());
         auto cond = condbrInst->getCondition();
         auto kind = cond->getKind();
-        if (kind != Instruction::kICmpLE)
+        if (kind != Instruction::kICmpLT)
             return false;
         auto ltInst = dynamic_cast<BinaryInst *>(cond);
         auto lhs = ltInst->getLhs();
@@ -4565,6 +4618,24 @@ namespace sysy
                     auto my_bInst = builder.createBinaryInst(bInst->getKind(), bInst->getType(), lhs->getAlter(), rhs->getAlter());
                     bInst->setAlter(my_bInst);
                 }
+                else if (isa<UnaryInst>(instr))
+                {
+                    auto uInst = dynamic_cast<UnaryInst *>(instr);
+                    auto hs = uInst->getOperand();
+                    auto my_uInst = builder.createUnaryInst(uInst->getKind(), uInst->getType(), hs->getAlter());
+                    instr->setAlter(my_uInst);
+                }
+                else if (isa<CallInst>(instr))
+                {
+                    auto callInst = dynamic_cast<CallInst *>(instr);
+                    auto args = callInst->getArguments();
+                    auto my_callee = dynamic_cast<Function *>(callInst->getCallee()->getAlter());
+                    vector<Value *> my_args;
+                    for (auto arg : args)
+                        my_args.push_back(arg->getAlter());
+                    auto my_callInst = builder.createCallInst(callInst->getCallee(), my_args);
+                    instr->setAlter(my_callInst);
+                }
             }
         }
         // insert "br ^exit" in  preheader
@@ -4574,10 +4645,13 @@ namespace sysy
         preheader->getSuccessors().push_back(exitblock);
         exitblock->getPredecessors().clear();
         exitblock->getPredecessors().push_back(preheader);
-        // clear header&body
-        header->getPredecessors().clear();
-        header->getSuccessors().clear();
-        body->getPredecessors().clear();
-        body->getSuccessors().clear();
+        // remove header&body
+        Function *func = curLoop.parent;
+        func->removeBasicBlock(header);
+        func->removeBasicBlock(body);
+        // header->getPredecessors().clear();
+        // header->getSuccessors().clear();
+        // body->getPredecessors().clear();
+        // body->getSuccessors().clear();
     }
 } // namespace sysy
