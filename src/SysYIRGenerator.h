@@ -319,7 +319,6 @@ namespace sysy
         map<Instruction::Kind, map<set<Value *>, Instruction *>> bInsts;
         map<Instruction::Kind, map<pair<Value *, Value *>, Instruction *>> OrderbInsts;
         map<Instruction::Kind, map<Value *, Instruction *>> uInsts;
-        map<string, bool> IsPure;
 
     public:
         CommonExp(Module *OriginModule) : OriginModule(OriginModule)
@@ -360,7 +359,9 @@ namespace sysy
         Module *OriginModule;
         Module *pModule;
         IRBuilder builder;
-        ConstSpread(Module *OriginModule) : OriginModule(OriginModule) { pModule = new Module(); }
+        int pass;
+        ConstSpread(Module *OriginModule, int pass = 1) : OriginModule(OriginModule), pass(pass) { pModule = new Module(); }
+        static const int MAX = 100;
 
     public:
         Module *Run();
@@ -393,7 +394,6 @@ namespace sysy
         Module *pModule;
         Inline(Module *OriginModule) : OriginModule(OriginModule) { pModule = new Module(); }
         IRBuilder builder;
-        map<string, bool> IsInline;
 
     public:
         Module *Run();
@@ -446,5 +446,21 @@ namespace sysy
         bool IsUnrollable(Loop curLoop);
         void ModifyIR();
         void Unroll(Loop);
+    };
+
+    // 多线程
+    class Parallel
+    {
+    public:
+        Module *pModule;
+        Parallel(Module *pModule) : pModule(pModule) {}
+        IRBuilder builder;
+
+    public:
+        Module *Run();
+        // 判断是否并行化
+        bool IsParallel(Loop);
+        // 实现多线程的IR
+        void DoParallel(Loop *);
     };
 } // namespace sysy

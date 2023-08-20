@@ -172,18 +172,18 @@ namespace sysy
         //! user->getOperands[index] == value
         int index;
         User *user;
-        Value *value;
+        Value *my_value;
 
     public:
         Use() = default;
         Use(int index, User *user, Value *value)
-            : index(index), user(user), value(value) {}
+            : index(index), user(user), my_value(value) {}
 
     public:
         int getIndex() const { return index; }
         User *getUser() const { return user; }
-        Value *getValue() const { return value; }
-        void setValue(Value *value) { value = value; }
+        Value *getValue() const { return my_value; }
+        void setValue(Value *value) { my_value = value; }
     }; // class Use
 
     template <typename T>
@@ -568,6 +568,20 @@ namespace sysy
         }
         void replaceOperand(int index, Value *value);
         void setOperand(int index, Value *value);
+        // void replaceOperandWith(unsigned index, Value *_value)
+        // {
+        //     assert(operands.size() > index);
+        //     if (!_value)
+        //     {
+        //         operands.at(index)->getValue()->removeUse(operands.at(index));
+        //         operands.at(index) = nullptr;
+        //         return;
+        //     }                                                              // FIXME Maybe bugs
+        //     operands.at(index)->getValue()->removeUse(operands.at(index)); // 1. remove corrent use
+        //     auto ptr = std::make_shared<Use>(_value, this, index);         // 2. initial new use
+        //     _value->addUse(ptr);                                           // 3. add a new use
+        //     operands.at(index) = ptr;                                      // 4. set the operand.                                    // 4. set the operand.
+        // }
     }; // class User
 
     /*!
@@ -755,6 +769,7 @@ namespace sysy
     class BinaryInst : public Instruction
     {
         friend class IRBuilder;
+        friend class Parallel;
 
     protected:
         BinaryInst(Kind kind, Type *type, Value *lhs, Value *rhs, BasicBlock *parent,
