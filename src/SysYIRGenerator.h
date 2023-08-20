@@ -319,6 +319,7 @@ namespace sysy
         map<Instruction::Kind, map<set<Value *>, Instruction *>> bInsts;
         map<Instruction::Kind, map<pair<Value *, Value *>, Instruction *>> OrderbInsts;
         map<Instruction::Kind, map<Value *, Instruction *>> uInsts;
+        map<string, bool> IsPure;
 
     public:
         CommonExp(Module *OriginModule) : OriginModule(OriginModule)
@@ -392,6 +393,7 @@ namespace sysy
         Module *pModule;
         Inline(Module *OriginModule) : OriginModule(OriginModule) { pModule = new Module(); }
         IRBuilder builder;
+        map<string, bool> IsInline;
 
     public:
         Module *Run();
@@ -434,8 +436,10 @@ namespace sysy
     public:
         Module *OriginModule;
         Module *pModule;
-        LoopUnroll(Module *OriginModule) : pModule(OriginModule) {}
+        int pass;
+        LoopUnroll(Module *OriginModule, int pass) : pModule(OriginModule), pass(pass) {}
         IRBuilder builder;
+        int iter_cnt = 0; // 迭代次数
 
     public:
         Module *Run();

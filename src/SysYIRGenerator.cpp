@@ -1635,6 +1635,7 @@ namespace sysy
             // else
             //   os << "nocall\n";
             Function *myFunc = pModule->createFunction(func->getName(), func->getType());
+            func->setAlter(myFunc);
             auto bblist = func->getBasicBlocks();
             if (bblist.empty())
                 continue;
@@ -1899,7 +1900,7 @@ namespace sysy
                         //       iter++;
                         //   }
                         // }
-                        auto my_callInst = builder.createCallInst(callInst->getCallee(), my_args);
+                        auto my_callInst = builder.createCallInst(dynamic_cast<Function *>(callee->getAlter()), my_args);
                         callInst->setAlter(my_callInst);
                     }
                     else if (isa<ReturnInst>(instr))
@@ -2772,6 +2773,85 @@ namespace sysy
     // Module *CommonExp::Run(std::ostream &os)
     {
         auto functions = OriginModule->getFunctions();
+        // 判断是否为纯函数
+        for (auto iter = functions->begin(); iter != functions->end(); iter++)
+        {
+            Function *func = iter->second;
+            string funcname = func->getName();
+            auto bblist = func->getBasicBlocks();
+            if (funcname == "getint" || funcname == "getch" || funcname == "getfloat" || funcname == "getarray" || funcname == "getfarray" || funcname == "putint" || funcname == "putch" || funcname == "putfloat" || funcname == "putarray" || funcname == "putfarray" || funcname == "starttime" || funcname == "stoptime" || funcname == "putf")
+            {
+                IsPure[funcname] = false;
+                func->pure = false;
+                continue;
+            }
+            // std::cout << func->getName();
+            bool pure = true;
+            auto entry = func->getEntryBlock();
+            auto args = entry->getArguments();
+            for (auto iter = args.begin(); iter != args.end(); iter++)
+            {
+                auto arg = iter->get();
+                if (arg->getNumDims() > 0)
+                {
+                    pure = false;
+                    // std::cout << "有数组参数\n";
+                    break;
+                }
+            }
+            if (pure == false)
+            {
+                IsPure[func->getName()] = false;
+                func->pure = false;
+                continue;
+            }
+            for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+            {
+                auto bb = iter->get();
+                for (auto &iiter : bb->getInstructions())
+                {
+                    auto instr = iiter.get();
+                    if (isa<CallInst>(instr))
+                    {
+                        // std::cout << "有函数调用\n";
+                        pure = false;
+                        break;
+                    }
+                    else if (isa<LoadInst>(instr))
+                    {
+                        auto ldInst = dynamic_cast<LoadInst *>(instr);
+                        auto pointer = ldInst->getPointer();
+                        if (isa<GlobalValue>(pointer))
+                        {
+                            // std::cout << "有全局变量\n";
+                            pure = false;
+                            break;
+                        }
+                    }
+                    else if (isa<StoreInst>(instr))
+                    {
+                        auto stInst = dynamic_cast<StoreInst *>(instr);
+                        auto pointer = stInst->getPointer();
+                        if (isa<GlobalValue>(pointer))
+                        {
+                            pure = false;
+                            // std::cout << "store全局变量\n";
+                            break;
+                        }
+                    }
+                }
+                if (pure == false)
+                    break;
+            }
+            func->pure = pure;
+            IsPure[func->getName()] = pure;
+            // if (func->pure)
+            // {
+            //     std::cout << "pure\n";
+            // }
+            // else
+            //     std::cout << "not pure\n";
+        }
         // 计算Eval集合
         for (auto iter = functions->begin(); iter != functions->end(); iter++)
         {
@@ -2799,6 +2879,83 @@ namespace sysy
         OriginModule = pModule;
         pModule = ppModule;
         functions = OriginModule->getFunctions();
+        // 判断是否为纯函数
+        // for (auto iter = functions->begin(); iter != functions->end(); iter++)
+        // {
+        //     Function *func = iter->second;
+        //     string funcname = func->getName();
+        //     auto bblist = func->getBasicBlocks();
+        //     if (funcname == "getint" || funcname == "getch" || funcname == "getfloat" || funcname == "getarray" || funcname == "getfarray" || funcname == "putint" || funcname == "putch" || funcname == "putfloat" || funcname == "putarray" || funcname == "putfarray" || funcname == "starttime" || funcname == "stoptime" || funcname == "putf")
+        //     {
+        //         func->pure = false;
+        //         continue;
+        //     }
+        //     std::cout << func->getName();
+        //     bool pure = true;
+        //     auto entry = func->getEntryBlock();
+        //     auto args = entry->getArguments();
+        //     for (auto iter = args.begin(); iter != args.end(); iter++)
+        //     {
+        //         auto arg = iter->get();
+        //         if (arg->getNumDims() > 0)
+        //         {
+        //             pure = false;
+        //             std::cout << "有数组参数\n";
+        //             break;
+        //         }
+        //     }
+        //     if (pure == false)
+        //     {
+        //         func->pure = false;
+        //         continue;
+        //     }
+        //     for (auto iter = bblist.begin(); iter != bblist.end(); iter++)
+        //     {
+        //         auto bb = iter->get();
+        //         for (auto &iiter : bb->getInstructions())
+        //         {
+        //             auto instr = iiter.get();
+        //             if (isa<CallInst>(instr))
+        //             {
+        //                 std::cout << "有函数调用\n";
+        //                 pure = false;
+        //                 break;
+        //             }
+        //             else if (isa<LoadInst>(instr))
+        //             {
+        //                 auto ldInst = dynamic_cast<LoadInst *>(instr);
+        //                 auto pointer = ldInst->getPointer();
+        //                 if (isa<GlobalValue>(pointer))
+        //                 {
+        //                     std::cout << "有全局变量\n";
+        //                     pure = false;
+        //                     break;
+        //                 }
+        //             }
+        //             else if (isa<StoreInst>(instr))
+        //             {
+        //                 auto stInst = dynamic_cast<StoreInst *>(instr);
+        //                 auto pointer = stInst->getPointer();
+        //                 if (isa<GlobalValue>(pointer))
+        //                 {
+        //                     pure = false;
+        //                     std::cout << "store全局变量\n";
+        //                     break;
+        //                 }
+        //             }
+        //         }
+        //         if (pure == false)
+        //             break;
+        //     }
+        //     func->pure = pure;
+        //     if (func->pure)
+        //     {
+        //         std::cout << " pure\n";
+        //     }
+        //     else
+        //         std::cout << "not pure\n";
+        // }
+
         // 计算Eval集合
         for (auto iter = functions->begin(); iter != functions->end(); iter++)
         {
@@ -2840,6 +2997,7 @@ namespace sysy
         {
             Function *func = iter->second;
             Function *myFunc = pModule->createFunction(func->getName(), func->getType());
+            func->setAlter(myFunc);
             auto bblist = func->getBasicBlocks();
             if (bblist.empty())
                 continue;
@@ -2892,6 +3050,8 @@ namespace sysy
                         OrderbInsts[instrType][{lhs, rhs}] = instr;
                     }
                 }
+                // 创建可用call集合
+                map<pair<Function *, vector<Value *>>, CallInst *> UsefulCall;
                 for (auto iter = bb->begin(); iter != bb->end(); iter++)
                 {
                     auto instr = iter->get();
@@ -2994,6 +3154,7 @@ namespace sysy
                     else if (isa<CallInst>(instr))
                     {
                         auto callInst = dynamic_cast<CallInst *>(instr);
+                        auto callee = callInst->getCallee();
                         auto args = callInst->getArguments();
                         vector<Value *> my_args;
                         for (auto iter = args.begin(); iter != args.end(); iter++)
@@ -3003,8 +3164,26 @@ namespace sysy
                             else
                                 my_args.push_back(iter->getAlter());
                         }
-                        auto my_callInst = builder.createCallInst(callInst->getCallee(), my_args);
+                        // std::cout << callee->getName() << endl;
+                        // if (callee->pure)
+                        // {
+                        //     std::cout << "pure call\n";
+                        // }
+                        // else
+                        // {
+                        //     std::cout << "not pure\n";
+                        // }
+                        if (UsefulCall.find({callee, my_args}) != UsefulCall.end())
+                        {
+                            callInst->setAlter(UsefulCall[{callee, my_args}]);
+                            continue;
+                        }
+                        auto my_callInst = builder.createCallInst(dynamic_cast<Function *>(callee->getAlter()), my_args);
                         callInst->setAlter(my_callInst);
+                        if (IsPure[callee->getName()])
+                        {
+                            UsefulCall[{callee, my_args}] = my_callInst;
+                        }
                     }
                     else if (isa<ReturnInst>(instr))
                     {
@@ -3195,13 +3374,24 @@ namespace sysy
                 oldvin.insert(bb->vConstIn.begin(), bb->vConstIn.end());
                 oldout.insert(bb->ConstOut.begin(), bb->ConstOut.end());
                 oldvout.insert(bb->vConstOut.begin(), bb->vConstOut.end());
+
                 // 计算In
+                bool notfinddefined = true;
                 auto pres = bb->getPredecessors();
                 for (int i = 0; i < pres.size(); i++)
                 {
-                    if (i == 0)
-                        temp.insert(pres[0]->ConstOut.begin(), pres[0]->ConstOut.end());
-                    else
+                    if (notfinddefined)
+                    {
+                        if (pres[i]->defined == false)
+                            continue;
+                        else
+                        {
+                            temp.insert(pres[i]->ConstOut.begin(), pres[i]->ConstOut.end());
+                            notfinddefined = false;
+                        }
+                    }
+                    //     temp.insert(pres[0]->ConstOut.begin(), pres[0]->ConstOut.end());
+                    else if (pres[i]->defined)
                     {
                         set_intersection(temp.begin(), temp.end(), pres[i]->ConstOut.begin(), pres[i]->ConstOut.end(), inserter(t, t.begin()));
                         temp.clear();
@@ -3209,24 +3399,69 @@ namespace sysy
                         t.clear();
                     }
                 }
+                bb->ConstIn.clear();
                 bb->ConstIn.insert(temp.begin(), temp.end());
                 // 计算vIn
+                // std::cout << bb->getName() << "'s true press:\n";
+                notfinddefined = true;
                 for (int i = 0; i < pres.size(); i++)
                 {
-                    if (i == 0)
-                        vtemp.insert(pres[0]->vConstOut.begin(), pres[0]->vConstOut.end());
-                    else
+                    if (notfinddefined)
                     {
+                        if (pres[i]->defined == false)
+                            continue;
+                        else
+                        {
+                            // std::cout << pres[i]->getName() << "_aa" << endl;
+                            vtemp.insert(pres[i]->vConstOut.begin(), pres[i]->vConstOut.end());
+                            notfinddefined = false;
+                        }
+                    }
+                    // vtemp.insert(pres[0]->vConstOut.begin(), pres[0]->vConstOut.end());
+                    else if (pres[i]->defined)
+                    {
+                        // std::cout << pres[i]->getName() << endl;
+                        // std::cout << "before intersection:\n";
+                        // for (auto v : vtemp)
+                        // {
+                        // std::cout << "%" << v.first.first->getName() << "=" << v.second->getInt() << endl;
+                        // }
                         set_intersection(vtemp.begin(), vtemp.end(), pres[i]->vConstOut.begin(), pres[i]->vConstOut.end(), inserter(vt, vt.begin()));
                         vtemp.clear();
                         vtemp.insert(vt.begin(), vt.end());
+                        // std::cout << "after intersection:\n";
+                        // std::cout << vtemp.size() << endl;
+                        // for (auto v : vtemp)
+                        // {
+                        //     std::cout << "%" << v.first.first->getName() << "=" << v.second->getInt() << endl;
+                        // }
                         vt.clear();
                     }
                 }
+                bb->vConstIn.clear();
                 bb->vConstIn.insert(vtemp.begin(), vtemp.end());
+                // std::cout << bb->getName() << "'s vIn:\n";
+                // for (auto v : bb->vConstIn)
+                // {
+                //     std::cout << "%" << v.first.first->getName() << "=" << v.second->getInt() << endl;
+                // }
+                // std::cout << "In:\n";
+                // for (auto v : bb->ConstIn)
+                // {
+                //     std::cout << "%" << v.first->getName() << "=" << v.second->getInt() << endl;
+                // }
                 // 计算Out
                 Fs(bb);
-
+                // std::cout << bb->getName() << "'s vOut:\n";
+                // for (auto v : bb->vConstOut)
+                // {
+                //     std::cout << "%" << v.first.first->getName() << "=" << v.second->getInt() << endl;
+                // }
+                // std::cout << "Out:\n";
+                // for (auto v : bb->ConstOut)
+                // {
+                //     std::cout << "%" << v.first->getName() << "=" << v.second->getInt() << endl;
+                // }
                 if (oldin != bb->ConstIn || oldout != bb->ConstOut || oldvin != bb->vConstIn || oldvout != bb->vConstOut)
                     change = true;
             }
@@ -3381,6 +3616,7 @@ namespace sysy
                 curbb->vConstOut.insert({{value, iter2.first}, iter2.second});
             }
         }
+        curbb->defined = true;
     }
     void ConstSpread::RegenerateIR()
     {
@@ -3397,6 +3633,7 @@ namespace sysy
         {
             Function *func = iter->second;
             Function *myFunc = pModule->createFunction(func->getName(), func->getType());
+            func->setAlter(myFunc);
             auto bblist = func->getBasicBlocks();
             if (bblist.empty())
                 continue;
@@ -3605,7 +3842,7 @@ namespace sysy
                             }
                             my_args.push_back(iter->getAlter());
                         }
-                        auto my_callInst = builder.createCallInst(callInst->getCallee(), my_args);
+                        auto my_callInst = builder.createCallInst(dynamic_cast<Function *>(callInst->getCallee()->getAlter()), my_args);
                         instr->setAlter(my_callInst);
                     }
                     else if (isa<CondBrInst>(instr))
@@ -3616,7 +3853,139 @@ namespace sysy
                             cond = In[dynamic_cast<Instruction *>(cond)];
                         BasicBlock *my_then = dynamic_cast<BasicBlock *>(cbInst->getThenBlock()->getAlter());
                         BasicBlock *my_else = dynamic_cast<BasicBlock *>(cbInst->getElseBlock()->getAlter());
-                        builder.createCondBrInst(cond->getAlter(), my_then, my_else, {}, {});
+                        if (isa<ConstantValue>(cond))
+                        {
+                            if (cond->getType()->isInt())
+                            {
+                                int condval = dynamic_cast<ConstantValue *>(cond)->getInt();
+                                if (condval != 0)
+                                    builder.createUncondBrInst(my_then, {});
+                                else
+                                    builder.createUncondBrInst(my_else, {});
+                            }
+                            else if (cond->getType()->isFloat())
+                            {
+                                double condval = dynamic_cast<ConstantValue *>(cond)->getDouble();
+                                if (condval != 0)
+                                    builder.createUncondBrInst(my_then, {});
+                                else
+                                    builder.createUncondBrInst(my_else, {});
+                            }
+                        }
+                        else if (isa<BinaryInst>(cond))
+                        {
+                            auto bcond = dynamic_cast<BinaryInst *>(cond);
+                            auto lhs = bcond->getLhs()->getAlter();
+                            auto rhs = bcond->getRhs()->getAlter();
+                            auto kind = bcond->getKind();
+                            if (isa<ConstantValue>(lhs) && isa<ConstantValue>(rhs))
+                            {
+                                if (lhs->getType()->isInt() && rhs->getType()->isInt())
+                                {
+                                    int lval = dynamic_cast<ConstantValue *>(lhs)->getInt();
+                                    int rval = dynamic_cast<ConstantValue *>(rhs)->getInt();
+                                    if (kind == Instruction::kICmpEQ)
+                                    {
+                                        if (lval == rval)
+                                            builder.createUncondBrInst(my_then, {});
+                                        else
+                                            builder.createUncondBrInst(my_else, {});
+                                    }
+                                    else if (kind == Instruction::kICmpGE)
+                                    {
+                                        if (lval >= rval)
+                                            builder.createUncondBrInst(my_then, {});
+                                        else
+                                            builder.createUncondBrInst(my_else, {});
+                                    }
+                                    else if (kind == Instruction::kICmpGT)
+                                    {
+                                        if (lval > rval)
+                                            builder.createUncondBrInst(my_then, {});
+                                        else
+                                            builder.createUncondBrInst(my_else, {});
+                                    }
+                                    else if (kind == Instruction::kICmpLE)
+                                    {
+                                        if (lval <= rval)
+                                            builder.createUncondBrInst(my_then, {});
+                                        else
+                                            builder.createUncondBrInst(my_else, {});
+                                    }
+                                    else if (kind == Instruction::kICmpLT)
+                                    {
+                                        if (lval < rval)
+                                            builder.createUncondBrInst(my_then, {});
+                                        else
+                                            builder.createUncondBrInst(my_else, {});
+                                    }
+                                    else if (kind == Instruction::kICmpNE)
+                                    {
+                                        if (lval != rval)
+                                            builder.createUncondBrInst(my_then, {});
+                                        else
+                                            builder.createUncondBrInst(my_else, {});
+                                    }
+                                    else
+                                        builder.createCondBrInst(cond->getAlter(), my_then, my_else, {}, {});
+                                }
+                                else if (lhs->getType()->isFloat() && rhs->getType()->isFloat())
+                                {
+                                    double lval = dynamic_cast<ConstantValue *>(lhs)->getDouble();
+                                    double rval = dynamic_cast<ConstantValue *>(rhs)->getDouble();
+                                    if (kind == Instruction::kFCmpEQ)
+                                    {
+                                        if (lval == rval)
+                                            builder.createUncondBrInst(my_then, {});
+                                        else
+                                            builder.createUncondBrInst(my_else, {});
+                                    }
+                                    else if (kind == Instruction::kFCmpGE)
+                                    {
+                                        if (lval >= rval)
+                                            builder.createUncondBrInst(my_then, {});
+                                        else
+                                            builder.createUncondBrInst(my_else, {});
+                                    }
+                                    else if (kind == Instruction::kFCmpGT)
+                                    {
+                                        if (lval > rval)
+                                            builder.createUncondBrInst(my_then, {});
+                                        else
+                                            builder.createUncondBrInst(my_else, {});
+                                    }
+                                    else if (kind == Instruction::kFCmpLE)
+                                    {
+                                        if (lval <= rval)
+                                            builder.createUncondBrInst(my_then, {});
+                                        else
+                                            builder.createUncondBrInst(my_else, {});
+                                    }
+                                    else if (kind == Instruction::kFCmpLT)
+                                    {
+                                        if (lval < rval)
+                                            builder.createUncondBrInst(my_then, {});
+                                        else
+                                            builder.createUncondBrInst(my_else, {});
+                                    }
+                                    else if (kind == Instruction::kFCmpNE)
+                                    {
+                                        if (lval != rval)
+                                            builder.createUncondBrInst(my_then, {});
+                                        else
+                                            builder.createUncondBrInst(my_else, {});
+                                    }
+                                    else
+                                        builder.createCondBrInst(cond->getAlter(), my_then, my_else, {}, {});
+                                }
+                                else
+                                    builder.createCondBrInst(cond->getAlter(), my_then, my_else, {}, {});
+                            }
+                            else
+                                builder.createCondBrInst(cond->getAlter(), my_then, my_else, {}, {});
+                        }
+                        else
+                            builder.createCondBrInst(cond->getAlter(), my_then, my_else, {}, {});
                     }
                     else if (isa<UncondBrInst>(instr))
                     {
@@ -3666,6 +4035,7 @@ namespace sysy
         {
             Function *func = iter->second;
             Function *myFunc = pModule->createFunction(func->getName(), func->getType());
+            func->setAlter(myFunc);
             auto bblist = func->getBasicBlocks();
             if (bblist.empty())
                 continue;
@@ -3813,6 +4183,30 @@ namespace sysy
                                 instr->setAlter(my_bInst);
                             }
                         }
+                        // (X * C1) / C2 => X * (C1 / C2)
+                        else if (kind == Value::kDiv && isa<BinaryInst>(my_lhs) && isa<ConstantValue>(my_rhs))
+                        {
+                            BinaryInst *bLhs = dynamic_cast<BinaryInst *>(my_lhs);
+                            auto my_kind = bLhs->getKind();
+                            auto llhs = bLhs->getLhs();
+                            auto rlhs = bLhs->getRhs();
+                            if (my_kind == Value::kMul && isa<Instruction>(llhs) && isa<ConstantValue>(rlhs))
+                            {
+                                int my_const = dynamic_cast<ConstantValue *>(rlhs)->getInt() / dynamic_cast<ConstantValue *>(my_rhs)->getInt();
+                                if (my_const == 1)
+                                    instr->setAlter(llhs);
+                                else
+                                {
+                                    auto my_bInst = builder.createMulInst(llhs, ConstantValue::get(my_const));
+                                    instr->setAlter(my_bInst);
+                                }
+                            }
+                            else
+                            {
+                                auto my_bInst = builder.createDivInst(my_lhs, my_rhs);
+                                instr->setAlter(my_bInst);
+                            }
+                        }
                         else
                         {
                             auto my_bInst = builder.createBinaryInst(kind, bInst->getType(), lhs->getAlter(), rhs->getAlter());
@@ -3838,7 +4232,7 @@ namespace sysy
                         {
                             my_args.push_back(iter->getAlter());
                         }
-                        auto my_callInst = builder.createCallInst(callInst->getCallee(), my_args);
+                        auto my_callInst = builder.createCallInst(dynamic_cast<Function *>(callInst->getCallee()->getAlter()), my_args);
                         instr->setAlter(my_callInst);
                     }
                     else if (isa<CondBrInst>(instr))
@@ -3883,8 +4277,16 @@ namespace sysy
             Function *func = iter->second;
             string funcname = iter->first;
             if (funcname == "getint" || funcname == "getch" || funcname == "getfloat" || funcname == "getarray" || funcname == "getfarray" || funcname == "putint" || funcname == "putch" || funcname == "putfloat" || funcname == "putarray" || funcname == "putfarray" || funcname == "starttime" || funcname == "stoptime" || funcname == "putf")
+            {
+                IsInline[funcname] = false;
                 continue;
+            }
             AnalyzeFunc(func);
+            // std::cout << func->getName() << endl;
+            // if (func->Inline)
+            //     std::cout << "inline\n";
+            // else
+            //     std::cout << "not inline\n";
         }
         RegenerateIR();
         return pModule;
@@ -3922,9 +4324,15 @@ namespace sysy
             }
         }
         if (noCall && ret_cnt <= 1 && (instr_cnt < 50 || bb_cnt == 1))
+        {
+            IsInline[curFunc->getName()] = true;
             curFunc->Inline = true;
+        }
         else
+        {
+            IsInline[curFunc->getName()] = false;
             curFunc->Inline = false;
+        }
     }
     void Inline::RegenerateIR()
     {
@@ -3944,6 +4352,7 @@ namespace sysy
         {
             Function *func = iter->second;
             Function *myFunc = pModule->createFunction(func->getName(), func->getType());
+            func->setAlter(myFunc);
             auto bblist = func->getBasicBlocks();
             if (bblist.empty())
                 continue;
@@ -4021,15 +4430,15 @@ namespace sysy
                     {
                         auto callInst = dynamic_cast<CallInst *>(instr);
                         auto args = callInst->getArguments();
-                        auto callee = callInst->getCallee();
-                        if (callee->Inline == false)
+                        auto callee = dynamic_cast<Function *>(callInst->getCallee()->getAlter());
+                        if (IsInline[callee->getName()] == false)
                         {
                             vector<Value *> my_args;
                             for (auto iter = args.begin(); iter != args.end(); iter++)
                             {
                                 my_args.push_back(iter->getAlter());
                             }
-                            auto my_callInst = builder.createCallInst(callInst->getCallee(), my_args);
+                            auto my_callInst = builder.createCallInst(callee, my_args);
                             callInst->setAlter(my_callInst);
                             continue;
                         }
@@ -4524,8 +4933,8 @@ namespace sysy
             {
                 if (IsUnrollable(loop))
                 {
-                    std::cout << "unroll " << loop.getHeader()->getName() << endl;
-                    std::cout << loop.getLoopBasicBlocks().size() << endl;
+                    // std::cout << "unroll " << loop.getHeader()->getName() << endl;
+                    // std::cout << loop.getLoopBasicBlocks().size() << endl;
                     Unroll(loop);
                 }
             }
@@ -4543,15 +4952,44 @@ namespace sysy
         CondBrInst *condbrInst = dynamic_cast<CondBrInst *>(iter->get());
         auto cond = condbrInst->getCondition();
         auto kind = cond->getKind();
-        if (kind != Instruction::kICmpLT)
+        if (kind != Instruction::kICmpLT && kind != Instruction::kICmpLE)
             return false;
         auto ltInst = dynamic_cast<BinaryInst *>(cond);
         auto lhs = ltInst->getLhs();
         auto rhs = ltInst->getRhs();
-        if (isa<Instruction>(lhs) && isa<ConstantValue>(rhs))
+        if (isa<LoadInst>(lhs) && isa<ConstantValue>(rhs))
         {
             // int iter_cnt = dynamic_cast<ConstantValue *>(rhs)->getInt();
-            return true;
+            auto pointer = dynamic_cast<LoadInst *>(lhs)->getPointer();
+            // 找到迭代变量的初始值
+            if (preheader->getNumInstructions() < 2)
+                return false;
+            iter = preheader->end();
+            iter--;
+            iter--;
+            if (isa<StoreInst>(iter->get()))
+            {
+                auto stInst = dynamic_cast<StoreInst *>(iter->get());
+                auto value = stInst->getValue();
+                if (pointer == stInst->getPointer())
+                {
+                    if (isa<ConstantValue>(value))
+                    {
+                        int start = dynamic_cast<ConstantValue *>(value)->getInt();
+                        int end = dynamic_cast<ConstantValue *>(rhs)->getInt();
+                        if (end > 100000)
+                            return false;
+                        if (kind == Instruction::kICmpLT)
+                            iter_cnt = end - start;
+                        else if (kind == Instruction::kICmpLE)
+                            iter_cnt = end - start + 1;
+                        return true;
+                    }
+                    return false;
+                }
+                return false;
+            }
+            return false;
         }
         return false;
     }
@@ -4562,6 +5000,7 @@ namespace sysy
     {
         BasicBlock *header = curLoop.getHeader();
         BasicBlock *preheader = curLoop.getPreHeader();
+        auto pointer = dynamic_cast<LoadInst *>(header->begin()->get())->getPointer();
         BasicBlock *body, *exitblock;
         for (auto s : header->getSuccessors())
         {
@@ -4570,6 +5009,10 @@ namespace sysy
             else if (s->getName()[0] == 'b')
                 body = s;
         }
+        if (pass == 1 && body->getNumInstructions() > 1000)
+            return;
+        // else if (pass == 2 && body->getNumInstructions() < 1000)
+        //     return;
         auto iter = header->getInstructions().rbegin();
         CondBrInst *condbrInst = dynamic_cast<CondBrInst *>(iter->get());
         auto cond = condbrInst->getCondition();
@@ -4577,10 +5020,11 @@ namespace sysy
         auto ltInst = dynamic_cast<BinaryInst *>(cond);
         auto lhs = ltInst->getLhs();
         auto rhs = ltInst->getRhs();
-        int iter_cnt = dynamic_cast<ConstantValue *>(rhs)->getInt();
+        int end = dynamic_cast<ConstantValue *>(rhs)->getInt();
         // delete "br ^header" in preheader
         iter = preheader->getInstructions().rbegin();
         preheader->getInstructions().erase(--iter.base());
+        iter--;
         // 将body中的指令插入preheader后,iter_cnt遍
         builder.setPosition(preheader, preheader->end());
         while (iter_cnt--)
@@ -4633,8 +5077,15 @@ namespace sysy
                     vector<Value *> my_args;
                     for (auto arg : args)
                         my_args.push_back(arg->getAlter());
-                    auto my_callInst = builder.createCallInst(callInst->getCallee(), my_args);
+                    auto my_callInst = builder.createCallInst(my_callee, my_args);
                     instr->setAlter(my_callInst);
+                }
+                else if (isa<AllocaInst>(instr))
+                {
+                    auto allocaInst = dynamic_cast<AllocaInst *>(instr);
+                    auto my_dims = vector<Value *>(allocaInst->getDims().begin(), allocaInst->getDims().end());
+                    auto my_allocaInst = builder.createAllocaInst(allocaInst->getType(), my_dims, allocaInst->getName(), allocaInst->Const());
+                    allocaInst->setAlter(my_allocaInst);
                 }
             }
         }

@@ -473,6 +473,7 @@ namespace sysy
         std::set<pair<pair<Value *, vector<Value *>>, ConstantValue *>> vConstIn;
         std::set<pair<Instruction *, ConstantValue *>> ConstOut;
         std::set<pair<pair<Value *, vector<Value *>>, ConstantValue *>> vConstOut;
+        bool defined = false;
         int depth = 0; // 基本块的深度
 
     protected:
@@ -1090,6 +1091,7 @@ namespace sysy
         using block_list = std::list<std::unique_ptr<BasicBlock>>;
         bool Inline = false;
         std::vector<Loop> Loops;
+        bool pure = false;
 
     protected:
         Module *parent;
