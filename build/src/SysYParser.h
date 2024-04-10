@@ -144,6 +144,7 @@ public:
     virtual size_t getRuleIndex() const override;
     ExpContext *exp();
     antlr4::tree::TerminalNode *LBRACE();
+    antlr4::tree::TerminalNode *RBRACE();
     std::vector<InitValueContext *> initValue();
     InitValueContext* initValue(size_t i);
     std::vector<antlr4::tree::TerminalNode *> COMMA();

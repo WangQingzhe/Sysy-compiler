@@ -1,4 +1,4 @@
-# Install script for directory: /home/lyq/Desktop/Sysy/sysY_backend/sysy/antlr/antlr4-runtime
+# Install script for directory: /home/lyq/Desktop/Sysy/sysY_Compiler/sysy/antlr/antlr4-runtime
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -44,14 +44,14 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("/home/lyq/Desktop/Sysy/sysY_backend/sysy/build/antlr/antlr4-runtime/runtime/cmake_install.cmake")
+  include("/home/lyq/Desktop/Sysy/sysY_Compiler/sysy/build/antlr/antlr4-runtime/runtime/cmake_install.cmake")
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cmake/antlr4-runtime/antlr4-targets.cmake")
     file(DIFFERENT _cmake_export_file_changed FILES
          "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cmake/antlr4-runtime/antlr4-targets.cmake"
-         "/home/lyq/Desktop/Sysy/sysY_backend/sysy/build/antlr/antlr4-runtime/CMakeFiles/Export/b687d5edce7d360f0dcc0a9573266ef6/antlr4-targets.cmake")
+         "/home/lyq/Desktop/Sysy/sysY_Compiler/sysy/build/antlr/antlr4-runtime/CMakeFiles/Export/b687d5edce7d360f0dcc0a9573266ef6/antlr4-targets.cmake")
     if(_cmake_export_file_changed)
       file(GLOB _cmake_old_config_files "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/cmake/antlr4-runtime/antlr4-targets-*.cmake")
       if(_cmake_old_config_files)
@@ -64,30 +64,30 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT
     endif()
     unset(_cmake_export_file_changed)
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cmake/antlr4-runtime" TYPE FILE FILES "/home/lyq/Desktop/Sysy/sysY_backend/sysy/build/antlr/antlr4-runtime/CMakeFiles/Export/b687d5edce7d360f0dcc0a9573266ef6/antlr4-targets.cmake")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cmake/antlr4-runtime" TYPE FILE FILES "/home/lyq/Desktop/Sysy/sysY_Compiler/sysy/build/antlr/antlr4-runtime/CMakeFiles/Export/b687d5edce7d360f0dcc0a9573266ef6/antlr4-targets.cmake")
   if(CMAKE_INSTALL_CONFIG_NAME MATCHES "^([Rr][Ee][Ll][Ee][Aa][Ss][Ee])$")
-    file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cmake/antlr4-runtime" TYPE FILE FILES "/home/lyq/Desktop/Sysy/sysY_backend/sysy/build/antlr/antlr4-runtime/CMakeFiles/Export/b687d5edce7d360f0dcc0a9573266ef6/antlr4-targets-release.cmake")
+    file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cmake/antlr4-runtime" TYPE FILE FILES "/home/lyq/Desktop/Sysy/sysY_Compiler/sysy/build/antlr/antlr4-runtime/CMakeFiles/Export/b687d5edce7d360f0dcc0a9573266ef6/antlr4-targets-release.cmake")
   endif()
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cmake/antlr4-runtime" TYPE FILE FILES
-    "/home/lyq/Desktop/Sysy/sysY_backend/sysy/build/antlr/antlr4-runtime/antlr4-runtime-config.cmake"
-    "/home/lyq/Desktop/Sysy/sysY_backend/sysy/build/antlr/antlr4-runtime/antlr4-runtime-config-version.cmake"
+    "/home/lyq/Desktop/Sysy/sysY_Compiler/sysy/build/antlr/antlr4-runtime/antlr4-runtime-config.cmake"
+    "/home/lyq/Desktop/Sysy/sysY_Compiler/sysy/build/antlr/antlr4-runtime/antlr4-runtime-config-version.cmake"
     )
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cmake/antlr4-generator" TYPE FILE FILES
-    "/home/lyq/Desktop/Sysy/sysY_backend/sysy/build/antlr/antlr4-runtime/antlr4-generator-config.cmake"
-    "/home/lyq/Desktop/Sysy/sysY_backend/sysy/build/antlr/antlr4-runtime/antlr4-generator-config-version.cmake"
+    "/home/lyq/Desktop/Sysy/sysY_Compiler/sysy/build/antlr/antlr4-runtime/antlr4-generator-config.cmake"
+    "/home/lyq/Desktop/Sysy/sysY_Compiler/sysy/build/antlr/antlr4-runtime/antlr4-generator-config-version.cmake"
     )
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/doc/libantlr4" TYPE FILE FILES
-    "/home/lyq/Desktop/Sysy/sysY_backend/sysy/antlr/antlr4-runtime/README.md"
-    "/home/lyq/Desktop/Sysy/sysY_backend/sysy/antlr/antlr4-runtime/VERSION"
+    "/home/lyq/Desktop/Sysy/sysY_Compiler/sysy/antlr/antlr4-runtime/README.md"
+    "/home/lyq/Desktop/Sysy/sysY_Compiler/sysy/antlr/antlr4-runtime/VERSION"
     )
 endif()
 
