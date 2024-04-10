@@ -238,4 +238,126 @@ namespace sysy
     }
   }; // class SysYIRGenerator
 
+    
+  class DAG
+  {
+    private:
+      Module *module;
+      std::vector<DAG_Function *> functions;
+    public:
+      DAG(Module *module) : module(module){}
+    public:
+      Module* DAG_refine();
+  };
+
+
+  class DAG_Function
+  {
+    private:
+      Function* function;
+      std::vector<DAG_BB *> basicblocks;
+    public:
+      DAG_Function(Function* function) : function(function){}
+    public:
+      void DAG_Function_refine();
+  };
+
+  class DAG_BB
+  {
+    private:
+      BasicBlock *basicblock;
+      //map from value to node
+      std::map<Value *, DAG_node *> value2node;
+      // //map from ID to node
+      // std::map<string, DAG_node *> ID2NODE;
+      // //map from int to node
+      // std::map<int, DAG_node *> INT2NODE;
+      // //map from float to node
+      // std::map<float, DAG_node *> FLOAT2NODE;
+      //all nodes
+      std::vector<DAG_node *> nodelist;
+    public:
+      DAG_BB(BasicBlock *bb) : basicblock(bb){}
+      void DAG_BB_refine();
+  };
+
+
+  class DAG_node : public Value
+  {
+    public:
+      enum OP : uint64_t
+      {
+        knoop,
+        // Instructions
+        // Binary
+        kAdd = 0x1UL << 0,
+        kSub = 0x1UL << 1,
+        kMul = 0x1UL << 2,
+        kDiv = 0x1UL << 3,
+        kRem = 0x1UL << 4,
+        kICmpEQ = 0x1UL << 5,
+        kICmpNE = 0x1UL << 6,
+        kICmpLT = 0x1UL << 7,
+        kICmpGT = 0x1UL << 8,
+        kICmpLE = 0x1UL << 9,
+        kICmpGE = 0x1UL << 10,
+        kFAdd = 0x1UL << 14,
+        kFSub = 0x1UL << 15,
+        kFMul = 0x1UL << 16,
+        kFDiv = 0x1UL << 17,
+        kFRem = 0x1UL << 18,
+        kFCmpEQ = 0x1UL << 19,
+        kFCmpNE = 0x1UL << 20,
+        kFCmpLT = 0x1UL << 21,
+        kFCmpGT = 0x1UL << 22,
+        kFCmpLE = 0x1UL << 23,
+        kFCmpGE = 0x1UL << 24,
+        // Unary
+        kNeg = 0x1UL << 25,
+        kNot = 0x1UL << 26,
+        kFNeg = 0x1UL << 27,
+        kFtoI = 0x1UL << 28,
+        kItoF = 0x1UL << 29,
+        // call
+        kCall = 0x1UL << 30,
+        // terminator
+        kCondBr = 0x1UL << 31,
+        kBr = 0x1UL << 32,
+        kReturn = 0x1UL << 33,
+        // mem op
+        kAlloca = 0x1UL << 34,
+        kLoad = 0x1UL << 35,
+        kStore = 0x1UL << 36,
+        kFirstInst = kAdd,
+        kLastInst = kStore,
+      };
+    private:
+      //node identifiers
+      int node_id;
+
+      //if is mid-node, maybe has operator
+      bool mid;
+      OP op;
+      
+      //if is leaf-node, maybe has constant number
+      bool leaf;
+      int intconst;
+      float floatconst;
+
+      //some identifiers that associated to this node 
+      std::vector<string> ids;
+      
+      //relationship with other nodes
+      std::vector<DAG_node *>sons;
+      std::vector<DAG_node *>fathers;
+
+
+
+
+    public:
+      DAG_node(bool isleaf, OP op) 
+          : leaf(isleaf), mid(!isleaf), op(op) {}
+
+    
+  };
 } // namespace sysy

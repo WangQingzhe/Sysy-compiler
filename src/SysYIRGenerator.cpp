@@ -1112,4 +1112,153 @@ namespace sysy
   {
     return ctx->exp()->accept(this);
   }
+
+
+  
+  void DAG::DAG_refine()
+  {
+    auto functions = module->getFunctions();
+    for(auto fiter = functions->begin(); fiter != functions->end(); ++fiter){
+      string func_name = fiter->first;
+      Function *func = fiter->second;
+      DAG_Function dag_function(func);
+      dag_function.DAG_Function_refine();
+    }
+  }
+
+  Module* DAG_Function::DAG_Function_refine()
+  {
+    auto basicblocks = function->getBasicBlocks();
+    for(auto biter = basicblocks.begin(); biter != basicblocks.end(); ++biter){
+      BasicBlock* bblock = biter->get();
+      DAG_BB dag_bb(bblock);
+      dag_bb.DAG_BB_refine();
+    }
+    Module* dagIR;
+    return dagIR;
+  }
+
+  void DAG_BB::DAG_BB_refine()
+  {
+    for(auto &instr : basicblock->getInstructions()){
+      auto inst = instr.get();
+      auto instType = instr->getKind();
+      switch(instType)
+      {
+        // binary float inst
+        case Instruction::kFAdd:
+        case Instruction::kFSub:
+        case Instruction::kFMul:
+        case Instruction::kFDiv:
+        case Instruction::kFRem:
+        case Instruction::kFCmpEQ:
+        case Instruction::kFCmpNE:
+        case Instruction::kFCmpLT:
+        case Instruction::kFCmpGT:
+        case Instruction::kFCmpLE:
+        case Instruction::kFCmpGE:
+
+        // binary int inst
+        case Instruction::kICmpEQ:
+        case Instruction::kICmpGE:
+        case Instruction::kICmpGT:
+        case Instruction::kICmpLE:
+        case Instruction::kICmpLT:
+        case Instruction::kICmpNE:
+        {
+          break;
+        }
+        case Instruction::kAdd:
+        case Instruction::kMul:
+        case Instruction::kSub:
+        case Instruction::kDiv:
+        case Instruction::kRem:
+        {
+          BinaryInst *bInst = dynamic_cast<BinaryInst *>(inst);
+          Value* lhs = bInst->getLhs();
+          Value* rhs = bInst->getRhs();
+          // Stage 1# prepare the operand nodes
+          auto liter = value2node.find(lhs);
+          auto riter = value2node.find(rhs);
+          bool lnode_new;
+          bool rnode_new;
+          DAG_node *lhs_node;
+          DAG_node *rhs_node;
+          //neither lhs or rhs have defined nodes
+          if(liter == value2node.end() && riter == value2node.end()){
+            lhs_node = new DAG_node(true, (DAG_node::OP)instType);
+            assert(lhs_node);
+            rhs_node = new DAG_node(true, (DAG_node::OP)instType);
+            assert(rhs_node);
+            lnode_new = true;
+            rnode_new = true;
+          }
+          //lhs have defined nodes but rhs not
+          if(liter != value2node.end() && riter == value2node.end()){
+            lhs_node = liter->second;
+            rhs_node = new DAG_node(true, (DAG_node::OP)instType);
+            assert(rhs_node);
+            lnode_new = false;
+            rnode_new = true;
+          }
+          //rhs have defined nodes but lhs not
+          if(liter == value2node.end() && riter != value2node.end()){
+            lhs_node = new DAG_node(true, (DAG_node::OP)instType);
+            rhs_node = liter->second;
+            assert(rhs_node);
+            lnode_new = true;
+            rnode_new = false;
+          }
+          //both lhs and rhs have defined nodes
+          if(liter != value2node.end() && riter != value2node.end()){
+            lhs_node = liter->second;
+            rhs_node = riter->second;
+            lnode_new = false;
+            rnode_new = false;
+          }
+
+          // Stage 2# 
+          if() 
+
+          break;
+        }
+        case Instruction::kLoad:
+        {
+          break;
+        }
+        case Instruction::kStore:
+        {
+          break;
+        }
+        case Instruction::kReturn:
+        {
+          break;
+        }
+        case Instruction::kCall:
+        {
+          break;
+        }
+        case Instruction::kBr:
+        {
+          break;
+        }
+        case Instruction::kCondBr:
+        {
+          break;
+        }
+        case Instruction::kFNeg:
+        case Instruction::kFtoI:
+        case Instruction::kNeg:
+        case Instruction::kNot:
+        case Instruction::kItoF:
+        {
+          break;
+        }
+        default:
+        {
+          break;
+        }
+      }
+    }
+  }
 } // namespace sysy
